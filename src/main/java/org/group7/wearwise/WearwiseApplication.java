@@ -86,8 +86,7 @@ public class WearwiseApplication {
         Season season = inputSeason(scanner);
         Style style = inputStyle(scanner);
 
-        System.out.print("Favorite? true/false: ");
-        Boolean favorite = Boolean.parseBoolean(scanner.nextLine());
+        Boolean favorite = inputBoolean(scanner, "Favorite? true/false: ");
 
         ClothingItem createdItem = service.createItem(
                 name,
@@ -120,8 +119,7 @@ public class WearwiseApplication {
         System.out.println();
         System.out.println("----- Find Clothing Item By ID -----");
 
-        System.out.print("Enter ID: ");
-        Long id = Long.parseLong(scanner.nextLine());
+        Long id = inputLong(scanner, "Enter ID: ");
 
         ClothingItem item = service.getItemById(id);
         printItem(item);
@@ -131,8 +129,7 @@ public class WearwiseApplication {
         System.out.println();
         System.out.println("----- Update Clothing Item -----");
 
-        System.out.print("Enter ID to update: ");
-        Long id = Long.parseLong(scanner.nextLine());
+        Long id = inputLong(scanner, "Enter ID to update: ");
 
         ClothingItem oldItem = service.getItemById(id);
 
@@ -149,8 +146,7 @@ public class WearwiseApplication {
         Season season = inputSeason(scanner);
         Style style = inputStyle(scanner);
 
-        System.out.print("Favorite? true/false: ");
-        Boolean favorite = Boolean.parseBoolean(scanner.nextLine());
+        Boolean favorite = inputBoolean(scanner, "Favorite? true/false: ");
 
         ClothingItem updatedItem = service.updateItem(
                 id,
@@ -170,8 +166,7 @@ public class WearwiseApplication {
         System.out.println();
         System.out.println("----- Delete Clothing Item -----");
 
-        System.out.print("Enter ID to delete: ");
-        Long id = Long.parseLong(scanner.nextLine());
+        Long id = inputLong(scanner, "Enter ID to delete: ");
 
         service.deleteItem(id);
 
@@ -226,60 +221,111 @@ public class WearwiseApplication {
     }
 
     private ClothingCategory inputCategory(Scanner scanner) {
-        System.out.println("Choose category:");
-        System.out.println("1. SHIRT");
-        System.out.println("2. PANTS");
-        System.out.println("3. SHOES");
-        System.out.println("4. JACKET");
-        System.out.println("5. ACCESSORY");
-        System.out.print("Category option: ");
+        while (true) {
+            System.out.println("Choose category:");
+            System.out.println("1. SHIRT");
+            System.out.println("2. PANTS");
+            System.out.println("3. SHOES");
+            System.out.println("4. JACKET");
+            System.out.println("5. ACCESSORY");
+            System.out.print("Category option: ");
 
-        String option = scanner.nextLine();
+            String option = scanner.nextLine();
 
-        return switch (option) {
-            case "1" -> ClothingCategory.SHIRT;
-            case "2" -> ClothingCategory.PANTS;
-            case "3" -> ClothingCategory.SHOES;
-            case "4" -> ClothingCategory.JACKET;
-            case "5" -> ClothingCategory.ACCESSORY;
-            default -> throw new RuntimeException("Invalid category option.");
-        };
+            switch (option) {
+                case "1":
+                    return ClothingCategory.SHIRT;
+                case "2":
+                    return ClothingCategory.PANTS;
+                case "3":
+                    return ClothingCategory.SHOES;
+                case "4":
+                    return ClothingCategory.JACKET;
+                case "5":
+                    return ClothingCategory.ACCESSORY;
+                default:
+                    System.out.println("Invalid category option. Please choose from 1 to 5.");
+            }
+        }
     }
 
     private Season inputSeason(Scanner scanner) {
-        System.out.println("Choose season:");
-        System.out.println("1. SUMMER");
-        System.out.println("2. WINTER");
-        System.out.println("3. ALL_SEASON");
-        System.out.print("Season option: ");
+        while (true) {
+            System.out.println("Choose season:");
+            System.out.println("1. SUMMER");
+            System.out.println("2. WINTER");
+            System.out.println("3. ALL_SEASON");
+            System.out.print("Season option: ");
 
-        String option = scanner.nextLine();
+            String option = scanner.nextLine();
 
-        return switch (option) {
-            case "1" -> Season.SUMMER;
-            case "2" -> Season.WINTER;
-            case "3" -> Season.ALL_SEASON;
-            default -> throw new RuntimeException("Invalid season option.");
-        };
+            switch (option) {
+                case "1":
+                    return Season.SUMMER;
+                case "2":
+                    return Season.WINTER;
+                case "3":
+                    return Season.ALL_SEASON;
+                default:
+                    System.out.println("Invalid season option. Please choose from 1 to 3.");
+            }
+        }
     }
 
     private Style inputStyle(Scanner scanner) {
-        System.out.println("Choose style:");
-        System.out.println("1. CASUAL");
-        System.out.println("2. FORMAL");
-        System.out.println("3. STREETWEAR");
-        System.out.println("4. SPORT");
-        System.out.print("Style option: ");
+        while (true) {
+            System.out.println("Choose style:");
+            System.out.println("1. CASUAL");
+            System.out.println("2. FORMAL");
+            System.out.println("3. STREETWEAR");
+            System.out.println("4. SPORT");
+            System.out.print("Style option: ");
 
-        String option = scanner.nextLine();
+            String option = scanner.nextLine();
 
-        return switch (option) {
-            case "1" -> Style.CASUAL;
-            case "2" -> Style.FORMAL;
-            case "3" -> Style.STREETWEAR;
-            case "4" -> Style.SPORT;
-            default -> throw new RuntimeException("Invalid style option.");
-        };
+            switch (option) {
+                case "1":
+                    return Style.CASUAL;
+                case "2":
+                    return Style.FORMAL;
+                case "3":
+                    return Style.STREETWEAR;
+                case "4":
+                    return Style.SPORT;
+                default:
+                    System.out.println("Invalid style option. Please choose from 1 to 4.");
+            }
+        }
+    }
+
+    private Long inputLong(Scanner scanner, String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String input = scanner.nextLine();
+
+            try {
+                return Long.parseLong(input);
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid number. Please enter a valid ID.");
+            }
+        }
+    }
+
+    private Boolean inputBoolean(Scanner scanner, String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String input = scanner.nextLine().trim();
+
+            if ("true".equalsIgnoreCase(input)) {
+                return true;
+            }
+
+            if ("false".equalsIgnoreCase(input)) {
+                return false;
+            }
+
+            System.out.println("Invalid value. Please enter true or false.");
+        }
     }
 
     private void printItem(ClothingItem item) {
