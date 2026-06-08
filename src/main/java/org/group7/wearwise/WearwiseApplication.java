@@ -8,19 +8,24 @@ import org.group7.wearwise.service.ClothingItemService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Scanner;
 
 @SpringBootApplication
 public class WearwiseApplication {
+
+    private static final int MAX_TEXT_LENGTH = 255;
 
     public static void main(String[] args) {
         SpringApplication.run(WearwiseApplication.class, args);
     }
 
     @Bean
+    @ConditionalOnProperty(name = "wearwise.console.enabled", havingValue = "true", matchIfMissing = true)
     public CommandLineRunner run(ClothingItemService clothingItemService) {
         return args -> {
             Scanner scanner = new Scanner(System.in);
@@ -29,10 +34,9 @@ public class WearwiseApplication {
             while (running) {
                 printMenu();
 
-                System.out.print("Choose an option: ");
-                String choice = scanner.nextLine();
-
                 try {
+                    String choice = readMenuChoice(scanner);
+
                     switch (choice) {
                         case "1" -> createItem(scanner, clothingItemService);
                         case "2" -> showAllItems(clothingItemService);
@@ -48,6 +52,9 @@ public class WearwiseApplication {
                         }
                         default -> System.out.println("Invalid option. Please try again.");
                     }
+                } catch (ConsoleInputEndedException e) {
+                    running = false;
+                    System.out.println("Console input ended. Exiting WearWise Console App...");
                 } catch (Exception e) {
                     System.out.println("Error: " + e.getMessage());
                 }
@@ -76,17 +83,15 @@ public class WearwiseApplication {
         System.out.println();
         System.out.println("----- Create Clothing Item -----");
 
-        System.out.print("Name: ");
-        String name = scanner.nextLine();
+        String name = readRequiredText(scanner, "Name");
 
-        System.out.print("Color: ");
-        String color = scanner.nextLine();
+        String color = readRequiredText(scanner, "Color");
 
         ClothingCategory category = inputCategory(scanner);
         Season season = inputSeason(scanner);
         Style style = inputStyle(scanner);
 
-        Boolean favorite = inputBoolean(scanner, "Favorite? true/false: ");
+        Boolean favorite = readBoolean(scanner, "Favorite? true/false: ");
 
         ClothingItem createdItem = service.createItem(
                 name,
@@ -119,7 +124,7 @@ public class WearwiseApplication {
         System.out.println();
         System.out.println("----- Find Clothing Item By ID -----");
 
-        Long id = inputLong(scanner, "Enter ID: ");
+        Long id = readPositiveLong(scanner, "Enter ID: ");
 
         ClothingItem item = service.getItemById(id);
         printItem(item);
@@ -129,24 +134,22 @@ public class WearwiseApplication {
         System.out.println();
         System.out.println("----- Update Clothing Item -----");
 
-        Long id = inputLong(scanner, "Enter ID to update: ");
+        Long id = readPositiveLong(scanner, "Enter ID to update: ");
 
         ClothingItem oldItem = service.getItemById(id);
 
         System.out.println("Current item:");
         printItem(oldItem);
 
-        System.out.print("New name: ");
-        String name = scanner.nextLine();
+        String name = readRequiredText(scanner, "New name");
 
-        System.out.print("New color: ");
-        String color = scanner.nextLine();
+        String color = readRequiredText(scanner, "New color");
 
         ClothingCategory category = inputCategory(scanner);
         Season season = inputSeason(scanner);
         Style style = inputStyle(scanner);
 
-        Boolean favorite = inputBoolean(scanner, "Favorite? true/false: ");
+        Boolean favorite = readBoolean(scanner, "Favorite? true/false: ");
 
         ClothingItem updatedItem = service.updateItem(
                 id,
@@ -166,7 +169,7 @@ public class WearwiseApplication {
         System.out.println();
         System.out.println("----- Delete Clothing Item -----");
 
-        Long id = inputLong(scanner, "Enter ID to delete: ");
+        Long id = readPositiveLong(scanner, "Enter ID to delete: ");
 
         service.deleteItem(id);
 
@@ -177,8 +180,7 @@ public class WearwiseApplication {
         System.out.println();
         System.out.println("----- Search By Name -----");
 
-        System.out.print("Enter keyword: ");
-        String keyword = scanner.nextLine();
+        String keyword = readRequiredText(scanner, "Enter keyword");
 
         List<ClothingItem> items = service.searchByName(keyword);
 
@@ -221,111 +223,161 @@ public class WearwiseApplication {
     }
 
     private ClothingCategory inputCategory(Scanner scanner) {
-        while (true) {
-            System.out.println("Choose category:");
-            System.out.println("1. SHIRT");
-            System.out.println("2. PANTS");
-            System.out.println("3. SHOES");
-            System.out.println("4. JACKET");
-            System.out.println("5. ACCESSORY");
-            System.out.print("Category option: ");
+        System.out.println("Choose category:");
+        System.out.println("1. SHIRT");
+        System.out.println("2. PANTS");
+        System.out.println("3. SHOES");
+        System.out.println("4. JACKET");
+        System.out.println("5. ACCESSORY");
 
-            String option = scanner.nextLine();
+        while (true) {
+            String option = readLine(scanner, "Category option: ");
 
             switch (option) {
-                case "1":
+                case "1" -> {
                     return ClothingCategory.SHIRT;
-                case "2":
+                }
+                case "2" -> {
                     return ClothingCategory.PANTS;
-                case "3":
+                }
+                case "3" -> {
                     return ClothingCategory.SHOES;
-                case "4":
+                }
+                case "4" -> {
                     return ClothingCategory.JACKET;
-                case "5":
+                }
+                case "5" -> {
                     return ClothingCategory.ACCESSORY;
-                default:
-                    System.out.println("Invalid category option. Please choose from 1 to 5.");
+                }
+                default -> System.out.println("Invalid category option. Please enter a number from 1 to 5.");
             }
         }
     }
 
     private Season inputSeason(Scanner scanner) {
-        while (true) {
-            System.out.println("Choose season:");
-            System.out.println("1. SUMMER");
-            System.out.println("2. WINTER");
-            System.out.println("3. ALL_SEASON");
-            System.out.print("Season option: ");
+        System.out.println("Choose season:");
+        System.out.println("1. SUMMER");
+        System.out.println("2. WINTER");
+        System.out.println("3. ALL_SEASON");
 
-            String option = scanner.nextLine();
+        while (true) {
+            String option = readLine(scanner, "Season option: ");
 
             switch (option) {
-                case "1":
+                case "1" -> {
                     return Season.SUMMER;
-                case "2":
+                }
+                case "2" -> {
                     return Season.WINTER;
-                case "3":
+                }
+                case "3" -> {
                     return Season.ALL_SEASON;
-                default:
-                    System.out.println("Invalid season option. Please choose from 1 to 3.");
+                }
+                default -> System.out.println("Invalid season option. Please enter a number from 1 to 3.");
             }
         }
     }
 
     private Style inputStyle(Scanner scanner) {
-        while (true) {
-            System.out.println("Choose style:");
-            System.out.println("1. CASUAL");
-            System.out.println("2. FORMAL");
-            System.out.println("3. STREETWEAR");
-            System.out.println("4. SPORT");
-            System.out.print("Style option: ");
+        System.out.println("Choose style:");
+        System.out.println("1. CASUAL");
+        System.out.println("2. FORMAL");
+        System.out.println("3. STREETWEAR");
+        System.out.println("4. SPORT");
 
-            String option = scanner.nextLine();
+        while (true) {
+            String option = readLine(scanner, "Style option: ");
 
             switch (option) {
-                case "1":
+                case "1" -> {
                     return Style.CASUAL;
-                case "2":
+                }
+                case "2" -> {
                     return Style.FORMAL;
-                case "3":
+                }
+                case "3" -> {
                     return Style.STREETWEAR;
-                case "4":
+                }
+                case "4" -> {
                     return Style.SPORT;
-                default:
-                    System.out.println("Invalid style option. Please choose from 1 to 4.");
+                }
+                default -> System.out.println("Invalid style option. Please enter a number from 1 to 4.");
             }
         }
     }
 
-    private Long inputLong(Scanner scanner, String prompt) {
+    private String readMenuChoice(Scanner scanner) {
         while (true) {
-            System.out.print(prompt);
-            String input = scanner.nextLine();
+            String choice = readLine(scanner, "Choose an option: ");
+
+            switch (choice) {
+                case "0", "1", "2", "3", "4", "5", "6", "7", "8" -> {
+                    return choice;
+                }
+                default -> System.out.println("Invalid option. Please enter a number from 0 to 8.");
+            }
+        }
+    }
+
+    private String readRequiredText(Scanner scanner, String label) {
+        while (true) {
+            String value = readLine(scanner, label + ": ");
+
+            if (value.isBlank()) {
+                System.out.println(label + " cannot be blank.");
+                continue;
+            }
+
+            if (value.length() > MAX_TEXT_LENGTH) {
+                System.out.println(label + " must be at most " + MAX_TEXT_LENGTH + " characters.");
+                continue;
+            }
+
+            return value;
+        }
+    }
+
+    private Long readPositiveLong(Scanner scanner, String prompt) {
+        while (true) {
+            String input = readLine(scanner, prompt);
 
             try {
-                return Long.parseLong(input);
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid number. Please enter a valid ID.");
+                long value = Long.parseLong(input);
+
+                if (value > 0) {
+                    return value;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+
+            System.out.println("ID must be a positive whole number.");
+        }
+    }
+
+    private Boolean readBoolean(Scanner scanner, String prompt) {
+        while (true) {
+            String input = readLine(scanner, prompt).toLowerCase(Locale.ROOT);
+
+            switch (input) {
+                case "true", "t", "yes", "y", "1" -> {
+                    return true;
+                }
+                case "false", "f", "no", "n", "0" -> {
+                    return false;
+                }
+                default -> System.out.println("Please enter true/false, yes/no, or 1/0.");
             }
         }
     }
 
-    private Boolean inputBoolean(Scanner scanner, String prompt) {
-        while (true) {
-            System.out.print(prompt);
-            String input = scanner.nextLine().trim();
+    private String readLine(Scanner scanner, String prompt) {
+        System.out.print(prompt);
 
-            if ("true".equalsIgnoreCase(input)) {
-                return true;
-            }
-
-            if ("false".equalsIgnoreCase(input)) {
-                return false;
-            }
-
-            System.out.println("Invalid value. Please enter true or false.");
+        if (!scanner.hasNextLine()) {
+            throw new ConsoleInputEndedException();
         }
+
+        return scanner.nextLine().trim();
     }
 
     private void printItem(ClothingItem item) {
@@ -339,5 +391,8 @@ public class WearwiseApplication {
         System.out.println("Favorite: " + item.getFavorite());
         System.out.println("Created At: " + item.getCreatedAt());
         System.out.println("Updated At: " + item.getUpdatedAt());
+    }
+
+    private static class ConsoleInputEndedException extends RuntimeException {
     }
 }

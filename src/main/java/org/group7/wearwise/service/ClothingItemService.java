@@ -13,6 +13,8 @@ import java.util.List;
 @Service
 public class ClothingItemService {
 
+    private static final int MAX_TEXT_LENGTH = 255;
+
     private final ClothingItemRepository clothingItemRepository;
 
     public ClothingItemService(ClothingItemRepository clothingItemRepository) {
@@ -28,13 +30,16 @@ public class ClothingItemService {
             Style style,
             Boolean favorite
     ) {
+        String normalizedName = normalizeRequiredText(name, "Name");
+        String normalizedColor = normalizeOptionalText(color, "Color");
+
         ClothingItem item = ClothingItem.builder()
-                .name(name)
-                .color(color)
-                .category(category)
-                .season(season)
-                .style(style)
-                .favorite(favorite)
+                .name(normalizedName)
+                .color(normalizedColor)
+                .category(requireCategory(category))
+                .season(requireSeason(season))
+                .style(requireStyle(style))
+                .favorite(favorite != null && favorite)
                 .build();
 
         return clothingItemRepository.save(item);
@@ -61,12 +66,12 @@ public class ClothingItemService {
     ) {
         ClothingItem item = getItemById(id);
 
-        item.setName(name);
-        item.setColor(color);
-        item.setCategory(category);
-        item.setSeason(season);
-        item.setStyle(style);
-        item.setFavorite(favorite);
+        item.setName(normalizeRequiredText(name, "Name"));
+        item.setColor(normalizeOptionalText(color, "Color"));
+        item.setCategory(requireCategory(category));
+        item.setSeason(requireSeason(season));
+        item.setStyle(requireStyle(style));
+        item.setFavorite(favorite != null && favorite);
 
         return clothingItemRepository.save(item);
     }
@@ -78,22 +83,74 @@ public class ClothingItemService {
     }
 
     public List<ClothingItem> searchByName(String keyword) {
-        return clothingItemRepository.findByNameContainingIgnoreCase(keyword);
+        return clothingItemRepository.findByNameContainingIgnoreCase(normalizeRequiredText(keyword, "Search keyword"));
     }
 
     public List<ClothingItem> filterByCategory(ClothingCategory category) {
-        return clothingItemRepository.findByCategory(category);
+        return clothingItemRepository.findByCategory(requireCategory(category));
     }
 
     public List<ClothingItem> filterBySeason(Season season) {
-        return clothingItemRepository.findBySeason(season);
+        return clothingItemRepository.findBySeason(requireSeason(season));
     }
 
     public List<ClothingItem> filterByStyle(Style style) {
-        return clothingItemRepository.findByStyle(style);
+        return clothingItemRepository.findByStyle(requireStyle(style));
     }
 
     public List<ClothingItem> getFavoriteItems() {
         return clothingItemRepository.findByFavoriteTrue();
+    }
+
+    private String normalizeRequiredText(String value, String fieldName) {
+        if (value == null || value.trim().isBlank()) {
+            throw new IllegalArgumentException(fieldName + " is required.");
+        }
+
+        String normalizedValue = value.trim();
+
+        if (normalizedValue.length() > MAX_TEXT_LENGTH) {
+            throw new IllegalArgumentException(fieldName + " must be at most " + MAX_TEXT_LENGTH + " characters.");
+        }
+
+        return normalizedValue;
+    }
+
+    private String normalizeOptionalText(String value, String fieldName) {
+        if (value == null || value.trim().isBlank()) {
+            return null;
+        }
+
+        String normalizedValue = value.trim();
+
+        if (normalizedValue.length() > MAX_TEXT_LENGTH) {
+            throw new IllegalArgumentException(fieldName + " must be at most " + MAX_TEXT_LENGTH + " characters.");
+        }
+
+        return normalizedValue;
+    }
+
+    private ClothingCategory requireCategory(ClothingCategory category) {
+        if (category == null) {
+            throw new IllegalArgumentException("Category is required.");
+        }
+
+        return category;
+    }
+
+    private Season requireSeason(Season season) {
+        if (season == null) {
+            throw new IllegalArgumentException("Season is required.");
+        }
+
+        return season;
+    }
+
+    private Style requireStyle(Style style) {
+        if (style == null) {
+            throw new IllegalArgumentException("Style is required.");
+        }
+
+        return style;
     }
 }
