@@ -1,0 +1,38 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: wearwise-compose-mysql
+    environment:
+      MYSQL_DATABASE: wearwise_db
+      MYSQL_USER: wearwise_user
+      MYSQL_PASSWORD: wearwise_pass
+      MYSQL_ROOT_PASSWORD: wearwise_root_pass
+    ports:
+      - "3307:3306"
+    volumes:
+      - wearwise_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build: .
+    container_name: wearwise-api
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/wearwise_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: wearwise_user
+      SPRING_DATASOURCE_PASSWORD: wearwise_pass
+      WEARWISE_CONSOLE_ENABLED: false
+      WEARWISE_SEED_ENABLED: false
+    ports:
+      - "8080:8080"
+
+volumes:
+  wearwise_mysql_data:
