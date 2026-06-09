@@ -4,7 +4,9 @@ import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.repository.ClothingItemRepository;
+import org.group7.wearwise.repository.specification.ClothingItemSpecifications;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,9 +51,21 @@ public class ClothingItemService {
         return clothingItemRepository.findAll();
     }
 
+    public List<ClothingItem> findItems(
+            String keyword,
+            ClothingCategory category,
+            Season season,
+            Style style,
+            Boolean favorite
+    ) {
+        return clothingItemRepository.findAll(
+                ClothingItemSpecifications.matchesFilters(keyword, category, season, style, favorite)
+        );
+    }
+
     public ClothingItem getItemById(Long id) {
         return clothingItemRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Clothing item not found with id: " + id));
+                .orElseThrow(() -> new ClothingItemNotFoundException(id));
     }
 
     @Transactional
@@ -80,6 +94,13 @@ public class ClothingItemService {
     public void deleteItem(Long id) {
         ClothingItem item = getItemById(id);
         clothingItemRepository.delete(item);
+    }
+
+    @Transactional
+    public ClothingItem updateFavorite(Long id, Boolean favorite) {
+        ClothingItem item = getItemById(id);
+        item.setFavorite(favorite != null && favorite);
+        return clothingItemRepository.save(item);
     }
 
     public List<ClothingItem> searchByName(String keyword) {
