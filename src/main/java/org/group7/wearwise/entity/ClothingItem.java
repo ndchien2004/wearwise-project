@@ -3,8 +3,11 @@ package org.group7.wearwise.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.group7.wearwise.enums.ClothingCategory;
+import org.group7.wearwise.enums.ClothingCondition;
+import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
 
@@ -38,6 +41,25 @@ public class ClothingItem {
     @Column(nullable = false)
     private Style style;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_condition", nullable = false)
+    @ColumnDefault("'GOOD'")
+    @Builder.Default
+    private ClothingCondition condition = ClothingCondition.GOOD;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @ColumnDefault("'AVAILABLE'")
+    @Builder.Default
+    private ClothingStatus status = ClothingStatus.AVAILABLE;
+
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+    private Integer wearCount = 0;
+
+    private LocalDateTime lastWornAt;
+
     private Boolean favorite;
 
     private LocalDateTime createdAt;
@@ -51,6 +73,18 @@ public class ClothingItem {
 
         if (this.favorite == null) {
             this.favorite = false;
+        }
+
+        if (this.condition == null) {
+            this.condition = ClothingCondition.GOOD;
+        }
+
+        if (this.status == null) {
+            this.status = ClothingStatus.AVAILABLE;
+        }
+
+        if (this.wearCount == null) {
+            this.wearCount = 0;
         }
     }
 

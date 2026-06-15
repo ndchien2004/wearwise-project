@@ -2,6 +2,7 @@ services:
   mysql:
     image: mysql:8.4
     container_name: wearwise-compose-mysql
+    restart: unless-stopped
     environment:
       MYSQL_DATABASE: wearwise_db
       MYSQL_USER: wearwise_user
@@ -21,6 +22,7 @@ services:
   api:
     build: .
     container_name: wearwise-api
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy

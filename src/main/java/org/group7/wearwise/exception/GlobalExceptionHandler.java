@@ -16,9 +16,14 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ClothingItemNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleNotFound(ClothingItemNotFoundException exception) {
+    @ExceptionHandler({ClothingItemNotFoundException.class, OutfitNotFoundException.class})
+    public ResponseEntity<ApiErrorResponse> handleNotFound(RuntimeException exception) {
         return build(HttpStatus.NOT_FOUND, exception.getMessage(), Map.of());
+    }
+
+    @ExceptionHandler(ClothingItemInUseException.class)
+    public ResponseEntity<ApiErrorResponse> handleConflict(ClothingItemInUseException exception) {
+        return build(HttpStatus.CONFLICT, exception.getMessage(), Map.of());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

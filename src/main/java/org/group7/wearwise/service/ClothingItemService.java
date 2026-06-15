@@ -2,14 +2,19 @@ package org.group7.wearwise.service;
 
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
+import org.group7.wearwise.enums.ClothingCondition;
+import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.exception.ClothingItemInUseException;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.repository.ClothingItemRepository;
+import org.group7.wearwise.repository.OutfitRepository;
 import org.group7.wearwise.repository.specification.ClothingItemSpecifications;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -18,9 +23,14 @@ public class ClothingItemService {
     private static final int MAX_TEXT_LENGTH = 255;
 
     private final ClothingItemRepository clothingItemRepository;
+    private final OutfitRepository outfitRepository;
 
-    public ClothingItemService(ClothingItemRepository clothingItemRepository) {
+    public ClothingItemService(
+            ClothingItemRepository clothingItemRepository,
+            OutfitRepository outfitRepository
+    ) {
         this.clothingItemRepository = clothingItemRepository;
+        this.outfitRepository = outfitRepository;
     }
 
     @Transactional
@@ -30,6 +40,10 @@ public class ClothingItemService {
             ClothingCategory category,
             Season season,
             Style style,
+            ClothingCondition condition,
+            ClothingStatus status,
+            Integer wearCount,
+            LocalDateTime lastWornAt,
             Boolean favorite
     ) {
         String normalizedName = normalizeRequiredText(name, "Name");
@@ -41,6 +55,10 @@ public class ClothingItemService {
                 .category(requireCategory(category))
                 .season(requireSeason(season))
                 .style(requireStyle(style))
+                .condition(requireCondition(condition))
+                .status(requireStatus(status))
+                .wearCount(normalizeWearCount(wearCount))
+                .lastWornAt(normalizeLastWornAt(lastWornAt))
                 .favorite(favorite != null && favorite)
                 .build();
 
@@ -56,10 +74,20 @@ public class ClothingItemService {
             ClothingCategory category,
             Season season,
             Style style,
+            ClothingCondition condition,
+            ClothingStatus status,
             Boolean favorite
     ) {
         return clothingItemRepository.findAll(
-                ClothingItemSpecifications.matchesFilters(keyword, category, season, style, favorite)
+                ClothingItemSpecifications.matchesFilters(
+                        keyword,
+                        category,
+                        season,
+                        style,
+                        condition,
+                        status,
+                        favorite
+                )
         );
     }
 
@@ -76,6 +104,10 @@ public class ClothingItemService {
             ClothingCategory category,
             Season season,
             Style style,
+            ClothingCondition condition,
+            ClothingStatus status,
+            Integer wearCount,
+            LocalDateTime lastWornAt,
             Boolean favorite
     ) {
         ClothingItem item = getItemById(id);
@@ -85,6 +117,10 @@ public class ClothingItemService {
         item.setCategory(requireCategory(category));
         item.setSeason(requireSeason(season));
         item.setStyle(requireStyle(style));
+        item.setCondition(requireCondition(condition));
+        item.setStatus(requireStatus(status));
+        item.setWearCount(normalizeWearCount(wearCount));
+        item.setLastWornAt(normalizeLastWornAt(lastWornAt));
         item.setFavorite(favorite != null && favorite);
 
         return clothingItemRepository.save(item);
@@ -93,6 +129,11 @@ public class ClothingItemService {
     @Transactional
     public void deleteItem(Long id) {
         ClothingItem item = getItemById(id);
+
+        if (outfitRepository.existsByClothingItems_Id(id)) {
+            throw new ClothingItemInUseException(id);
+        }
+
         clothingItemRepository.delete(item);
     }
 
@@ -173,5 +214,41 @@ public class ClothingItemService {
         }
 
         return style;
+    }
+
+    private ClothingCondition requireCondition(ClothingCondition condition) {
+        if (condition == null) {
+            throw new IllegalArgumentException("Condition is required.");
+        }
+
+        return condition;
+    }
+
+    private ClothingStatus requireStatus(ClothingStatus status) {
+        if (status == null) {
+            throw new IllegalArgumentException("Status is required.");
+        }
+
+        return status;
+    }
+
+    private int normalizeWearCount(Integer wearCount) {
+        if (wearCount == null) {
+            return 0;
+        }
+
+        if (wearCount < 0) {
+            throw new IllegalArgumentException("Wear count must be zero or greater.");
+        }
+
+        return wearCount;
+    }
+
+    private LocalDateTime normalizeLastWornAt(LocalDateTime lastWornAt) {
+        if (lastWornAt != null && lastWornAt.isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Last worn at cannot be in the future.");
+        }
+
+        return lastWornAt;
     }
 }

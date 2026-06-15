@@ -2,10 +2,14 @@ package org.group7.wearwise.service;
 
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
+import org.group7.wearwise.enums.ClothingCondition;
+import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.exception.ClothingItemInUseException;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.repository.ClothingItemRepository;
+import org.group7.wearwise.repository.OutfitRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -14,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,6 +34,9 @@ class ClothingItemServiceTest {
     @Mock
     private ClothingItemRepository clothingItemRepository;
 
+    @Mock
+    private OutfitRepository outfitRepository;
+
     @InjectMocks
     private ClothingItemService clothingItemService;
 
@@ -43,12 +51,19 @@ class ClothingItemServiceTest {
                 ClothingCategory.SHIRT,
                 Season.ALL_SEASON,
                 Style.FORMAL,
+                ClothingCondition.GOOD,
+                ClothingStatus.AVAILABLE,
+                null,
+                null,
                 null
         );
 
         verify(clothingItemRepository).save(captor.capture());
         assertThat(captor.getValue().getName()).isEqualTo("White Shirt");
         assertThat(captor.getValue().getColor()).isEqualTo("White");
+        assertThat(createdItem.getCondition()).isEqualTo(ClothingCondition.GOOD);
+        assertThat(createdItem.getStatus()).isEqualTo(ClothingStatus.AVAILABLE);
+        assertThat(createdItem.getWearCount()).isZero();
         assertThat(createdItem.getFavorite()).isFalse();
     }
 
@@ -60,6 +75,10 @@ class ClothingItemServiceTest {
                 ClothingCategory.SHIRT,
                 Season.ALL_SEASON,
                 Style.FORMAL,
+                ClothingCondition.GOOD,
+                ClothingStatus.AVAILABLE,
+                0,
+                null,
                 false
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Name is required.");
@@ -83,6 +102,9 @@ class ClothingItemServiceTest {
                 .category(ClothingCategory.PANTS)
                 .season(Season.ALL_SEASON)
                 .style(Style.CASUAL)
+                .condition(ClothingCondition.GOOD)
+                .status(ClothingStatus.AVAILABLE)
+                .wearCount(0)
                 .favorite(false)
                 .build();
 
@@ -104,6 +126,9 @@ class ClothingItemServiceTest {
                 .category(ClothingCategory.SHOES)
                 .season(Season.SUMMER)
                 .style(Style.SPORT)
+                .condition(ClothingCondition.GOOD)
+                .status(ClothingStatus.AVAILABLE)
+                .wearCount(4)
                 .favorite(true)
                 .build();
 
@@ -114,10 +139,40 @@ class ClothingItemServiceTest {
                 ClothingCategory.SHOES,
                 Season.SUMMER,
                 Style.SPORT,
+                ClothingCondition.GOOD,
+                ClothingStatus.AVAILABLE,
                 true
         );
 
         assertThat(items).containsExactly(sneaker);
         verify(clothingItemRepository).findAll(any(Specification.class));
+    }
+
+    @Test
+    void createItemRejectsFutureLastWornAt() {
+        assertThatThrownBy(() -> clothingItemService.createItem(
+                "White Shirt",
+                "White",
+                ClothingCategory.SHIRT,
+                Season.ALL_SEASON,
+                Style.FORMAL,
+                ClothingCondition.GOOD,
+                ClothingStatus.AVAILABLE,
+                1,
+                LocalDateTime.now().plusDays(1),
+                false
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Last worn at cannot be in the future.");
+    }
+
+    @Test
+    void deleteItemRejectsItemUsedByOutfit() {
+        ClothingItem item = ClothingItem.builder().id(7L).name("Jacket").build();
+        when(clothingItemRepository.findById(7L)).thenReturn(Optional.of(item));
+        when(outfitRepository.existsByClothingItems_Id(7L)).thenReturn(true);
+
+        assertThatThrownBy(() -> clothingItemService.deleteItem(7L))
+                .isInstanceOf(ClothingItemInUseException.class)
+                .hasMessageContaining("7");
     }
 }

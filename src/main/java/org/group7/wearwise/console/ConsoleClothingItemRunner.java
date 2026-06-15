@@ -2,6 +2,8 @@ package org.group7.wearwise.console;
 
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
+import org.group7.wearwise.enums.ClothingCondition;
+import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.service.ClothingItemService;
@@ -9,6 +11,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Scanner;
@@ -86,9 +90,24 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         ClothingCategory category = inputCategory(scanner);
         Season season = inputSeason(scanner);
         Style style = inputStyle(scanner);
+        ClothingCondition condition = inputCondition(scanner);
+        ClothingStatus status = inputStatus(scanner);
+        Integer wearCount = readNonNegativeInteger(scanner, "Wear count: ");
+        LocalDateTime lastWornAt = readOptionalDateTime(scanner, "Last worn at (yyyy-MM-ddTHH:mm, blank for none): ");
         Boolean favorite = readBoolean(scanner, "Favorite? true/false: ");
 
-        ClothingItem createdItem = clothingItemService.createItem(name, color, category, season, style, favorite);
+        ClothingItem createdItem = clothingItemService.createItem(
+                name,
+                color,
+                category,
+                season,
+                style,
+                condition,
+                status,
+                wearCount,
+                lastWornAt,
+                favorite
+        );
 
         System.out.println("Created successfully!");
         printItem(createdItem);
@@ -132,9 +151,25 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         ClothingCategory category = inputCategory(scanner);
         Season season = inputSeason(scanner);
         Style style = inputStyle(scanner);
+        ClothingCondition condition = inputCondition(scanner);
+        ClothingStatus status = inputStatus(scanner);
+        Integer wearCount = readNonNegativeInteger(scanner, "New wear count: ");
+        LocalDateTime lastWornAt = readOptionalDateTime(scanner, "New last worn at (yyyy-MM-ddTHH:mm, blank for none): ");
         Boolean favorite = readBoolean(scanner, "Favorite? true/false: ");
 
-        ClothingItem updatedItem = clothingItemService.updateItem(id, name, color, category, season, style, favorite);
+        ClothingItem updatedItem = clothingItemService.updateItem(
+                id,
+                name,
+                color,
+                category,
+                season,
+                style,
+                condition,
+                status,
+                wearCount,
+                lastWornAt,
+                favorite
+        );
 
         System.out.println("Updated successfully!");
         printItem(updatedItem);
@@ -278,6 +313,50 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         }
     }
 
+    private ClothingCondition inputCondition(Scanner scanner) {
+        System.out.println("Choose condition:");
+        System.out.println("1. GOOD");
+        System.out.println("2. DAMAGED");
+
+        while (true) {
+            String option = readLine(scanner, "Condition option: ");
+
+            switch (option) {
+                case "1" -> {
+                    return ClothingCondition.GOOD;
+                }
+                case "2" -> {
+                    return ClothingCondition.DAMAGED;
+                }
+                default -> System.out.println("Invalid condition option. Please enter 1 or 2.");
+            }
+        }
+    }
+
+    private ClothingStatus inputStatus(Scanner scanner) {
+        System.out.println("Choose status:");
+        System.out.println("1. AVAILABLE");
+        System.out.println("2. LAUNDRY");
+        System.out.println("3. UNAVAILABLE");
+
+        while (true) {
+            String option = readLine(scanner, "Status option: ");
+
+            switch (option) {
+                case "1" -> {
+                    return ClothingStatus.AVAILABLE;
+                }
+                case "2" -> {
+                    return ClothingStatus.LAUNDRY;
+                }
+                case "3" -> {
+                    return ClothingStatus.UNAVAILABLE;
+                }
+                default -> System.out.println("Invalid status option. Please enter a number from 1 to 3.");
+            }
+        }
+    }
+
     private String readMenuChoice(Scanner scanner) {
         while (true) {
             String choice = readLine(scanner, "Choose an option: ");
@@ -326,6 +405,45 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         }
     }
 
+    private Integer readNonNegativeInteger(Scanner scanner, String prompt) {
+        while (true) {
+            String input = readLine(scanner, prompt);
+
+            try {
+                int value = Integer.parseInt(input);
+
+                if (value >= 0) {
+                    return value;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+
+            System.out.println("Value must be a non-negative whole number.");
+        }
+    }
+
+    private LocalDateTime readOptionalDateTime(Scanner scanner, String prompt) {
+        while (true) {
+            String input = readLine(scanner, prompt);
+
+            if (input.isBlank()) {
+                return null;
+            }
+
+            try {
+                LocalDateTime value = LocalDateTime.parse(input);
+
+                if (!value.isAfter(LocalDateTime.now())) {
+                    return value;
+                }
+
+                System.out.println("Last worn at cannot be in the future.");
+            } catch (DateTimeParseException e) {
+                System.out.println("Invalid date-time. Use format yyyy-MM-ddTHH:mm.");
+            }
+        }
+    }
+
     private Boolean readBoolean(Scanner scanner, String prompt) {
         while (true) {
             String input = readLine(scanner, prompt).toLowerCase(Locale.ROOT);
@@ -360,6 +478,10 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         System.out.println("Category: " + item.getCategory());
         System.out.println("Season: " + item.getSeason());
         System.out.println("Style: " + item.getStyle());
+        System.out.println("Condition: " + item.getCondition());
+        System.out.println("Status: " + item.getStatus());
+        System.out.println("Wear Count: " + item.getWearCount());
+        System.out.println("Last Worn At: " + item.getLastWornAt());
         System.out.println("Favorite: " + item.getFavorite());
         System.out.println("Created At: " + item.getCreatedAt());
         System.out.println("Updated At: " + item.getUpdatedAt());

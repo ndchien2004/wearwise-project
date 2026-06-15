@@ -2,6 +2,8 @@ package org.group7.wearwise.controller;
 
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
+import org.group7.wearwise.enums.ClothingCondition;
+import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
@@ -52,7 +54,18 @@ class ClothingItemControllerTest {
     @Test
     void createItemReturnsCreatedItem() throws Exception {
         ClothingItem createdItem = item(1L, "White Shirt", "White", ClothingCategory.SHIRT, Season.ALL_SEASON, Style.FORMAL, true);
-        when(clothingItemService.createItem("White Shirt", "White", ClothingCategory.SHIRT, Season.ALL_SEASON, Style.FORMAL, true))
+        when(clothingItemService.createItem(
+                "White Shirt",
+                "White",
+                ClothingCategory.SHIRT,
+                Season.ALL_SEASON,
+                Style.FORMAL,
+                ClothingCondition.GOOD,
+                ClothingStatus.AVAILABLE,
+                2,
+                null,
+                true
+        ))
                 .thenReturn(createdItem);
 
         mockMvc.perform(post("/api/clothing-items")
@@ -64,19 +77,32 @@ class ClothingItemControllerTest {
                                   "category": "SHIRT",
                                   "season": "ALL_SEASON",
                                   "style": "FORMAL",
+                                  "condition": "GOOD",
+                                  "status": "AVAILABLE",
+                                  "wearCount": 2,
                                   "favorite": true
                                 }
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("White Shirt"))
+                .andExpect(jsonPath("$.condition").value("GOOD"))
+                .andExpect(jsonPath("$.wearCount").value(0))
                 .andExpect(jsonPath("$.favorite").value(true));
     }
 
     @Test
     void findItemsPassesCombinedFilters() throws Exception {
         ClothingItem sneaker = item(2L, "Running Sneakers", "Gray", ClothingCategory.SHOES, Season.SUMMER, Style.SPORT, true);
-        when(clothingItemService.findItems("run", ClothingCategory.SHOES, Season.SUMMER, Style.SPORT, true))
+        when(clothingItemService.findItems(
+                "run",
+                ClothingCategory.SHOES,
+                Season.SUMMER,
+                Style.SPORT,
+                ClothingCondition.GOOD,
+                ClothingStatus.AVAILABLE,
+                true
+        ))
                 .thenReturn(List.of(sneaker));
 
         mockMvc.perform(get("/api/clothing-items")
@@ -84,6 +110,8 @@ class ClothingItemControllerTest {
                         .param("category", "SHOES")
                         .param("season", "SUMMER")
                         .param("style", "SPORT")
+                        .param("condition", "GOOD")
+                        .param("status", "AVAILABLE")
                         .param("favorite", "true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(2))
@@ -115,13 +143,27 @@ class ClothingItemControllerTest {
                 .andExpect(jsonPath("$.errors.name").value("Name is required."))
                 .andExpect(jsonPath("$.errors.category").value("Category is required."))
                 .andExpect(jsonPath("$.errors.season").value("Season is required."))
-                .andExpect(jsonPath("$.errors.style").value("Style is required."));
+                .andExpect(jsonPath("$.errors.style").value("Style is required."))
+                .andExpect(jsonPath("$.errors.condition").value("Condition is required."))
+                .andExpect(jsonPath("$.errors.status").value("Status is required."));
     }
 
     @Test
     void updateItemReturnsUpdatedItem() throws Exception {
         ClothingItem updatedItem = item(3L, "Black Jeans", "Black", ClothingCategory.PANTS, Season.ALL_SEASON, Style.CASUAL, false);
-        when(clothingItemService.updateItem(3L, "Black Jeans", "Black", ClothingCategory.PANTS, Season.ALL_SEASON, Style.CASUAL, false))
+        when(clothingItemService.updateItem(
+                3L,
+                "Black Jeans",
+                "Black",
+                ClothingCategory.PANTS,
+                Season.ALL_SEASON,
+                Style.CASUAL,
+                ClothingCondition.GOOD,
+                ClothingStatus.LAUNDRY,
+                6,
+                null,
+                false
+        ))
                 .thenReturn(updatedItem);
 
         mockMvc.perform(put("/api/clothing-items/3")
@@ -133,6 +175,9 @@ class ClothingItemControllerTest {
                                   "category": "PANTS",
                                   "season": "ALL_SEASON",
                                   "style": "CASUAL",
+                                  "condition": "GOOD",
+                                  "status": "LAUNDRY",
+                                  "wearCount": 6,
                                   "favorite": false
                                 }
                                 """))
@@ -171,7 +216,30 @@ class ClothingItemControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.categories[0]").value("SHIRT"))
                 .andExpect(jsonPath("$.seasons[0]").value("SUMMER"))
-                .andExpect(jsonPath("$.styles[0]").value("CASUAL"));
+                .andExpect(jsonPath("$.styles[0]").value("CASUAL"))
+                .andExpect(jsonPath("$.conditions[0]").value("GOOD"))
+                .andExpect(jsonPath("$.statuses[0]").value("AVAILABLE"));
+    }
+
+    @Test
+    void invalidWearDataReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/clothing-items")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "White Shirt",
+                                  "category": "SHIRT",
+                                  "season": "ALL_SEASON",
+                                  "style": "FORMAL",
+                                  "condition": "GOOD",
+                                  "status": "AVAILABLE",
+                                  "wearCount": -1,
+                                  "lastWornAt": "2999-01-01T10:00:00"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.wearCount").value("Wear count must be zero or greater."))
+                .andExpect(jsonPath("$.errors.lastWornAt").value("Last worn at cannot be in the future."));
     }
 
     private static ClothingItem item(
@@ -192,6 +260,9 @@ class ClothingItemControllerTest {
                 .category(category)
                 .season(season)
                 .style(style)
+                .condition(ClothingCondition.GOOD)
+                .status(ClothingStatus.AVAILABLE)
+                .wearCount(0)
                 .favorite(favorite)
                 .createdAt(now)
                 .updatedAt(now)

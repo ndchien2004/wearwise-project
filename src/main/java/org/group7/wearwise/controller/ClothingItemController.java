@@ -7,6 +7,8 @@ import org.group7.wearwise.dto.response.ClothingItemOptionsResponse;
 import org.group7.wearwise.dto.response.ClothingItemResponse;
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
+import org.group7.wearwise.enums.ClothingCondition;
+import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.service.ClothingItemService;
@@ -41,9 +43,11 @@ public class ClothingItemController {
             @RequestParam(required = false) ClothingCategory category,
             @RequestParam(required = false) Season season,
             @RequestParam(required = false) Style style,
+            @RequestParam(required = false) ClothingCondition condition,
+            @RequestParam(required = false) ClothingStatus status,
             @RequestParam(required = false) Boolean favorite
     ) {
-        return clothingItemService.findItems(keyword, category, season, style, favorite)
+        return clothingItemService.findItems(keyword, category, season, style, condition, status, favorite)
                 .stream()
                 .map(ClothingItemResponse::from)
                 .toList();
@@ -63,6 +67,10 @@ public class ClothingItemController {
                 request.category(),
                 request.season(),
                 request.style(),
+                request.condition(),
+                request.status(),
+                request.wearCount(),
+                request.lastWornAt(),
                 request.favorite()
         );
 
@@ -81,6 +89,10 @@ public class ClothingItemController {
                 request.category(),
                 request.season(),
                 request.style(),
+                request.condition(),
+                request.status(),
+                request.wearCount(),
+                request.lastWornAt(),
                 request.favorite()
         );
 

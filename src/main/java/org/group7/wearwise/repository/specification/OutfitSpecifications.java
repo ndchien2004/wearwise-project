@@ -1,42 +1,35 @@
 package org.group7.wearwise.repository.specification;
 
-import org.group7.wearwise.entity.ClothingItem;
-import org.group7.wearwise.enums.ClothingCategory;
-import org.group7.wearwise.enums.ClothingCondition;
-import org.group7.wearwise.enums.ClothingStatus;
+import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.Locale;
 
-public final class ClothingItemSpecifications {
+public final class OutfitSpecifications {
 
-    private ClothingItemSpecifications() {
+    private OutfitSpecifications() {
     }
 
-    public static Specification<ClothingItem> matchesFilters(
+    public static Specification<Outfit> matchesFilters(
             String keyword,
-            ClothingCategory category,
             Season season,
             Style style,
-            ClothingCondition condition,
-            ClothingStatus status,
             Boolean favorite
     ) {
         return (root, query, criteriaBuilder) -> {
             var predicate = criteriaBuilder.conjunction();
 
             if (keyword != null && !keyword.trim().isBlank()) {
-                String normalizedKeyword = keyword.trim().toLowerCase(Locale.ROOT);
+                String normalizedKeyword = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
                 predicate = criteriaBuilder.and(
                         predicate,
-                        criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), "%" + normalizedKeyword + "%")
+                        criteriaBuilder.or(
+                                criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), normalizedKeyword),
+                                criteriaBuilder.like(criteriaBuilder.lower(root.get("description")), normalizedKeyword)
+                        )
                 );
-            }
-
-            if (category != null) {
-                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("category"), category));
             }
 
             if (season != null) {
@@ -45,14 +38,6 @@ public final class ClothingItemSpecifications {
 
             if (style != null) {
                 predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("style"), style));
-            }
-
-            if (condition != null) {
-                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("condition"), condition));
-            }
-
-            if (status != null) {
-                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("status"), status));
             }
 
             if (favorite != null) {
