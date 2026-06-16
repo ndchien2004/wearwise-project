@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -146,6 +148,59 @@ class ClothingItemServiceTest {
 
         assertThat(items).containsExactly(sneaker);
         verify(clothingItemRepository).findAll(any(Specification.class));
+    }
+
+    @Test
+    void getRecentlyWornItemsUsesRequestedLimit() {
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        ClothingItem item = ClothingItem.builder().id(3L).name("White Shirt").build();
+        when(clothingItemRepository.findByLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(any(Pageable.class)))
+                .thenReturn(List.of(item));
+
+        List<ClothingItem> items = clothingItemService.getRecentlyWornItems(3);
+
+        assertThat(items).containsExactly(item);
+        verify(clothingItemRepository)
+                .findByLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageNumber()).isZero();
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(3);
+    }
+
+    @Test
+    void getMostWornItemsOnlyRequestsItemsWithPositiveWearCount() {
+        ClothingItem item = ClothingItem.builder().id(4L).name("Running Shoes").wearCount(9).build();
+        when(clothingItemRepository.findByWearCountGreaterThanOrderByWearCountDescIdAsc(eq(0), any(Pageable.class)))
+                .thenReturn(List.of(item));
+
+        List<ClothingItem> items = clothingItemService.getMostWornItems(2);
+
+        assertThat(items).containsExactly(item);
+        verify(clothingItemRepository).findByWearCountGreaterThanOrderByWearCountDescIdAsc(eq(0), any(Pageable.class));
+    }
+
+    @Test
+    void getLeastWornItemsUsesDefaultLimitWhenLimitIsNull() {
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        ClothingItem item = ClothingItem.builder().id(5L).name("Rain Jacket").wearCount(0).build();
+        when(clothingItemRepository.findAllByOrderByWearCountAscIdAsc(any(Pageable.class)))
+                .thenReturn(List.of(item));
+
+        List<ClothingItem> items = clothingItemService.getLeastWornItems(null);
+
+        assertThat(items).containsExactly(item);
+        verify(clothingItemRepository).findAllByOrderByWearCountAscIdAsc(pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(5);
+    }
+
+    @Test
+    void listEndpointsRejectInvalidLimit() {
+        assertThatThrownBy(() -> clothingItemService.getRecentlyWornItems(0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Limit must be at least 1.");
+
+        assertThatThrownBy(() -> clothingItemService.getMostWornItems(51))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Limit must be at most 50.");
     }
 
     @Test

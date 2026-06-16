@@ -11,6 +11,7 @@ import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitRepository;
 import org.group7.wearwise.repository.specification.ClothingItemSpecifications;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import java.util.List;
 public class ClothingItemService {
 
     private static final int MAX_TEXT_LENGTH = 255;
+    private static final int MAX_LIST_LIMIT = 50;
 
     private final ClothingItemRepository clothingItemRepository;
     private final OutfitRepository outfitRepository;
@@ -164,6 +166,25 @@ public class ClothingItemService {
         return clothingItemRepository.findByFavoriteTrue();
     }
 
+    public List<ClothingItem> getRecentlyWornItems(Integer limit) {
+        return clothingItemRepository.findByLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(
+                PageRequest.of(0, normalizeLimit(limit))
+        );
+    }
+
+    public List<ClothingItem> getMostWornItems(Integer limit) {
+        return clothingItemRepository.findByWearCountGreaterThanOrderByWearCountDescIdAsc(
+                0,
+                PageRequest.of(0, normalizeLimit(limit))
+        );
+    }
+
+    public List<ClothingItem> getLeastWornItems(Integer limit) {
+        return clothingItemRepository.findAllByOrderByWearCountAscIdAsc(
+                PageRequest.of(0, normalizeLimit(limit))
+        );
+    }
+
     private String normalizeRequiredText(String value, String fieldName) {
         if (value == null || value.trim().isBlank()) {
             throw new IllegalArgumentException(fieldName + " is required.");
@@ -250,5 +271,21 @@ public class ClothingItemService {
         }
 
         return lastWornAt;
+    }
+
+    private int normalizeLimit(Integer limit) {
+        if (limit == null) {
+            return 5;
+        }
+
+        if (limit < 1) {
+            throw new IllegalArgumentException("Limit must be at least 1.");
+        }
+
+        if (limit > MAX_LIST_LIMIT) {
+            throw new IllegalArgumentException("Limit must be at most " + MAX_LIST_LIMIT + ".");
+        }
+
+        return limit;
     }
 }

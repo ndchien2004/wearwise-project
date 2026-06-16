@@ -1,7 +1,7 @@
 services:
   mysql:
     image: mysql:8.4
-    container_name: wearwise-compose-mysql
+    container_name: wearwise-mysql
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: wearwise_db
@@ -9,7 +9,7 @@ services:
       MYSQL_PASSWORD: wearwise_pass
       MYSQL_ROOT_PASSWORD: wearwise_root_pass
     ports:
-      - "3307:3306"
+      - "3306:3306"
     volumes:
       - wearwise_mysql_data:/var/lib/mysql
     healthcheck:

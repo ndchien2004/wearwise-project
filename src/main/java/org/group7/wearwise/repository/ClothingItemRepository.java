@@ -7,6 +7,7 @@ import org.group7.wearwise.enums.Style;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -21,6 +22,12 @@ public interface ClothingItemRepository extends JpaRepository<ClothingItem, Long
     List<ClothingItem> findByFavoriteTrue();
 
     List<ClothingItem> findByNameContainingIgnoreCase(String keyword);
+
+    List<ClothingItem> findByLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(Pageable pageable);
+
+    List<ClothingItem> findByWearCountGreaterThanOrderByWearCountDescIdAsc(Integer minimumWearCount, Pageable pageable);
+
+    List<ClothingItem> findAllByOrderByWearCountAscIdAsc(Pageable pageable);
 
     long countByFavoriteTrue();
 

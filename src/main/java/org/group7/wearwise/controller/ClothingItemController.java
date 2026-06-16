@@ -53,6 +53,36 @@ public class ClothingItemController {
                 .toList();
     }
 
+    @GetMapping("/recently-worn")
+    public List<ClothingItemResponse> getRecentlyWornItems(
+            @RequestParam(defaultValue = "5") Integer limit
+    ) {
+        return clothingItemService.getRecentlyWornItems(limit)
+                .stream()
+                .map(ClothingItemResponse::from)
+                .toList();
+    }
+
+    @GetMapping("/most-worn")
+    public List<ClothingItemResponse> getMostWornItems(
+            @RequestParam(defaultValue = "5") Integer limit
+    ) {
+        return clothingItemService.getMostWornItems(limit)
+                .stream()
+                .map(ClothingItemResponse::from)
+                .toList();
+    }
+
+    @GetMapping("/least-worn")
+    public List<ClothingItemResponse> getLeastWornItems(
+            @RequestParam(defaultValue = "5") Integer limit
+    ) {
+        return clothingItemService.getLeastWornItems(limit)
+                .stream()
+                .map(ClothingItemResponse::from)
+                .toList();
+    }
+
     @GetMapping("/{id}")
     public ClothingItemResponse getItem(@PathVariable Long id) {
         return ClothingItemResponse.from(clothingItemService.getItemById(id));

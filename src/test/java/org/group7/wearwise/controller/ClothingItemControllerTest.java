@@ -119,6 +119,70 @@ class ClothingItemControllerTest {
     }
 
     @Test
+    void recentlyWornItemsReturnsLimitedItems() throws Exception {
+        ClothingItem shirt = itemWithWear(
+                6L,
+                "White Shirt",
+                ClothingCategory.SHIRT,
+                4,
+                LocalDateTime.of(2026, 6, 15, 8, 30)
+        );
+        when(clothingItemService.getRecentlyWornItems(3)).thenReturn(List.of(shirt));
+
+        mockMvc.perform(get("/api/clothing-items/recently-worn")
+                        .param("limit", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(6))
+                .andExpect(jsonPath("$[0].wearCount").value(4));
+    }
+
+    @Test
+    void mostWornItemsReturnsLimitedItems() throws Exception {
+        ClothingItem shoes = itemWithWear(
+                7L,
+                "Running Shoes",
+                ClothingCategory.SHOES,
+                12,
+                LocalDateTime.of(2026, 6, 14, 18, 0)
+        );
+        when(clothingItemService.getMostWornItems(2)).thenReturn(List.of(shoes));
+
+        mockMvc.perform(get("/api/clothing-items/most-worn")
+                        .param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(7))
+                .andExpect(jsonPath("$[0].wearCount").value(12));
+    }
+
+    @Test
+    void leastWornItemsReturnsLimitedItems() throws Exception {
+        ClothingItem jacket = itemWithWear(
+                8L,
+                "Rain Jacket",
+                ClothingCategory.JACKET,
+                0,
+                null
+        );
+        when(clothingItemService.getLeastWornItems(5)).thenReturn(List.of(jacket));
+
+        mockMvc.perform(get("/api/clothing-items/least-worn"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(8))
+                .andExpect(jsonPath("$[0].wearCount").value(0));
+    }
+
+    @Test
+    void invalidListLimitReturnsBadRequest() throws Exception {
+        when(clothingItemService.getLeastWornItems(0))
+                .thenThrow(new IllegalArgumentException("Limit must be at least 1."));
+
+        mockMvc.perform(get("/api/clothing-items/least-worn")
+                        .param("limit", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Limit must be at least 1."));
+    }
+
+    @Test
     void getMissingItemReturnsNotFound() throws Exception {
         when(clothingItemService.getItemById(99L)).thenThrow(new ClothingItemNotFoundException(99L));
 
@@ -264,6 +328,32 @@ class ClothingItemControllerTest {
                 .status(ClothingStatus.AVAILABLE)
                 .wearCount(0)
                 .favorite(favorite)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+    }
+
+    private static ClothingItem itemWithWear(
+            Long id,
+            String name,
+            ClothingCategory category,
+            Integer wearCount,
+            LocalDateTime lastWornAt
+    ) {
+        LocalDateTime now = LocalDateTime.of(2026, 6, 9, 10, 0);
+
+        return ClothingItem.builder()
+                .id(id)
+                .name(name)
+                .color("Black")
+                .category(category)
+                .season(Season.ALL_SEASON)
+                .style(Style.CASUAL)
+                .condition(ClothingCondition.GOOD)
+                .status(ClothingStatus.AVAILABLE)
+                .wearCount(wearCount)
+                .lastWornAt(lastWornAt)
+                .favorite(false)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
