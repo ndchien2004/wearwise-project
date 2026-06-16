@@ -137,6 +137,11 @@ public class ClothingItemController {
         return ClothingItemResponse.from(clothingItemService.updateFavorite(id, request.favorite()));
     }
 
+    @PatchMapping("/{id}/wear")
+    public ClothingItemResponse markAsWorn(@PathVariable Long id) {
+        return ClothingItemResponse.from(clothingItemService.markAsWorn(id));
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteItem(@PathVariable Long id) {

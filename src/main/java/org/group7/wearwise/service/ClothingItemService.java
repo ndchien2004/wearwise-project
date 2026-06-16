@@ -146,6 +146,17 @@ public class ClothingItemService {
         return clothingItemRepository.save(item);
     }
 
+    @Transactional
+    public ClothingItem markAsWorn(Long id) {
+        ClothingItem item = getItemById(id);
+        int currentWearCount = item.getWearCount() == null ? 0 : item.getWearCount();
+
+        item.setWearCount(currentWearCount + 1);
+        item.setLastWornAt(LocalDateTime.now());
+
+        return clothingItemRepository.save(item);
+    }
+
     public List<ClothingItem> searchByName(String keyword) {
         return clothingItemRepository.findByNameContainingIgnoreCase(normalizeRequiredText(keyword, "Search keyword"));
     }

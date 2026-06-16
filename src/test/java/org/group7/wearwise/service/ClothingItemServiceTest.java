@@ -120,6 +120,49 @@ class ClothingItemServiceTest {
     }
 
     @Test
+    void markAsWornIncrementsWearCountAndUpdatesLastWornAt() {
+        ClothingItem item = ClothingItem.builder()
+                .id(1L)
+                .name("Black Jeans")
+                .color("Black")
+                .category(ClothingCategory.PANTS)
+                .season(Season.ALL_SEASON)
+                .style(Style.CASUAL)
+                .condition(ClothingCondition.GOOD)
+                .status(ClothingStatus.AVAILABLE)
+                .wearCount(2)
+                .favorite(false)
+                .build();
+        LocalDateTime beforeUpdate = LocalDateTime.now().minusSeconds(1);
+
+        when(clothingItemRepository.findById(1L)).thenReturn(Optional.of(item));
+        when(clothingItemRepository.save(any(ClothingItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ClothingItem updatedItem = clothingItemService.markAsWorn(1L);
+
+        assertThat(updatedItem.getWearCount()).isEqualTo(3);
+        assertThat(updatedItem.getLastWornAt()).isAfter(beforeUpdate);
+        verify(clothingItemRepository).save(item);
+    }
+
+    @Test
+    void markAsWornTreatsNullWearCountAsZero() {
+        ClothingItem item = ClothingItem.builder()
+                .id(2L)
+                .name("White Shirt")
+                .wearCount(null)
+                .build();
+
+        when(clothingItemRepository.findById(2L)).thenReturn(Optional.of(item));
+        when(clothingItemRepository.save(any(ClothingItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ClothingItem updatedItem = clothingItemService.markAsWorn(2L);
+
+        assertThat(updatedItem.getWearCount()).isEqualTo(1);
+        assertThat(updatedItem.getLastWornAt()).isNotNull();
+    }
+
+    @Test
     void findItemsDelegatesCombinedFilterSpecification() {
         ClothingItem sneaker = ClothingItem.builder()
                 .id(2L)

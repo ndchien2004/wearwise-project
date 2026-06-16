@@ -267,6 +267,24 @@ class ClothingItemControllerTest {
     }
 
     @Test
+    void markAsWornReturnsUpdatedItem() throws Exception {
+        ClothingItem updatedItem = itemWithWear(
+                9L,
+                "White Shirt",
+                ClothingCategory.SHIRT,
+                3,
+                LocalDateTime.of(2026, 6, 16, 9, 0)
+        );
+        when(clothingItemService.markAsWorn(9L)).thenReturn(updatedItem);
+
+        mockMvc.perform(patch("/api/clothing-items/9/wear"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(9))
+                .andExpect(jsonPath("$.wearCount").value(3))
+                .andExpect(jsonPath("$.lastWornAt").value("2026-06-16T09:00:00"));
+    }
+
+    @Test
     void deleteItemReturnsNoContent() throws Exception {
         mockMvc.perform(delete("/api/clothing-items/5"))
                 .andExpect(status().isNoContent());
