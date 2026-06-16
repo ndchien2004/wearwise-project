@@ -13,6 +13,7 @@ import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.service.ClothingItemService;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -39,6 +40,7 @@ public class ClothingItemController {
 
     @GetMapping
     public List<ClothingItemResponse> findItems(
+            Authentication authentication,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) ClothingCategory category,
             @RequestParam(required = false) Season season,
@@ -47,7 +49,7 @@ public class ClothingItemController {
             @RequestParam(required = false) ClothingStatus status,
             @RequestParam(required = false) Boolean favorite
     ) {
-        return clothingItemService.findItems(keyword, category, season, style, condition, status, favorite)
+        return clothingItemService.findItems(authentication.getName(), keyword, category, season, style, condition, status, favorite)
                 .stream()
                 .map(ClothingItemResponse::from)
                 .toList();
@@ -55,9 +57,10 @@ public class ClothingItemController {
 
     @GetMapping("/recently-worn")
     public List<ClothingItemResponse> getRecentlyWornItems(
+            Authentication authentication,
             @RequestParam(defaultValue = "5") Integer limit
     ) {
-        return clothingItemService.getRecentlyWornItems(limit)
+        return clothingItemService.getRecentlyWornItems(authentication.getName(), limit)
                 .stream()
                 .map(ClothingItemResponse::from)
                 .toList();
@@ -65,9 +68,10 @@ public class ClothingItemController {
 
     @GetMapping("/most-worn")
     public List<ClothingItemResponse> getMostWornItems(
+            Authentication authentication,
             @RequestParam(defaultValue = "5") Integer limit
     ) {
-        return clothingItemService.getMostWornItems(limit)
+        return clothingItemService.getMostWornItems(authentication.getName(), limit)
                 .stream()
                 .map(ClothingItemResponse::from)
                 .toList();
@@ -75,23 +79,25 @@ public class ClothingItemController {
 
     @GetMapping("/least-worn")
     public List<ClothingItemResponse> getLeastWornItems(
+            Authentication authentication,
             @RequestParam(defaultValue = "5") Integer limit
     ) {
-        return clothingItemService.getLeastWornItems(limit)
+        return clothingItemService.getLeastWornItems(authentication.getName(), limit)
                 .stream()
                 .map(ClothingItemResponse::from)
                 .toList();
     }
 
     @GetMapping("/{id}")
-    public ClothingItemResponse getItem(@PathVariable Long id) {
-        return ClothingItemResponse.from(clothingItemService.getItemById(id));
+    public ClothingItemResponse getItem(Authentication authentication, @PathVariable Long id) {
+        return ClothingItemResponse.from(clothingItemService.getItemById(authentication.getName(), id));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ClothingItemResponse createItem(@Valid @RequestBody ClothingItemRequest request) {
+    public ClothingItemResponse createItem(Authentication authentication, @Valid @RequestBody ClothingItemRequest request) {
         ClothingItem item = clothingItemService.createItem(
+                authentication.getName(),
                 request.name(),
                 request.color(),
                 request.category(),
@@ -109,10 +115,12 @@ public class ClothingItemController {
 
     @PutMapping("/{id}")
     public ClothingItemResponse updateItem(
+            Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody ClothingItemRequest request
     ) {
         ClothingItem item = clothingItemService.updateItem(
+                authentication.getName(),
                 id,
                 request.name(),
                 request.color(),
@@ -131,21 +139,22 @@ public class ClothingItemController {
 
     @PatchMapping("/{id}/favorite")
     public ClothingItemResponse updateFavorite(
+            Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody FavoriteRequest request
     ) {
-        return ClothingItemResponse.from(clothingItemService.updateFavorite(id, request.favorite()));
+        return ClothingItemResponse.from(clothingItemService.updateFavorite(authentication.getName(), id, request.favorite()));
     }
 
     @PatchMapping("/{id}/wear")
-    public ClothingItemResponse markAsWorn(@PathVariable Long id) {
-        return ClothingItemResponse.from(clothingItemService.markAsWorn(id));
+    public ClothingItemResponse markAsWorn(Authentication authentication, @PathVariable Long id) {
+        return ClothingItemResponse.from(clothingItemService.markAsWorn(authentication.getName(), id));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteItem(@PathVariable Long id) {
-        clothingItemService.deleteItem(id);
+    public void deleteItem(Authentication authentication, @PathVariable Long id) {
+        clothingItemService.deleteItem(authentication.getName(), id);
     }
 
     @GetMapping("/options")

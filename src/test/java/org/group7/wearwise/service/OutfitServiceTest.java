@@ -1,12 +1,15 @@
 package org.group7.wearwise.service;
 
+import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
+import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -23,11 +26,17 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OutfitServiceTest {
+
+    private static final String OWNER = "demo";
+
+    @Mock
+    private AppUserRepository appUserRepository;
 
     @Mock
     private OutfitRepository outfitRepository;
@@ -38,14 +47,22 @@ class OutfitServiceTest {
     @InjectMocks
     private OutfitService outfitService;
 
+    @BeforeEach
+    void setUpOwner() {
+        lenient().when(appUserRepository.findByUsername(OWNER))
+                .thenReturn(Optional.of(AppUser.builder().username(OWNER).build()));
+    }
+
     @Test
     void createOutfitNormalizesTextAndResolvesItems() {
         ClothingItem shirt = item(1L, "White Shirt");
         ClothingItem pants = item(2L, "Black Pants");
-        when(clothingItemRepository.findAllById(any())).thenReturn(List.of(shirt, pants));
+        when(clothingItemRepository.findByIdAndOwner_Username(1L, OWNER)).thenReturn(Optional.of(shirt));
+        when(clothingItemRepository.findByIdAndOwner_Username(2L, OWNER)).thenReturn(Optional.of(pants));
         when(outfitRepository.save(any(Outfit.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Outfit created = outfitService.createOutfit(
+                OWNER,
                 "  Office Set  ",
                 "  Work clothes  ",
                 Season.ALL_SEASON,
@@ -65,6 +82,7 @@ class OutfitServiceTest {
     @Test
     void createOutfitRejectsDuplicateItemIds() {
         assertThatThrownBy(() -> outfitService.createOutfit(
+                OWNER,
                 "Office Set",
                 null,
                 Season.ALL_SEASON,
@@ -77,9 +95,12 @@ class OutfitServiceTest {
 
     @Test
     void createOutfitReportsMissingClothingItem() {
-        when(clothingItemRepository.findAllById(any())).thenReturn(List.of(item(1L, "White Shirt")));
+        when(clothingItemRepository.findByIdAndOwner_Username(1L, OWNER))
+                .thenReturn(Optional.of(item(1L, "White Shirt")));
+        when(clothingItemRepository.findByIdAndOwner_Username(99L, OWNER)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> outfitService.createOutfit(
+                OWNER,
                 "Office Set",
                 null,
                 Season.ALL_SEASON,
@@ -99,11 +120,12 @@ class OutfitServiceTest {
                 .style(Style.CASUAL)
                 .build();
         ClothingItem shoes = item(3L, "Shoes");
-        when(outfitRepository.findById(10L)).thenReturn(Optional.of(outfit));
-        when(clothingItemRepository.findAllById(any())).thenReturn(List.of(shoes));
+        when(outfitRepository.findByIdAndOwner_Username(10L, OWNER)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.findByIdAndOwner_Username(3L, OWNER)).thenReturn(Optional.of(shoes));
         when(outfitRepository.save(outfit)).thenReturn(outfit);
 
         Outfit updated = outfitService.updateOutfit(
+                OWNER,
                 10L,
                 "Sport Set",
                 "Training",
@@ -123,7 +145,7 @@ class OutfitServiceTest {
         Outfit outfit = Outfit.builder().id(1L).name("Sport Set").build();
         when(outfitRepository.findAll(any(Specification.class))).thenReturn(List.of(outfit));
 
-        List<Outfit> outfits = outfitService.findOutfits("sport", Season.SUMMER, Style.SPORT, true);
+        List<Outfit> outfits = outfitService.findOutfits(OWNER, "sport", Season.SUMMER, Style.SPORT, true);
 
         assertThat(outfits).containsExactly(outfit);
         verify(outfitRepository).findAll(any(Specification.class));
@@ -139,11 +161,11 @@ class OutfitServiceTest {
                 .clothingItems(new LinkedHashSet<>(List.of(shirt)))
                 .build();
 
-        when(outfitRepository.findById(1L)).thenReturn(Optional.of(outfit));
-        when(clothingItemRepository.findById(2L)).thenReturn(Optional.of(pants));
+        when(outfitRepository.findByIdAndOwner_Username(1L, OWNER)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.findByIdAndOwner_Username(2L, OWNER)).thenReturn(Optional.of(pants));
         when(outfitRepository.save(outfit)).thenReturn(outfit);
 
-        Outfit updated = outfitService.addClothingItem(1L, 2L);
+        Outfit updated = outfitService.addClothingItem(OWNER, 1L, 2L);
 
         assertThat(updated.getClothingItems()).extracting(ClothingItem::getId)
                 .containsExactly(5L, 2L);
@@ -159,11 +181,11 @@ class OutfitServiceTest {
                 .clothingItems(new LinkedHashSet<>(List.of(shirt)))
                 .build();
 
-        when(outfitRepository.findById(1L)).thenReturn(Optional.of(outfit));
-        when(clothingItemRepository.findById(5L)).thenReturn(Optional.of(shirt));
+        when(outfitRepository.findByIdAndOwner_Username(1L, OWNER)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.findByIdAndOwner_Username(5L, OWNER)).thenReturn(Optional.of(shirt));
         when(outfitRepository.save(outfit)).thenReturn(outfit);
 
-        Outfit updated = outfitService.addClothingItem(1L, 5L);
+        Outfit updated = outfitService.addClothingItem(OWNER, 1L, 5L);
 
         assertThat(updated.getClothingItems()).hasSize(1);
         assertThat(updated.getClothingItems()).extracting(ClothingItem::getId)
@@ -180,11 +202,11 @@ class OutfitServiceTest {
                 .clothingItems(new LinkedHashSet<>(List.of(shirt, pants)))
                 .build();
 
-        when(outfitRepository.findById(1L)).thenReturn(Optional.of(outfit));
-        when(clothingItemRepository.findById(2L)).thenReturn(Optional.of(pants));
+        when(outfitRepository.findByIdAndOwner_Username(1L, OWNER)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.findByIdAndOwner_Username(2L, OWNER)).thenReturn(Optional.of(pants));
         when(outfitRepository.save(outfit)).thenReturn(outfit);
 
-        Outfit updated = outfitService.removeClothingItem(1L, 2L);
+        Outfit updated = outfitService.removeClothingItem(OWNER, 1L, 2L);
 
         assertThat(updated.getClothingItems()).extracting(ClothingItem::getId)
                 .containsExactly(5L);
@@ -200,10 +222,10 @@ class OutfitServiceTest {
                 .clothingItems(new LinkedHashSet<>(List.of(shirt)))
                 .build();
 
-        when(outfitRepository.findById(1L)).thenReturn(Optional.of(outfit));
-        when(clothingItemRepository.findById(5L)).thenReturn(Optional.of(shirt));
+        when(outfitRepository.findByIdAndOwner_Username(1L, OWNER)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.findByIdAndOwner_Username(5L, OWNER)).thenReturn(Optional.of(shirt));
 
-        assertThatThrownBy(() -> outfitService.removeClothingItem(1L, 5L))
+        assertThatThrownBy(() -> outfitService.removeClothingItem(OWNER, 1L, 5L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("At least one clothing item is required.");
     }
@@ -228,11 +250,11 @@ class OutfitServiceTest {
                 .build();
         LocalDateTime beforeUpdate = LocalDateTime.now().minusSeconds(1);
 
-        when(outfitRepository.findById(6L)).thenReturn(Optional.of(outfit));
+        when(outfitRepository.findByIdAndOwner_Username(6L, OWNER)).thenReturn(Optional.of(outfit));
         when(clothingItemRepository.saveAll(any())).thenReturn(List.of(shirt, pants));
         when(outfitRepository.save(outfit)).thenReturn(outfit);
 
-        Outfit updated = outfitService.markAsWorn(6L);
+        Outfit updated = outfitService.markAsWorn(OWNER, 6L);
 
         assertThat(updated.getWearCount()).isEqualTo(5);
         assertThat(updated.getLastWornAt()).isAfter(beforeUpdate);
@@ -247,9 +269,9 @@ class OutfitServiceTest {
     @Test
     void deleteOutfitDeletesExistingOutfit() {
         Outfit outfit = Outfit.builder().id(4L).name("Weekend").build();
-        when(outfitRepository.findById(4L)).thenReturn(Optional.of(outfit));
+        when(outfitRepository.findByIdAndOwner_Username(4L, OWNER)).thenReturn(Optional.of(outfit));
 
-        outfitService.deleteOutfit(4L);
+        outfitService.deleteOutfit(OWNER, 4L);
 
         verify(outfitRepository).delete(outfit);
     }

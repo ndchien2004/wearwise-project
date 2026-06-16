@@ -10,6 +10,7 @@ import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.service.OutfitService;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -36,26 +37,28 @@ public class OutfitController {
 
     @GetMapping
     public List<OutfitResponse> findOutfits(
+            Authentication authentication,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Season season,
             @RequestParam(required = false) Style style,
             @RequestParam(required = false) Boolean favorite
     ) {
-        return outfitService.findOutfits(keyword, season, style, favorite)
+        return outfitService.findOutfits(authentication.getName(), keyword, season, style, favorite)
                 .stream()
                 .map(OutfitResponse::from)
                 .toList();
     }
 
     @GetMapping("/{id}")
-    public OutfitResponse getOutfit(@PathVariable Long id) {
-        return OutfitResponse.from(outfitService.getOutfitById(id));
+    public OutfitResponse getOutfit(Authentication authentication, @PathVariable Long id) {
+        return OutfitResponse.from(outfitService.getOutfitById(authentication.getName(), id));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public OutfitResponse createOutfit(@Valid @RequestBody OutfitRequest request) {
+    public OutfitResponse createOutfit(Authentication authentication, @Valid @RequestBody OutfitRequest request) {
         Outfit outfit = outfitService.createOutfit(
+                authentication.getName(),
                 request.name(),
                 request.description(),
                 request.season(),
@@ -69,10 +72,12 @@ public class OutfitController {
 
     @PutMapping("/{id}")
     public OutfitResponse updateOutfit(
+            Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody OutfitRequest request
     ) {
         Outfit outfit = outfitService.updateOutfit(
+                authentication.getName(),
                 id,
                 request.name(),
                 request.description(),
@@ -87,37 +92,40 @@ public class OutfitController {
 
     @PatchMapping("/{id}/favorite")
     public OutfitResponse updateFavorite(
+            Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody FavoriteRequest request
     ) {
-        return OutfitResponse.from(outfitService.updateFavorite(id, request.favorite()));
+        return OutfitResponse.from(outfitService.updateFavorite(authentication.getName(), id, request.favorite()));
     }
 
     @PatchMapping("/{id}/wear")
-    public OutfitResponse markAsWorn(@PathVariable Long id) {
-        return OutfitResponse.from(outfitService.markAsWorn(id));
+    public OutfitResponse markAsWorn(Authentication authentication, @PathVariable Long id) {
+        return OutfitResponse.from(outfitService.markAsWorn(authentication.getName(), id));
     }
 
     @PatchMapping("/{outfitId}/items/{clothingItemId}")
     public OutfitResponse addClothingItem(
+            Authentication authentication,
             @PathVariable Long outfitId,
             @PathVariable Long clothingItemId
     ) {
-        return OutfitResponse.from(outfitService.addClothingItem(outfitId, clothingItemId));
+        return OutfitResponse.from(outfitService.addClothingItem(authentication.getName(), outfitId, clothingItemId));
     }
 
     @DeleteMapping("/{outfitId}/items/{clothingItemId}")
     public OutfitResponse removeClothingItem(
+            Authentication authentication,
             @PathVariable Long outfitId,
             @PathVariable Long clothingItemId
     ) {
-        return OutfitResponse.from(outfitService.removeClothingItem(outfitId, clothingItemId));
+        return OutfitResponse.from(outfitService.removeClothingItem(authentication.getName(), outfitId, clothingItemId));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteOutfit(@PathVariable Long id) {
-        outfitService.deleteOutfit(id);
+    public void deleteOutfit(Authentication authentication, @PathVariable Long id) {
+        outfitService.deleteOutfit(authentication.getName(), id);
     }
 
     @GetMapping("/options")

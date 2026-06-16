@@ -12,6 +12,7 @@ import org.group7.wearwise.service.ClothingItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.Validator;
@@ -36,6 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ClothingItemControllerTest {
 
+    private static final String OWNER = "demo";
+
     private ClothingItemService clothingItemService;
     private MockMvc mockMvc;
 
@@ -55,6 +58,7 @@ class ClothingItemControllerTest {
     void createItemReturnsCreatedItem() throws Exception {
         ClothingItem createdItem = item(1L, "White Shirt", "White", ClothingCategory.SHIRT, Season.ALL_SEASON, Style.FORMAL, true);
         when(clothingItemService.createItem(
+                OWNER,
                 "White Shirt",
                 "White",
                 ClothingCategory.SHIRT,
@@ -69,6 +73,7 @@ class ClothingItemControllerTest {
                 .thenReturn(createdItem);
 
         mockMvc.perform(post("/api/clothing-items")
+                        .principal(authentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -95,6 +100,7 @@ class ClothingItemControllerTest {
     void findItemsPassesCombinedFilters() throws Exception {
         ClothingItem sneaker = item(2L, "Running Sneakers", "Gray", ClothingCategory.SHOES, Season.SUMMER, Style.SPORT, true);
         when(clothingItemService.findItems(
+                OWNER,
                 "run",
                 ClothingCategory.SHOES,
                 Season.SUMMER,
@@ -106,6 +112,7 @@ class ClothingItemControllerTest {
                 .thenReturn(List.of(sneaker));
 
         mockMvc.perform(get("/api/clothing-items")
+                        .principal(authentication())
                         .param("keyword", "run")
                         .param("category", "SHOES")
                         .param("season", "SUMMER")
@@ -127,9 +134,10 @@ class ClothingItemControllerTest {
                 4,
                 LocalDateTime.of(2026, 6, 15, 8, 30)
         );
-        when(clothingItemService.getRecentlyWornItems(3)).thenReturn(List.of(shirt));
+        when(clothingItemService.getRecentlyWornItems(OWNER, 3)).thenReturn(List.of(shirt));
 
         mockMvc.perform(get("/api/clothing-items/recently-worn")
+                        .principal(authentication())
                         .param("limit", "3"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(6))
@@ -145,9 +153,10 @@ class ClothingItemControllerTest {
                 12,
                 LocalDateTime.of(2026, 6, 14, 18, 0)
         );
-        when(clothingItemService.getMostWornItems(2)).thenReturn(List.of(shoes));
+        when(clothingItemService.getMostWornItems(OWNER, 2)).thenReturn(List.of(shoes));
 
         mockMvc.perform(get("/api/clothing-items/most-worn")
+                        .principal(authentication())
                         .param("limit", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(7))
@@ -163,9 +172,10 @@ class ClothingItemControllerTest {
                 0,
                 null
         );
-        when(clothingItemService.getLeastWornItems(5)).thenReturn(List.of(jacket));
+        when(clothingItemService.getLeastWornItems(OWNER, 5)).thenReturn(List.of(jacket));
 
-        mockMvc.perform(get("/api/clothing-items/least-worn"))
+        mockMvc.perform(get("/api/clothing-items/least-worn")
+                        .principal(authentication()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(8))
                 .andExpect(jsonPath("$[0].wearCount").value(0));
@@ -173,10 +183,11 @@ class ClothingItemControllerTest {
 
     @Test
     void invalidListLimitReturnsBadRequest() throws Exception {
-        when(clothingItemService.getLeastWornItems(0))
+        when(clothingItemService.getLeastWornItems(OWNER, 0))
                 .thenThrow(new IllegalArgumentException("Limit must be at least 1."));
 
         mockMvc.perform(get("/api/clothing-items/least-worn")
+                        .principal(authentication())
                         .param("limit", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Limit must be at least 1."));
@@ -184,9 +195,10 @@ class ClothingItemControllerTest {
 
     @Test
     void getMissingItemReturnsNotFound() throws Exception {
-        when(clothingItemService.getItemById(99L)).thenThrow(new ClothingItemNotFoundException(99L));
+        when(clothingItemService.getItemById(OWNER, 99L)).thenThrow(new ClothingItemNotFoundException(99L));
 
-        mockMvc.perform(get("/api/clothing-items/99"))
+        mockMvc.perform(get("/api/clothing-items/99")
+                        .principal(authentication()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message", containsString("99")));
@@ -195,6 +207,7 @@ class ClothingItemControllerTest {
     @Test
     void invalidCreateRequestReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/clothing-items")
+                        .principal(authentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -216,6 +229,7 @@ class ClothingItemControllerTest {
     void updateItemReturnsUpdatedItem() throws Exception {
         ClothingItem updatedItem = item(3L, "Black Jeans", "Black", ClothingCategory.PANTS, Season.ALL_SEASON, Style.CASUAL, false);
         when(clothingItemService.updateItem(
+                OWNER,
                 3L,
                 "Black Jeans",
                 "Black",
@@ -231,6 +245,7 @@ class ClothingItemControllerTest {
                 .thenReturn(updatedItem);
 
         mockMvc.perform(put("/api/clothing-items/3")
+                        .principal(authentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -253,9 +268,10 @@ class ClothingItemControllerTest {
     @Test
     void updateFavoriteReturnsUpdatedItem() throws Exception {
         ClothingItem updatedItem = item(4L, "Silver Watch", "Silver", ClothingCategory.ACCESSORY, Season.ALL_SEASON, Style.FORMAL, true);
-        when(clothingItemService.updateFavorite(4L, true)).thenReturn(updatedItem);
+        when(clothingItemService.updateFavorite(OWNER, 4L, true)).thenReturn(updatedItem);
 
         mockMvc.perform(patch("/api/clothing-items/4/favorite")
+                        .principal(authentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -275,9 +291,10 @@ class ClothingItemControllerTest {
                 3,
                 LocalDateTime.of(2026, 6, 16, 9, 0)
         );
-        when(clothingItemService.markAsWorn(9L)).thenReturn(updatedItem);
+        when(clothingItemService.markAsWorn(OWNER, 9L)).thenReturn(updatedItem);
 
-        mockMvc.perform(patch("/api/clothing-items/9/wear"))
+        mockMvc.perform(patch("/api/clothing-items/9/wear")
+                        .principal(authentication()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(9))
                 .andExpect(jsonPath("$.wearCount").value(3))
@@ -286,10 +303,11 @@ class ClothingItemControllerTest {
 
     @Test
     void deleteItemReturnsNoContent() throws Exception {
-        mockMvc.perform(delete("/api/clothing-items/5"))
+        mockMvc.perform(delete("/api/clothing-items/5")
+                        .principal(authentication()))
                 .andExpect(status().isNoContent());
 
-        verify(clothingItemService).deleteItem(5L);
+        verify(clothingItemService).deleteItem(OWNER, 5L);
     }
 
     @Test
@@ -306,6 +324,7 @@ class ClothingItemControllerTest {
     @Test
     void invalidWearDataReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/clothing-items")
+                        .principal(authentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -381,5 +400,9 @@ class ClothingItemControllerTest {
         LocalValidatorFactoryBean validatorFactoryBean = new LocalValidatorFactoryBean();
         validatorFactoryBean.afterPropertiesSet();
         return validatorFactoryBean;
+    }
+
+    private static UsernamePasswordAuthenticationToken authentication() {
+        return new UsernamePasswordAuthenticationToken(OWNER, null);
     }
 }

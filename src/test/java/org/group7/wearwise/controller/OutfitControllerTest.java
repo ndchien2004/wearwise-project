@@ -13,6 +13,7 @@ import org.group7.wearwise.service.OutfitService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.Validator;
@@ -36,6 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class OutfitControllerTest {
 
+    private static final String OWNER = "demo";
+
     private OutfitService outfitService;
     private MockMvc mockMvc;
 
@@ -55,6 +58,7 @@ class OutfitControllerTest {
     void createOutfitReturnsCreatedOutfit() throws Exception {
         Outfit outfit = outfit(1L, "Office Set", Season.ALL_SEASON, Style.FORMAL, true);
         when(outfitService.createOutfit(
+                OWNER,
                 "Office Set",
                 "Work clothes",
                 Season.ALL_SEASON,
@@ -64,6 +68,7 @@ class OutfitControllerTest {
         )).thenReturn(outfit);
 
         mockMvc.perform(post("/api/outfits")
+                        .principal(authentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -84,10 +89,11 @@ class OutfitControllerTest {
     @Test
     void findOutfitsPassesFilters() throws Exception {
         Outfit outfit = outfit(2L, "Sport Set", Season.SUMMER, Style.SPORT, false);
-        when(outfitService.findOutfits("sport", Season.SUMMER, Style.SPORT, false))
+        when(outfitService.findOutfits(OWNER, "sport", Season.SUMMER, Style.SPORT, false))
                 .thenReturn(List.of(outfit));
 
         mockMvc.perform(get("/api/outfits")
+                        .principal(authentication())
                         .param("keyword", "sport")
                         .param("season", "SUMMER")
                         .param("style", "SPORT")
@@ -98,9 +104,10 @@ class OutfitControllerTest {
 
     @Test
     void getMissingOutfitReturnsNotFound() throws Exception {
-        when(outfitService.getOutfitById(99L)).thenThrow(new OutfitNotFoundException(99L));
+        when(outfitService.getOutfitById(OWNER, 99L)).thenThrow(new OutfitNotFoundException(99L));
 
-        mockMvc.perform(get("/api/outfits/99"))
+        mockMvc.perform(get("/api/outfits/99")
+                        .principal(authentication()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message", containsString("99")));
     }
@@ -108,6 +115,7 @@ class OutfitControllerTest {
     @Test
     void emptyClothingItemListReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/outfits")
+                        .principal(authentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -125,6 +133,7 @@ class OutfitControllerTest {
     @Test
     void duplicateClothingItemIdsReturnBadRequest() throws Exception {
         when(outfitService.createOutfit(
+                OWNER,
                 "Office Set",
                 null,
                 Season.ALL_SEASON,
@@ -134,6 +143,7 @@ class OutfitControllerTest {
         )).thenThrow(new IllegalArgumentException("Clothing item IDs must not contain duplicates."));
 
         mockMvc.perform(post("/api/outfits")
+                        .principal(authentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -153,6 +163,7 @@ class OutfitControllerTest {
     void updateOutfitReturnsUpdatedOutfit() throws Exception {
         Outfit outfit = outfit(3L, "Weekend Set", Season.WINTER, Style.CASUAL, false);
         when(outfitService.updateOutfit(
+                OWNER,
                 3L,
                 "Weekend Set",
                 null,
@@ -163,6 +174,7 @@ class OutfitControllerTest {
         )).thenReturn(outfit);
 
         mockMvc.perform(put("/api/outfits/3")
+                        .principal(authentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -180,9 +192,10 @@ class OutfitControllerTest {
     @Test
     void updateFavoriteReturnsUpdatedOutfit() throws Exception {
         Outfit outfit = outfit(4L, "Sport Set", Season.SUMMER, Style.SPORT, true);
-        when(outfitService.updateFavorite(4L, true)).thenReturn(outfit);
+        when(outfitService.updateFavorite(OWNER, 4L, true)).thenReturn(outfit);
 
         mockMvc.perform(patch("/api/outfits/4/favorite")
+                        .principal(authentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"favorite": true}
@@ -217,9 +230,10 @@ class OutfitControllerTest {
                 .lastWornAt(wornAt)
                 .clothingItems(new LinkedHashSet<>(List.of(item)))
                 .build();
-        when(outfitService.markAsWorn(6L)).thenReturn(outfit);
+        when(outfitService.markAsWorn(OWNER, 6L)).thenReturn(outfit);
 
-        mockMvc.perform(patch("/api/outfits/6/wear"))
+        mockMvc.perform(patch("/api/outfits/6/wear")
+                        .principal(authentication()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(6))
                 .andExpect(jsonPath("$.wearCount").value(2))
@@ -236,9 +250,10 @@ class OutfitControllerTest {
                 item(5L, "White Shirt"),
                 item(2L, "Black Pants")
         );
-        when(outfitService.addClothingItem(7L, 2L)).thenReturn(outfit);
+        when(outfitService.addClothingItem(OWNER, 7L, 2L)).thenReturn(outfit);
 
-        mockMvc.perform(patch("/api/outfits/7/items/2"))
+        mockMvc.perform(patch("/api/outfits/7/items/2")
+                        .principal(authentication()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(7))
                 .andExpect(jsonPath("$.clothingItems[0].id").value(5))
@@ -252,9 +267,10 @@ class OutfitControllerTest {
                 "Office Set",
                 item(5L, "White Shirt")
         );
-        when(outfitService.removeClothingItem(8L, 2L)).thenReturn(outfit);
+        when(outfitService.removeClothingItem(OWNER, 8L, 2L)).thenReturn(outfit);
 
-        mockMvc.perform(delete("/api/outfits/8/items/2"))
+        mockMvc.perform(delete("/api/outfits/8/items/2")
+                        .principal(authentication()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(8))
                 .andExpect(jsonPath("$.clothingItems.length()").value(1))
@@ -263,10 +279,11 @@ class OutfitControllerTest {
 
     @Test
     void deleteOutfitReturnsNoContent() throws Exception {
-        mockMvc.perform(delete("/api/outfits/5"))
+        mockMvc.perform(delete("/api/outfits/5")
+                        .principal(authentication()))
                 .andExpect(status().isNoContent());
 
-        verify(outfitService).deleteOutfit(5L);
+        verify(outfitService).deleteOutfit(OWNER, 5L);
     }
 
     @Test
@@ -331,5 +348,9 @@ class OutfitControllerTest {
         LocalValidatorFactoryBean validatorFactoryBean = new LocalValidatorFactoryBean();
         validatorFactoryBean.afterPropertiesSet();
         return validatorFactoryBean;
+    }
+
+    private static UsernamePasswordAuthenticationToken authentication() {
+        return new UsernamePasswordAuthenticationToken(OWNER, null);
     }
 }

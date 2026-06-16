@@ -13,13 +13,14 @@ public final class OutfitSpecifications {
     }
 
     public static Specification<Outfit> matchesFilters(
+            String ownerUsername,
             String keyword,
             Season season,
             Style style,
             Boolean favorite
     ) {
         return (root, query, criteriaBuilder) -> {
-            var predicate = criteriaBuilder.conjunction();
+            var predicate = criteriaBuilder.equal(root.get("owner").get("username"), ownerUsername);
 
             if (keyword != null && !keyword.trim().isBlank()) {
                 String normalizedKeyword = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";

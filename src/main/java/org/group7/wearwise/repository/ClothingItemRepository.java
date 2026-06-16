@@ -10,44 +10,56 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ClothingItemRepository extends JpaRepository<ClothingItem, Long>, JpaSpecificationExecutor<ClothingItem> {
 
-    List<ClothingItem> findByCategory(ClothingCategory category);
+    Optional<ClothingItem> findByIdAndOwner_Username(Long id, String username);
 
-    List<ClothingItem> findBySeason(Season season);
+    List<ClothingItem> findByCategoryAndOwner_Username(ClothingCategory category, String username);
 
-    List<ClothingItem> findByStyle(Style style);
+    List<ClothingItem> findBySeasonAndOwner_Username(Season season, String username);
 
-    List<ClothingItem> findByFavoriteTrue();
+    List<ClothingItem> findByStyleAndOwner_Username(Style style, String username);
 
-    List<ClothingItem> findByNameContainingIgnoreCase(String keyword);
+    List<ClothingItem> findByFavoriteTrueAndOwner_Username(String username);
 
-    List<ClothingItem> findByLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(Pageable pageable);
+    List<ClothingItem> findByNameContainingIgnoreCaseAndOwner_Username(String keyword, String username);
 
-    List<ClothingItem> findByWearCountGreaterThanOrderByWearCountDescIdAsc(Integer minimumWearCount, Pageable pageable);
+    List<ClothingItem> findByOwner_UsernameAndLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(String username, Pageable pageable);
 
-    List<ClothingItem> findAllByOrderByWearCountAscIdAsc(Pageable pageable);
+    List<ClothingItem> findByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(
+            String username,
+            Integer minimumWearCount,
+            Pageable pageable
+    );
 
-    long countByFavoriteTrue();
+    List<ClothingItem> findByOwner_UsernameOrderByWearCountAscIdAsc(String username, Pageable pageable);
 
-    List<ClothingItem> findTop5ByWearCountGreaterThanOrderByWearCountDescIdAsc(Integer minimumWearCount);
+    long countByOwner_Username(String username);
 
-    @Query("select coalesce(sum(item.wearCount), 0) from ClothingItem item")
-    long sumWearCount();
+    long countByOwner_UsernameAndFavoriteTrue(String username);
 
-    @Query("select item.category, count(item) from ClothingItem item group by item.category")
-    List<Object[]> countGroupedByCategory();
+    List<ClothingItem> findTop5ByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(
+            String username,
+            Integer minimumWearCount
+    );
 
-    @Query("select item.style, count(item) from ClothingItem item group by item.style")
-    List<Object[]> countGroupedByStyle();
+    @Query("select coalesce(sum(item.wearCount), 0) from ClothingItem item where item.owner.username = :username")
+    long sumWearCountByOwnerUsername(String username);
 
-    @Query("select item.season, count(item) from ClothingItem item group by item.season")
-    List<Object[]> countGroupedBySeason();
+    @Query("select item.category, count(item) from ClothingItem item where item.owner.username = :username group by item.category")
+    List<Object[]> countGroupedByCategory(String username);
 
-    @Query("select item.condition, count(item) from ClothingItem item group by item.condition")
-    List<Object[]> countGroupedByCondition();
+    @Query("select item.style, count(item) from ClothingItem item where item.owner.username = :username group by item.style")
+    List<Object[]> countGroupedByStyle(String username);
 
-    @Query("select item.status, count(item) from ClothingItem item group by item.status")
-    List<Object[]> countGroupedByStatus();
+    @Query("select item.season, count(item) from ClothingItem item where item.owner.username = :username group by item.season")
+    List<Object[]> countGroupedBySeason(String username);
+
+    @Query("select item.condition, count(item) from ClothingItem item where item.owner.username = :username group by item.condition")
+    List<Object[]> countGroupedByCondition(String username);
+
+    @Query("select item.status, count(item) from ClothingItem item where item.owner.username = :username group by item.status")
+    List<Object[]> countGroupedByStatus(String username);
 }

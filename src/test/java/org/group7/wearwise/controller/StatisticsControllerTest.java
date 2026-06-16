@@ -9,6 +9,7 @@ import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.service.StatisticsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -22,6 +23,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class StatisticsControllerTest {
+
+    private static final String OWNER = "demo";
 
     private StatisticsService statisticsService;
     private MockMvc mockMvc;
@@ -49,9 +52,10 @@ class StatisticsControllerTest {
                 Map.of(ClothingStatus.AVAILABLE, 3L),
                 List.of()
         );
-        when(statisticsService.getStatistics()).thenReturn(response);
+        when(statisticsService.getStatistics(OWNER)).thenReturn(response);
 
-        mockMvc.perform(get("/api/statistics"))
+        mockMvc.perform(get("/api/statistics")
+                        .principal(new UsernamePasswordAuthenticationToken(OWNER, null)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalClothingItems").value(5))
                 .andExpect(jsonPath("$.favoriteOutfits").value(1))

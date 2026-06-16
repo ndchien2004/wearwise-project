@@ -23,6 +23,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class StatisticsServiceTest {
 
+    private static final String OWNER = "demo";
+
     @Mock
     private ClothingItemRepository clothingItemRepository;
 
@@ -36,25 +38,25 @@ class StatisticsServiceTest {
     void getStatisticsCombinesTotalsGroupsAndTopItems() {
         ClothingItem first = item(1L, "Shirt", 8);
         ClothingItem second = item(2L, "Shoes", 5);
-        when(clothingItemRepository.count()).thenReturn(3L);
-        when(clothingItemRepository.countByFavoriteTrue()).thenReturn(2L);
-        when(outfitRepository.count()).thenReturn(2L);
-        when(outfitRepository.countByFavoriteTrue()).thenReturn(1L);
-        when(clothingItemRepository.sumWearCount()).thenReturn(13L);
-        when(clothingItemRepository.countGroupedByCategory())
+        when(clothingItemRepository.countByOwner_Username(OWNER)).thenReturn(3L);
+        when(clothingItemRepository.countByOwner_UsernameAndFavoriteTrue(OWNER)).thenReturn(2L);
+        when(outfitRepository.countByOwner_Username(OWNER)).thenReturn(2L);
+        when(outfitRepository.countByOwner_UsernameAndFavoriteTrue(OWNER)).thenReturn(1L);
+        when(clothingItemRepository.sumWearCountByOwnerUsername(OWNER)).thenReturn(13L);
+        when(clothingItemRepository.countGroupedByCategory(OWNER))
                 .thenReturn(List.<Object[]>of(new Object[]{ClothingCategory.SHIRT, 2L}));
-        when(clothingItemRepository.countGroupedByStyle())
+        when(clothingItemRepository.countGroupedByStyle(OWNER))
                 .thenReturn(List.<Object[]>of(new Object[]{Style.FORMAL, 1L}));
-        when(clothingItemRepository.countGroupedBySeason())
+        when(clothingItemRepository.countGroupedBySeason(OWNER))
                 .thenReturn(List.<Object[]>of(new Object[]{Season.ALL_SEASON, 3L}));
-        when(clothingItemRepository.countGroupedByCondition())
+        when(clothingItemRepository.countGroupedByCondition(OWNER))
                 .thenReturn(List.<Object[]>of(new Object[]{ClothingCondition.GOOD, 2L}));
-        when(clothingItemRepository.countGroupedByStatus())
+        when(clothingItemRepository.countGroupedByStatus(OWNER))
                 .thenReturn(List.<Object[]>of(new Object[]{ClothingStatus.AVAILABLE, 2L}));
-        when(clothingItemRepository.findTop5ByWearCountGreaterThanOrderByWearCountDescIdAsc(0))
+        when(clothingItemRepository.findTop5ByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(OWNER, 0))
                 .thenReturn(List.of(first, second));
 
-        StatisticsResponse response = statisticsService.getStatistics();
+        StatisticsResponse response = statisticsService.getStatistics(OWNER);
 
         assertThat(response.totalClothingItems()).isEqualTo(3);
         assertThat(response.favoriteClothingItems()).isEqualTo(2);

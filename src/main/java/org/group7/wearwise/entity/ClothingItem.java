@@ -62,6 +62,10 @@ public class ClothingItem {
 
     private Boolean favorite;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id")
+    private AppUser owner;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

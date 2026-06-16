@@ -1,13 +1,16 @@
 package org.group7.wearwise.service;
 
+import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.exception.ClothingItemInUseException;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
+import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitRepository;
 import org.group7.wearwise.repository.specification.ClothingItemSpecifications;
@@ -26,17 +29,21 @@ public class ClothingItemService {
 
     private final ClothingItemRepository clothingItemRepository;
     private final OutfitRepository outfitRepository;
+    private final AppUserRepository appUserRepository;
 
     public ClothingItemService(
             ClothingItemRepository clothingItemRepository,
-            OutfitRepository outfitRepository
+            OutfitRepository outfitRepository,
+            AppUserRepository appUserRepository
     ) {
         this.clothingItemRepository = clothingItemRepository;
         this.outfitRepository = outfitRepository;
+        this.appUserRepository = appUserRepository;
     }
 
     @Transactional
     public ClothingItem createItem(
+            String ownerUsername,
             String name,
             String color,
             ClothingCategory category,
@@ -50,6 +57,7 @@ public class ClothingItemService {
     ) {
         String normalizedName = normalizeRequiredText(name, "Name");
         String normalizedColor = normalizeOptionalText(color, "Color");
+        AppUser owner = getOwner(ownerUsername);
 
         ClothingItem item = ClothingItem.builder()
                 .name(normalizedName)
@@ -62,16 +70,29 @@ public class ClothingItemService {
                 .wearCount(normalizeWearCount(wearCount))
                 .lastWornAt(normalizeLastWornAt(lastWornAt))
                 .favorite(favorite != null && favorite)
+                .owner(owner)
                 .build();
 
         return clothingItemRepository.save(item);
     }
 
-    public List<ClothingItem> getAllItems() {
-        return clothingItemRepository.findAll();
+    public List<ClothingItem> getAllItems(String ownerUsername) {
+        return clothingItemRepository.findAll(
+                ClothingItemSpecifications.matchesFilters(
+                        normalizeOwnerUsername(ownerUsername),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                )
+        );
     }
 
     public List<ClothingItem> findItems(
+            String ownerUsername,
             String keyword,
             ClothingCategory category,
             Season season,
@@ -82,6 +103,7 @@ public class ClothingItemService {
     ) {
         return clothingItemRepository.findAll(
                 ClothingItemSpecifications.matchesFilters(
+                        normalizeOwnerUsername(ownerUsername),
                         keyword,
                         category,
                         season,
@@ -93,13 +115,14 @@ public class ClothingItemService {
         );
     }
 
-    public ClothingItem getItemById(Long id) {
-        return clothingItemRepository.findById(id)
+    public ClothingItem getItemById(String ownerUsername, Long id) {
+        return clothingItemRepository.findByIdAndOwner_Username(id, normalizeOwnerUsername(ownerUsername))
                 .orElseThrow(() -> new ClothingItemNotFoundException(id));
     }
 
     @Transactional
     public ClothingItem updateItem(
+            String ownerUsername,
             Long id,
             String name,
             String color,
@@ -112,7 +135,7 @@ public class ClothingItemService {
             LocalDateTime lastWornAt,
             Boolean favorite
     ) {
-        ClothingItem item = getItemById(id);
+        ClothingItem item = getItemById(ownerUsername, id);
 
         item.setName(normalizeRequiredText(name, "Name"));
         item.setColor(normalizeOptionalText(color, "Color"));
@@ -129,10 +152,11 @@ public class ClothingItemService {
     }
 
     @Transactional
-    public void deleteItem(Long id) {
-        ClothingItem item = getItemById(id);
+    public void deleteItem(String ownerUsername, Long id) {
+        String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
+        ClothingItem item = getItemById(normalizedOwnerUsername, id);
 
-        if (outfitRepository.existsByClothingItems_Id(id)) {
+        if (outfitRepository.existsByOwner_UsernameAndClothingItems_Id(normalizedOwnerUsername, id)) {
             throw new ClothingItemInUseException(id);
         }
 
@@ -140,15 +164,15 @@ public class ClothingItemService {
     }
 
     @Transactional
-    public ClothingItem updateFavorite(Long id, Boolean favorite) {
-        ClothingItem item = getItemById(id);
+    public ClothingItem updateFavorite(String ownerUsername, Long id, Boolean favorite) {
+        ClothingItem item = getItemById(ownerUsername, id);
         item.setFavorite(favorite != null && favorite);
         return clothingItemRepository.save(item);
     }
 
     @Transactional
-    public ClothingItem markAsWorn(Long id) {
-        ClothingItem item = getItemById(id);
+    public ClothingItem markAsWorn(String ownerUsername, Long id) {
+        ClothingItem item = getItemById(ownerUsername, id);
         int currentWearCount = item.getWearCount() == null ? 0 : item.getWearCount();
 
         item.setWearCount(currentWearCount + 1);
@@ -157,43 +181,71 @@ public class ClothingItemService {
         return clothingItemRepository.save(item);
     }
 
-    public List<ClothingItem> searchByName(String keyword) {
-        return clothingItemRepository.findByNameContainingIgnoreCase(normalizeRequiredText(keyword, "Search keyword"));
+    public List<ClothingItem> searchByName(String ownerUsername, String keyword) {
+        return clothingItemRepository.findByNameContainingIgnoreCaseAndOwner_Username(
+                normalizeRequiredText(keyword, "Search keyword"),
+                normalizeOwnerUsername(ownerUsername)
+        );
     }
 
-    public List<ClothingItem> filterByCategory(ClothingCategory category) {
-        return clothingItemRepository.findByCategory(requireCategory(category));
+    public List<ClothingItem> filterByCategory(String ownerUsername, ClothingCategory category) {
+        return clothingItemRepository.findByCategoryAndOwner_Username(
+                requireCategory(category),
+                normalizeOwnerUsername(ownerUsername)
+        );
     }
 
-    public List<ClothingItem> filterBySeason(Season season) {
-        return clothingItemRepository.findBySeason(requireSeason(season));
+    public List<ClothingItem> filterBySeason(String ownerUsername, Season season) {
+        return clothingItemRepository.findBySeasonAndOwner_Username(
+                requireSeason(season),
+                normalizeOwnerUsername(ownerUsername)
+        );
     }
 
-    public List<ClothingItem> filterByStyle(Style style) {
-        return clothingItemRepository.findByStyle(requireStyle(style));
+    public List<ClothingItem> filterByStyle(String ownerUsername, Style style) {
+        return clothingItemRepository.findByStyleAndOwner_Username(
+                requireStyle(style),
+                normalizeOwnerUsername(ownerUsername)
+        );
     }
 
-    public List<ClothingItem> getFavoriteItems() {
-        return clothingItemRepository.findByFavoriteTrue();
+    public List<ClothingItem> getFavoriteItems(String ownerUsername) {
+        return clothingItemRepository.findByFavoriteTrueAndOwner_Username(normalizeOwnerUsername(ownerUsername));
     }
 
-    public List<ClothingItem> getRecentlyWornItems(Integer limit) {
-        return clothingItemRepository.findByLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(
+    public List<ClothingItem> getRecentlyWornItems(String ownerUsername, Integer limit) {
+        return clothingItemRepository.findByOwner_UsernameAndLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(
+                normalizeOwnerUsername(ownerUsername),
                 PageRequest.of(0, normalizeLimit(limit))
         );
     }
 
-    public List<ClothingItem> getMostWornItems(Integer limit) {
-        return clothingItemRepository.findByWearCountGreaterThanOrderByWearCountDescIdAsc(
+    public List<ClothingItem> getMostWornItems(String ownerUsername, Integer limit) {
+        return clothingItemRepository.findByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(
+                normalizeOwnerUsername(ownerUsername),
                 0,
                 PageRequest.of(0, normalizeLimit(limit))
         );
     }
 
-    public List<ClothingItem> getLeastWornItems(Integer limit) {
-        return clothingItemRepository.findAllByOrderByWearCountAscIdAsc(
+    public List<ClothingItem> getLeastWornItems(String ownerUsername, Integer limit) {
+        return clothingItemRepository.findByOwner_UsernameOrderByWearCountAscIdAsc(
+                normalizeOwnerUsername(ownerUsername),
                 PageRequest.of(0, normalizeLimit(limit))
         );
+    }
+
+    private AppUser getOwner(String ownerUsername) {
+        return appUserRepository.findByUsername(normalizeOwnerUsername(ownerUsername))
+                .orElseThrow(AuthenticationFailedException::new);
+    }
+
+    private String normalizeOwnerUsername(String ownerUsername) {
+        if (ownerUsername == null || ownerUsername.trim().isBlank()) {
+            throw new AuthenticationFailedException();
+        }
+
+        return ownerUsername.trim();
     }
 
     private String normalizeRequiredText(String value, String fieldName) {

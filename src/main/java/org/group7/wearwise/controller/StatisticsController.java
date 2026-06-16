@@ -2,6 +2,7 @@ package org.group7.wearwise.controller;
 
 import org.group7.wearwise.dto.response.StatisticsResponse;
 import org.group7.wearwise.service.StatisticsService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,7 +18,7 @@ public class StatisticsController {
     }
 
     @GetMapping
-    public StatisticsResponse getStatistics() {
-        return statisticsService.getStatistics();
+    public StatisticsResponse getStatistics(Authentication authentication) {
+        return statisticsService.getStatistics(authentication.getName());
     }
 }

@@ -30,19 +30,19 @@ public class StatisticsService {
     }
 
     @Transactional(readOnly = true)
-    public StatisticsResponse getStatistics() {
+    public StatisticsResponse getStatistics(String ownerUsername) {
         return new StatisticsResponse(
-                clothingItemRepository.count(),
-                clothingItemRepository.countByFavoriteTrue(),
-                outfitRepository.count(),
-                outfitRepository.countByFavoriteTrue(),
-                clothingItemRepository.sumWearCount(),
-                groupedCounts(ClothingCategory.class, clothingItemRepository.countGroupedByCategory()),
-                groupedCounts(Style.class, clothingItemRepository.countGroupedByStyle()),
-                groupedCounts(Season.class, clothingItemRepository.countGroupedBySeason()),
-                groupedCounts(ClothingCondition.class, clothingItemRepository.countGroupedByCondition()),
-                groupedCounts(ClothingStatus.class, clothingItemRepository.countGroupedByStatus()),
-                clothingItemRepository.findTop5ByWearCountGreaterThanOrderByWearCountDescIdAsc(0)
+                clothingItemRepository.countByOwner_Username(ownerUsername),
+                clothingItemRepository.countByOwner_UsernameAndFavoriteTrue(ownerUsername),
+                outfitRepository.countByOwner_Username(ownerUsername),
+                outfitRepository.countByOwner_UsernameAndFavoriteTrue(ownerUsername),
+                clothingItemRepository.sumWearCountByOwnerUsername(ownerUsername),
+                groupedCounts(ClothingCategory.class, clothingItemRepository.countGroupedByCategory(ownerUsername)),
+                groupedCounts(Style.class, clothingItemRepository.countGroupedByStyle(ownerUsername)),
+                groupedCounts(Season.class, clothingItemRepository.countGroupedBySeason(ownerUsername)),
+                groupedCounts(ClothingCondition.class, clothingItemRepository.countGroupedByCondition(ownerUsername)),
+                groupedCounts(ClothingStatus.class, clothingItemRepository.countGroupedByStatus(ownerUsername)),
+                clothingItemRepository.findTop5ByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(ownerUsername, 0)
                         .stream()
                         .map(ClothingItemResponse::from)
                         .toList()

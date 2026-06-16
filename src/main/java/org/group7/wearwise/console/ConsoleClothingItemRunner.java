@@ -1,11 +1,13 @@
 package org.group7.wearwise.console;
 
+import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.service.ClothingItemService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,15 +24,23 @@ import java.util.Scanner;
 public class ConsoleClothingItemRunner implements CommandLineRunner {
 
     private static final int MAX_TEXT_LENGTH = 255;
+    private static final String CONSOLE_OWNER_USERNAME = "console";
 
     private final ClothingItemService clothingItemService;
+    private final AppUserRepository appUserRepository;
 
-    public ConsoleClothingItemRunner(ClothingItemService clothingItemService) {
+    public ConsoleClothingItemRunner(
+            ClothingItemService clothingItemService,
+            AppUserRepository appUserRepository
+    ) {
         this.clothingItemService = clothingItemService;
+        this.appUserRepository = appUserRepository;
     }
 
     @Override
     public void run(String... args) {
+        ensureConsoleOwnerExists();
+
         Scanner scanner = new Scanner(System.in);
         boolean running = true;
 
@@ -97,6 +107,7 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         Boolean favorite = readBoolean(scanner, "Favorite? true/false: ");
 
         ClothingItem createdItem = clothingItemService.createItem(
+                CONSOLE_OWNER_USERNAME,
                 name,
                 color,
                 category,
@@ -117,7 +128,7 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         System.out.println();
         System.out.println("----- All Clothing Items -----");
 
-        List<ClothingItem> items = clothingItemService.getAllItems();
+        List<ClothingItem> items = clothingItemService.getAllItems(CONSOLE_OWNER_USERNAME);
 
         if (items.isEmpty()) {
             System.out.println("No clothing items found.");
@@ -132,7 +143,7 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         System.out.println("----- Find Clothing Item By ID -----");
 
         Long id = readPositiveLong(scanner, "Enter ID: ");
-        ClothingItem item = clothingItemService.getItemById(id);
+        ClothingItem item = clothingItemService.getItemById(CONSOLE_OWNER_USERNAME, id);
         printItem(item);
     }
 
@@ -141,7 +152,7 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         System.out.println("----- Update Clothing Item -----");
 
         Long id = readPositiveLong(scanner, "Enter ID to update: ");
-        ClothingItem oldItem = clothingItemService.getItemById(id);
+        ClothingItem oldItem = clothingItemService.getItemById(CONSOLE_OWNER_USERNAME, id);
 
         System.out.println("Current item:");
         printItem(oldItem);
@@ -158,6 +169,7 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         Boolean favorite = readBoolean(scanner, "Favorite? true/false: ");
 
         ClothingItem updatedItem = clothingItemService.updateItem(
+                CONSOLE_OWNER_USERNAME,
                 id,
                 name,
                 color,
@@ -180,7 +192,7 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         System.out.println("----- Delete Clothing Item -----");
 
         Long id = readPositiveLong(scanner, "Enter ID to delete: ");
-        clothingItemService.deleteItem(id);
+        clothingItemService.deleteItem(CONSOLE_OWNER_USERNAME, id);
 
         System.out.println("Deleted successfully!");
     }
@@ -190,7 +202,7 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         System.out.println("----- Search By Name -----");
 
         String keyword = readRequiredText(scanner, "Enter keyword");
-        List<ClothingItem> items = clothingItemService.searchByName(keyword);
+        List<ClothingItem> items = clothingItemService.searchByName(CONSOLE_OWNER_USERNAME, keyword);
 
         if (items.isEmpty()) {
             System.out.println("No matching clothing items found.");
@@ -205,7 +217,7 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         System.out.println("----- Filter By Category -----");
 
         ClothingCategory category = inputCategory(scanner);
-        List<ClothingItem> items = clothingItemService.filterByCategory(category);
+        List<ClothingItem> items = clothingItemService.filterByCategory(CONSOLE_OWNER_USERNAME, category);
 
         if (items.isEmpty()) {
             System.out.println("No clothing items found with category: " + category);
@@ -219,7 +231,7 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         System.out.println();
         System.out.println("----- Favorite Clothing Items -----");
 
-        List<ClothingItem> items = clothingItemService.getFavoriteItems();
+        List<ClothingItem> items = clothingItemService.getFavoriteItems(CONSOLE_OWNER_USERNAME);
 
         if (items.isEmpty()) {
             System.out.println("No favorite clothing items found.");
@@ -485,6 +497,15 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
         System.out.println("Favorite: " + item.getFavorite());
         System.out.println("Created At: " + item.getCreatedAt());
         System.out.println("Updated At: " + item.getUpdatedAt());
+    }
+
+    private void ensureConsoleOwnerExists() {
+        appUserRepository.findByUsername(CONSOLE_OWNER_USERNAME)
+                .orElseGet(() -> appUserRepository.save(AppUser.builder()
+                        .username(CONSOLE_OWNER_USERNAME)
+                        .passwordHash("console-user-login-through-api")
+                        .role("USER")
+                        .build()));
     }
 
     private static class ConsoleInputEndedException extends RuntimeException {

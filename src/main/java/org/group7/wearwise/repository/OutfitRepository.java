@@ -15,11 +15,16 @@ public interface OutfitRepository extends JpaRepository<Outfit, Long>, JpaSpecif
     @EntityGraph(attributePaths = "clothingItems")
     Optional<Outfit> findById(Long id);
 
+    @EntityGraph(attributePaths = "clothingItems")
+    Optional<Outfit> findByIdAndOwner_Username(Long id, String username);
+
     @Override
     @EntityGraph(attributePaths = "clothingItems")
     List<Outfit> findAll(Specification<Outfit> specification);
 
-    boolean existsByClothingItems_Id(Long clothingItemId);
+    boolean existsByOwner_UsernameAndClothingItems_Id(String username, Long clothingItemId);
 
-    long countByFavoriteTrue();
+    long countByOwner_Username(String username);
+
+    long countByOwner_UsernameAndFavoriteTrue(String username);
 }

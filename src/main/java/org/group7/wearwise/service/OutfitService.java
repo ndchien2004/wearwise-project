@@ -1,11 +1,14 @@
 package org.group7.wearwise.service;
 
+import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.exception.OutfitNotFoundException;
+import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitRepository;
 import org.group7.wearwise.repository.specification.OutfitSpecifications;
@@ -13,10 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -27,17 +28,21 @@ public class OutfitService {
 
     private final OutfitRepository outfitRepository;
     private final ClothingItemRepository clothingItemRepository;
+    private final AppUserRepository appUserRepository;
 
     public OutfitService(
             OutfitRepository outfitRepository,
-            ClothingItemRepository clothingItemRepository
+            ClothingItemRepository clothingItemRepository,
+            AppUserRepository appUserRepository
     ) {
         this.outfitRepository = outfitRepository;
         this.clothingItemRepository = clothingItemRepository;
+        this.appUserRepository = appUserRepository;
     }
 
     @Transactional
     public Outfit createOutfit(
+            String ownerUsername,
             String name,
             String description,
             Season season,
@@ -45,13 +50,16 @@ public class OutfitService {
             Boolean favorite,
             List<Long> clothingItemIds
     ) {
+        AppUser owner = getOwner(ownerUsername);
+
         Outfit outfit = Outfit.builder()
                 .name(normalizeRequiredText(name, "Name", MAX_NAME_LENGTH))
                 .description(normalizeOptionalText(description, "Description", MAX_DESCRIPTION_LENGTH))
                 .season(requireSeason(season))
                 .style(requireStyle(style))
                 .favorite(favorite != null && favorite)
-                .clothingItems(resolveClothingItems(clothingItemIds))
+                .owner(owner)
+                .clothingItems(resolveClothingItems(owner.getUsername(), clothingItemIds))
                 .build();
 
         return outfitRepository.save(outfit);
@@ -59,24 +67,26 @@ public class OutfitService {
 
     @Transactional(readOnly = true)
     public List<Outfit> findOutfits(
+            String ownerUsername,
             String keyword,
             Season season,
             Style style,
             Boolean favorite
     ) {
         return outfitRepository.findAll(
-                OutfitSpecifications.matchesFilters(keyword, season, style, favorite)
+                OutfitSpecifications.matchesFilters(normalizeOwnerUsername(ownerUsername), keyword, season, style, favorite)
         );
     }
 
     @Transactional(readOnly = true)
-    public Outfit getOutfitById(Long id) {
-        return outfitRepository.findById(id)
+    public Outfit getOutfitById(String ownerUsername, Long id) {
+        return outfitRepository.findByIdAndOwner_Username(id, normalizeOwnerUsername(ownerUsername))
                 .orElseThrow(() -> new OutfitNotFoundException(id));
     }
 
     @Transactional
     public Outfit updateOutfit(
+            String ownerUsername,
             Long id,
             String name,
             String description,
@@ -85,28 +95,29 @@ public class OutfitService {
             Boolean favorite,
             List<Long> clothingItemIds
     ) {
-        Outfit outfit = getOutfitById(id);
+        String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
+        Outfit outfit = getOutfitById(normalizedOwnerUsername, id);
 
         outfit.setName(normalizeRequiredText(name, "Name", MAX_NAME_LENGTH));
         outfit.setDescription(normalizeOptionalText(description, "Description", MAX_DESCRIPTION_LENGTH));
         outfit.setSeason(requireSeason(season));
         outfit.setStyle(requireStyle(style));
         outfit.setFavorite(favorite != null && favorite);
-        outfit.setClothingItems(resolveClothingItems(clothingItemIds));
+        outfit.setClothingItems(resolveClothingItems(normalizedOwnerUsername, clothingItemIds));
 
         return outfitRepository.save(outfit);
     }
 
     @Transactional
-    public Outfit updateFavorite(Long id, Boolean favorite) {
-        Outfit outfit = getOutfitById(id);
+    public Outfit updateFavorite(String ownerUsername, Long id, Boolean favorite) {
+        Outfit outfit = getOutfitById(ownerUsername, id);
         outfit.setFavorite(favorite != null && favorite);
         return outfitRepository.save(outfit);
     }
 
     @Transactional
-    public Outfit markAsWorn(Long id) {
-        Outfit outfit = getOutfitById(id);
+    public Outfit markAsWorn(String ownerUsername, Long id) {
+        Outfit outfit = getOutfitById(ownerUsername, id);
         LocalDateTime wornAt = LocalDateTime.now();
 
         outfit.setWearCount(normalizeWearCount(outfit.getWearCount()) + 1);
@@ -122,9 +133,10 @@ public class OutfitService {
     }
 
     @Transactional
-    public Outfit addClothingItem(Long outfitId, Long clothingItemId) {
-        Outfit outfit = getOutfitById(outfitId);
-        ClothingItem item = getClothingItemById(clothingItemId);
+    public Outfit addClothingItem(String ownerUsername, Long outfitId, Long clothingItemId) {
+        String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
+        Outfit outfit = getOutfitById(normalizedOwnerUsername, outfitId);
+        ClothingItem item = getClothingItemById(normalizedOwnerUsername, clothingItemId);
 
         boolean alreadyAdded = outfit.getClothingItems()
                 .stream()
@@ -138,9 +150,10 @@ public class OutfitService {
     }
 
     @Transactional
-    public Outfit removeClothingItem(Long outfitId, Long clothingItemId) {
-        Outfit outfit = getOutfitById(outfitId);
-        ClothingItem item = getClothingItemById(clothingItemId);
+    public Outfit removeClothingItem(String ownerUsername, Long outfitId, Long clothingItemId) {
+        String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
+        Outfit outfit = getOutfitById(normalizedOwnerUsername, outfitId);
+        ClothingItem item = getClothingItemById(normalizedOwnerUsername, clothingItemId);
 
         boolean removed = outfit.getClothingItems()
                 .removeIf(existingItem -> existingItem.getId().equals(item.getId()));
@@ -156,12 +169,12 @@ public class OutfitService {
     }
 
     @Transactional
-    public void deleteOutfit(Long id) {
-        Outfit outfit = getOutfitById(id);
+    public void deleteOutfit(String ownerUsername, Long id) {
+        Outfit outfit = getOutfitById(ownerUsername, id);
         outfitRepository.delete(outfit);
     }
 
-    private Set<ClothingItem> resolveClothingItems(List<Long> clothingItemIds) {
+    private Set<ClothingItem> resolveClothingItems(String ownerUsername, List<Long> clothingItemIds) {
         if (clothingItemIds == null || clothingItemIds.isEmpty()) {
             throw new IllegalArgumentException("At least one clothing item is required.");
         }
@@ -175,31 +188,35 @@ public class OutfitService {
             throw new IllegalArgumentException("Clothing item IDs must not contain duplicates.");
         }
 
-        Map<Long, ClothingItem> itemsById = new LinkedHashMap<>();
-        clothingItemRepository.findAllById(uniqueIds)
-                .forEach(item -> itemsById.put(item.getId(), item));
-
         LinkedHashSet<ClothingItem> resolvedItems = new LinkedHashSet<>();
         for (Long clothingItemId : uniqueIds) {
-            ClothingItem item = itemsById.get(clothingItemId);
-
-            if (item == null) {
-                throw new ClothingItemNotFoundException(clothingItemId);
-            }
-
+            ClothingItem item = getClothingItemById(ownerUsername, clothingItemId);
             resolvedItems.add(item);
         }
 
         return resolvedItems;
     }
 
-    private ClothingItem getClothingItemById(Long clothingItemId) {
+    private ClothingItem getClothingItemById(String ownerUsername, Long clothingItemId) {
         if (clothingItemId == null || clothingItemId <= 0) {
             throw new IllegalArgumentException("Clothing item ID must be positive.");
         }
 
-        return clothingItemRepository.findById(clothingItemId)
+        return clothingItemRepository.findByIdAndOwner_Username(clothingItemId, normalizeOwnerUsername(ownerUsername))
                 .orElseThrow(() -> new ClothingItemNotFoundException(clothingItemId));
+    }
+
+    private AppUser getOwner(String ownerUsername) {
+        return appUserRepository.findByUsername(normalizeOwnerUsername(ownerUsername))
+                .orElseThrow(AuthenticationFailedException::new);
+    }
+
+    private String normalizeOwnerUsername(String ownerUsername) {
+        if (ownerUsername == null || ownerUsername.trim().isBlank()) {
+            throw new AuthenticationFailedException();
+        }
+
+        return ownerUsername.trim();
     }
 
     private String normalizeRequiredText(String value, String fieldName, int maxLength) {
