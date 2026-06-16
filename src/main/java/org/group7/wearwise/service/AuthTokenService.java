@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -62,6 +64,10 @@ public class AuthTokenService {
     }
 
     public Optional<String> validateAndGetUsername(String token) {
+        return validateAndGetDetails(token).map(AuthTokenDetails::username);
+    }
+
+    public Optional<AuthTokenDetails> validateAndGetDetails(String token) {
         try {
             String[] parts = token.split("\\.");
             if (parts.length != 3) {
@@ -87,9 +93,21 @@ public class AuthTokenService {
                 return Optional.empty();
             }
 
-            return Optional.of((String) username);
+            return Optional.of(new AuthTokenDetails(
+                    (String) username,
+                    Instant.ofEpochSecond(((Number) expiresAt).longValue())
+            ));
         } catch (RuntimeException | java.io.IOException exception) {
             return Optional.empty();
+        }
+    }
+
+    public String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return BASE64_URL_ENCODER.encodeToString(digest.digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("Unable to hash auth token.", exception);
         }
     }
 

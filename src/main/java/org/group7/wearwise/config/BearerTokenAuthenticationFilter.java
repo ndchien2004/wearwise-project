@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.service.AuthTokenService;
+import org.group7.wearwise.service.AuthTokenRevocationService;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,13 +22,16 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final AuthTokenService authTokenService;
+    private final AuthTokenRevocationService authTokenRevocationService;
     private final AppUserRepository appUserRepository;
 
     public BearerTokenAuthenticationFilter(
             AuthTokenService authTokenService,
+            AuthTokenRevocationService authTokenRevocationService,
             AppUserRepository appUserRepository
     ) {
         this.authTokenService = authTokenService;
+        this.authTokenRevocationService = authTokenRevocationService;
         this.appUserRepository = appUserRepository;
     }
 
@@ -44,6 +48,7 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
             String token = authorizationHeader.substring(BEARER_PREFIX.length());
             authTokenService.validateAndGetUsername(token)
+                    .filter(username -> !authTokenRevocationService.isRevoked(token))
                     .filter(appUserRepository::existsByUsername)
                     .ifPresent(this::authenticate);
         }

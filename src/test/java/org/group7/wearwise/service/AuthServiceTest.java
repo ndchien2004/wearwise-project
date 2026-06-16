@@ -1,6 +1,7 @@
 package org.group7.wearwise.service;
 
 import org.group7.wearwise.dto.response.AuthResponse;
+import org.group7.wearwise.dto.response.CurrentUserResponse;
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.repository.AppUserRepository;
@@ -28,11 +29,19 @@ class AuthServiceTest {
     @Mock
     private AppUserRepository appUserRepository;
 
+    @Mock
+    private AuthTokenRevocationService authTokenRevocationService;
+
     @Test
     void registerNormalizesUsernameHashesPasswordAndReturnsToken() {
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         AuthTokenService authTokenService = new AuthTokenService(TEST_TOKEN_SECRET, 3600);
-        AuthService authService = new AuthService(appUserRepository, passwordEncoder, authTokenService);
+        AuthService authService = new AuthService(
+                appUserRepository,
+                passwordEncoder,
+                authTokenService,
+                authTokenRevocationService
+        );
         ArgumentCaptor<AppUser> userCaptor = ArgumentCaptor.forClass(AppUser.class);
 
         when(appUserRepository.existsByUsername("demo")).thenReturn(false);
@@ -53,7 +62,8 @@ class AuthServiceTest {
         AuthService authService = new AuthService(
                 appUserRepository,
                 new BCryptPasswordEncoder(),
-                new AuthTokenService(TEST_TOKEN_SECRET, 3600)
+                new AuthTokenService(TEST_TOKEN_SECRET, 3600),
+                authTokenRevocationService
         );
         when(appUserRepository.existsByUsername("demo")).thenReturn(true);
 
@@ -72,12 +82,50 @@ class AuthServiceTest {
         AuthService authService = new AuthService(
                 appUserRepository,
                 passwordEncoder,
-                new AuthTokenService(TEST_TOKEN_SECRET, 3600)
+                new AuthTokenService(TEST_TOKEN_SECRET, 3600),
+                authTokenRevocationService
         );
         when(appUserRepository.findByUsername("demo")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> authService.login("demo", "wrong-password"))
                 .isInstanceOf(AuthenticationFailedException.class)
                 .hasMessage("Invalid username or password.");
+    }
+
+    @Test
+    void getCurrentUserReturnsUserProfile() {
+        AppUser user = AppUser.builder()
+                .id(1L)
+                .username("demo")
+                .passwordHash("hash")
+                .role("USER")
+                .build();
+        AuthService authService = new AuthService(
+                appUserRepository,
+                new BCryptPasswordEncoder(),
+                new AuthTokenService(TEST_TOKEN_SECRET, 3600),
+                authTokenRevocationService
+        );
+        when(appUserRepository.findByUsername("demo")).thenReturn(Optional.of(user));
+
+        CurrentUserResponse response = authService.getCurrentUser(" Demo ");
+
+        assertThat(response.id()).isEqualTo(1L);
+        assertThat(response.username()).isEqualTo("demo");
+        assertThat(response.role()).isEqualTo("USER");
+    }
+
+    @Test
+    void logoutRevokesBearerToken() {
+        AuthService authService = new AuthService(
+                appUserRepository,
+                new BCryptPasswordEncoder(),
+                new AuthTokenService(TEST_TOKEN_SECRET, 3600),
+                authTokenRevocationService
+        );
+
+        authService.logout("Bearer token-value");
+
+        verify(authTokenRevocationService).revoke("token-value");
     }
 }

@@ -19,6 +19,30 @@ class AuthTokenServiceTest {
     }
 
     @Test
+    void createdTokenValidatesBackToDetails() {
+        AuthTokenService authTokenService = new AuthTokenService(TEST_TOKEN_SECRET, 3600);
+
+        String token = authTokenService.createToken("demo");
+
+        assertThat(authTokenService.validateAndGetDetails(token))
+                .hasValueSatisfying(details -> {
+                    assertThat(details.username()).isEqualTo("demo");
+                    assertThat(details.expiresAt()).isNotNull();
+                });
+    }
+
+    @Test
+    void hashTokenReturnsStableValueWithoutRawToken() {
+        AuthTokenService authTokenService = new AuthTokenService(TEST_TOKEN_SECRET, 3600);
+
+        String firstHash = authTokenService.hashToken("token-value");
+        String secondHash = authTokenService.hashToken("token-value");
+
+        assertThat(firstHash).isEqualTo(secondHash);
+        assertThat(firstHash).doesNotContain("token-value");
+    }
+
+    @Test
     void tamperedTokenIsRejected() {
         AuthTokenService authTokenService = new AuthTokenService(TEST_TOKEN_SECRET, 3600);
 

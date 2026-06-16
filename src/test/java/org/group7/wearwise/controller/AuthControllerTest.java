@@ -1,19 +1,25 @@
 package org.group7.wearwise.controller;
 
 import org.group7.wearwise.dto.response.AuthResponse;
+import org.group7.wearwise.dto.response.CurrentUserResponse;
 import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.exception.GlobalExceptionHandler;
 import org.group7.wearwise.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.Validator;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import java.time.LocalDateTime;
+
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -69,6 +75,29 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("token-value"));
+    }
+
+    @Test
+    void meReturnsCurrentUser() throws Exception {
+        when(authService.getCurrentUser("demo"))
+                .thenReturn(new CurrentUserResponse(1L, "demo", "USER", LocalDateTime.of(2026, 6, 16, 10, 0)));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .principal(new UsernamePasswordAuthenticationToken("demo", null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.username").value("demo"))
+                .andExpect(jsonPath("$.role").value("USER"));
+    }
+
+    @Test
+    void logoutRevokesBearerToken() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer token-value")
+                        .principal(new UsernamePasswordAuthenticationToken("demo", null)))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logout("Bearer token-value");
     }
 
     @Test

@@ -1,6 +1,7 @@
 package org.group7.wearwise.service;
 
 import org.group7.wearwise.dto.response.AuthResponse;
+import org.group7.wearwise.dto.response.CurrentUserResponse;
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.repository.AppUserRepository;
@@ -16,15 +17,18 @@ public class AuthService {
     private final AppUserRepository appUserRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthTokenService authTokenService;
+    private final AuthTokenRevocationService authTokenRevocationService;
 
     public AuthService(
             AppUserRepository appUserRepository,
             PasswordEncoder passwordEncoder,
-            AuthTokenService authTokenService
+            AuthTokenService authTokenService,
+            AuthTokenRevocationService authTokenRevocationService
     ) {
         this.appUserRepository = appUserRepository;
         this.passwordEncoder = passwordEncoder;
         this.authTokenService = authTokenService;
+        this.authTokenRevocationService = authTokenRevocationService;
     }
 
     @Transactional
@@ -58,6 +62,19 @@ public class AuthService {
         return authResponse(normalizedUsername);
     }
 
+    @Transactional(readOnly = true)
+    public CurrentUserResponse getCurrentUser(String username) {
+        AppUser user = appUserRepository.findByUsername(normalizeUsername(username))
+                .orElseThrow(AuthenticationFailedException::new);
+
+        return CurrentUserResponse.from(user);
+    }
+
+    @Transactional
+    public void logout(String authorizationHeader) {
+        authTokenRevocationService.revoke(extractBearerToken(authorizationHeader));
+    }
+
     private AuthResponse authResponse(String username) {
         return new AuthResponse(
                 "Bearer",
@@ -73,5 +90,18 @@ public class AuthService {
         }
 
         return username.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new AuthenticationFailedException();
+        }
+
+        String token = authorizationHeader.substring("Bearer ".length()).trim();
+        if (token.isBlank()) {
+            throw new AuthenticationFailedException();
+        }
+
+        return token;
     }
 }

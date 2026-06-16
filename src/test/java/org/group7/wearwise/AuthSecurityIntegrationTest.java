@@ -2,6 +2,7 @@ package org.group7.wearwise;
 
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.repository.AppUserRepository;
+import org.group7.wearwise.repository.RevokedAuthTokenRepository;
 import org.group7.wearwise.service.AuthTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,9 @@ class AuthSecurityIntegrationTest {
     private AppUserRepository appUserRepository;
 
     @Autowired
+    private RevokedAuthTokenRepository revokedAuthTokenRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -35,6 +39,7 @@ class AuthSecurityIntegrationTest {
 
     @BeforeEach
     void cleanUsers() {
+        revokedAuthTokenRepository.deleteAll();
         appUserRepository.deleteAll();
     }
 
@@ -70,5 +75,49 @@ class AuthSecurityIntegrationTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty());
+    }
+
+    @Test
+    void meEndpointRequiresBearerToken() throws Exception {
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void meEndpointReturnsCurrentUserForValidBearerToken() throws Exception {
+        appUserRepository.save(AppUser.builder()
+                .username("demo")
+                .passwordHash(passwordEncoder.encode("password123"))
+                .role("USER")
+                .build());
+        String token = authTokenService.createToken("demo");
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("demo"))
+                .andExpect(jsonPath("$.role").value("USER"));
+    }
+
+    @Test
+    void logoutRevokesCurrentBearerToken() throws Exception {
+        appUserRepository.save(AppUser.builder()
+                .username("demo")
+                .passwordHash(passwordEncoder.encode("password123"))
+                .role("USER")
+                .build());
+        String token = authTokenService.createToken("demo");
+
+        mockMvc.perform(get("/api/clothing-items")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/clothing-items")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
     }
 }
