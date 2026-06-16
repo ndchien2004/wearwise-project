@@ -12,6 +12,7 @@ import org.group7.wearwise.repository.specification.OutfitSpecifications;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -104,6 +105,57 @@ public class OutfitService {
     }
 
     @Transactional
+    public Outfit markAsWorn(Long id) {
+        Outfit outfit = getOutfitById(id);
+        LocalDateTime wornAt = LocalDateTime.now();
+
+        outfit.setWearCount(normalizeWearCount(outfit.getWearCount()) + 1);
+        outfit.setLastWornAt(wornAt);
+
+        outfit.getClothingItems().forEach(item -> {
+            item.setWearCount(normalizeWearCount(item.getWearCount()) + 1);
+            item.setLastWornAt(wornAt);
+        });
+
+        clothingItemRepository.saveAll(outfit.getClothingItems());
+        return outfitRepository.save(outfit);
+    }
+
+    @Transactional
+    public Outfit addClothingItem(Long outfitId, Long clothingItemId) {
+        Outfit outfit = getOutfitById(outfitId);
+        ClothingItem item = getClothingItemById(clothingItemId);
+
+        boolean alreadyAdded = outfit.getClothingItems()
+                .stream()
+                .anyMatch(existingItem -> existingItem.getId().equals(clothingItemId));
+
+        if (!alreadyAdded) {
+            outfit.getClothingItems().add(item);
+        }
+
+        return outfitRepository.save(outfit);
+    }
+
+    @Transactional
+    public Outfit removeClothingItem(Long outfitId, Long clothingItemId) {
+        Outfit outfit = getOutfitById(outfitId);
+        ClothingItem item = getClothingItemById(clothingItemId);
+
+        boolean removed = outfit.getClothingItems()
+                .removeIf(existingItem -> existingItem.getId().equals(item.getId()));
+        if (!removed) {
+            throw new IllegalArgumentException("Clothing item is not part of this outfit.");
+        }
+
+        if (outfit.getClothingItems().isEmpty()) {
+            throw new IllegalArgumentException("At least one clothing item is required.");
+        }
+
+        return outfitRepository.save(outfit);
+    }
+
+    @Transactional
     public void deleteOutfit(Long id) {
         Outfit outfit = getOutfitById(id);
         outfitRepository.delete(outfit);
@@ -139,6 +191,15 @@ public class OutfitService {
         }
 
         return resolvedItems;
+    }
+
+    private ClothingItem getClothingItemById(Long clothingItemId) {
+        if (clothingItemId == null || clothingItemId <= 0) {
+            throw new IllegalArgumentException("Clothing item ID must be positive.");
+        }
+
+        return clothingItemRepository.findById(clothingItemId)
+                .orElseThrow(() -> new ClothingItemNotFoundException(clothingItemId));
     }
 
     private String normalizeRequiredText(String value, String fieldName, int maxLength) {
@@ -181,5 +242,9 @@ public class OutfitService {
         }
 
         return style;
+    }
+
+    private int normalizeWearCount(Integer wearCount) {
+        return wearCount == null ? 0 : wearCount;
     }
 }

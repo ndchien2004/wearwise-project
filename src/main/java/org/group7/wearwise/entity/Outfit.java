@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.hibernate.annotations.ColumnDefault;
 
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -57,6 +58,13 @@ public class Outfit {
     @Builder.Default
     private Boolean favorite = false;
 
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+    private Integer wearCount = 0;
+
+    private LocalDateTime lastWornAt;
+
     @ManyToMany
     @JoinTable(
             name = "outfit_clothing_items",
@@ -78,6 +86,10 @@ public class Outfit {
 
         if (this.favorite == null) {
             this.favorite = false;
+        }
+
+        if (this.wearCount == null) {
+            this.wearCount = 0;
         }
 
         if (this.clothingItems == null) {

@@ -192,6 +192,76 @@ class OutfitControllerTest {
     }
 
     @Test
+    void markAsWornReturnsUpdatedOutfitAndItems() throws Exception {
+        LocalDateTime wornAt = LocalDateTime.of(2026, 6, 16, 14, 0);
+        ClothingItem item = ClothingItem.builder()
+                .id(1L)
+                .name("White Shirt")
+                .color("White")
+                .category(ClothingCategory.SHIRT)
+                .season(Season.ALL_SEASON)
+                .style(Style.FORMAL)
+                .condition(ClothingCondition.GOOD)
+                .status(ClothingStatus.AVAILABLE)
+                .wearCount(3)
+                .lastWornAt(wornAt)
+                .favorite(true)
+                .build();
+        Outfit outfit = Outfit.builder()
+                .id(6L)
+                .name("Office Set")
+                .season(Season.ALL_SEASON)
+                .style(Style.FORMAL)
+                .favorite(false)
+                .wearCount(2)
+                .lastWornAt(wornAt)
+                .clothingItems(new LinkedHashSet<>(List.of(item)))
+                .build();
+        when(outfitService.markAsWorn(6L)).thenReturn(outfit);
+
+        mockMvc.perform(patch("/api/outfits/6/wear"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(6))
+                .andExpect(jsonPath("$.wearCount").value(2))
+                .andExpect(jsonPath("$.lastWornAt").value("2026-06-16T14:00:00"))
+                .andExpect(jsonPath("$.clothingItems[0].wearCount").value(3))
+                .andExpect(jsonPath("$.clothingItems[0].lastWornAt").value("2026-06-16T14:00:00"));
+    }
+
+    @Test
+    void addClothingItemReturnsUpdatedOutfit() throws Exception {
+        Outfit outfit = outfitWithItems(
+                7L,
+                "Office Set",
+                item(5L, "White Shirt"),
+                item(2L, "Black Pants")
+        );
+        when(outfitService.addClothingItem(7L, 2L)).thenReturn(outfit);
+
+        mockMvc.perform(patch("/api/outfits/7/items/2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(7))
+                .andExpect(jsonPath("$.clothingItems[0].id").value(5))
+                .andExpect(jsonPath("$.clothingItems[1].id").value(2));
+    }
+
+    @Test
+    void removeClothingItemReturnsUpdatedOutfit() throws Exception {
+        Outfit outfit = outfitWithItems(
+                8L,
+                "Office Set",
+                item(5L, "White Shirt")
+        );
+        when(outfitService.removeClothingItem(8L, 2L)).thenReturn(outfit);
+
+        mockMvc.perform(delete("/api/outfits/8/items/2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(8))
+                .andExpect(jsonPath("$.clothingItems.length()").value(1))
+                .andExpect(jsonPath("$.clothingItems[0].id").value(5));
+    }
+
+    @Test
     void deleteOutfitReturnsNoContent() throws Exception {
         mockMvc.perform(delete("/api/outfits/5"))
                 .andExpect(status().isNoContent());
@@ -209,20 +279,7 @@ class OutfitControllerTest {
 
     private static Outfit outfit(Long id, String name, Season season, Style style, Boolean favorite) {
         LocalDateTime now = LocalDateTime.of(2026, 6, 15, 10, 0);
-        ClothingItem item = ClothingItem.builder()
-                .id(1L)
-                .name("White Shirt")
-                .color("White")
-                .category(ClothingCategory.SHIRT)
-                .season(Season.ALL_SEASON)
-                .style(Style.FORMAL)
-                .condition(ClothingCondition.GOOD)
-                .status(ClothingStatus.AVAILABLE)
-                .wearCount(2)
-                .favorite(true)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
+        ClothingItem item = item(1L, "White Shirt");
 
         return Outfit.builder()
                 .id(id)
@@ -231,6 +288,40 @@ class OutfitControllerTest {
                 .style(style)
                 .favorite(favorite)
                 .clothingItems(new LinkedHashSet<>(List.of(item)))
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+    }
+
+    private static Outfit outfitWithItems(Long id, String name, ClothingItem... items) {
+        LocalDateTime now = LocalDateTime.of(2026, 6, 15, 10, 0);
+
+        return Outfit.builder()
+                .id(id)
+                .name(name)
+                .season(Season.ALL_SEASON)
+                .style(Style.FORMAL)
+                .favorite(false)
+                .clothingItems(new LinkedHashSet<>(List.of(items)))
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+    }
+
+    private static ClothingItem item(Long id, String name) {
+        LocalDateTime now = LocalDateTime.of(2026, 6, 15, 10, 0);
+
+        return ClothingItem.builder()
+                .id(id)
+                .name(name)
+                .color("White")
+                .category(ClothingCategory.SHIRT)
+                .season(Season.ALL_SEASON)
+                .style(Style.FORMAL)
+                .condition(ClothingCondition.GOOD)
+                .status(ClothingStatus.AVAILABLE)
+                .wearCount(2)
+                .favorite(true)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();

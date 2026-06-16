@@ -14,6 +14,8 @@ public record OutfitResponse(
         Season season,
         Style style,
         Boolean favorite,
+        Integer wearCount,
+        LocalDateTime lastWornAt,
         List<ClothingItemResponse> clothingItems,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -27,6 +29,8 @@ public record OutfitResponse(
                 outfit.getSeason(),
                 outfit.getStyle(),
                 outfit.getFavorite(),
+                outfit.getWearCount(),
+                outfit.getLastWornAt(),
                 outfit.getClothingItems().stream()
                         .map(ClothingItemResponse::from)
                         .toList(),

@@ -15,6 +15,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -125,6 +127,121 @@ class OutfitServiceTest {
 
         assertThat(outfits).containsExactly(outfit);
         verify(outfitRepository).findAll(any(Specification.class));
+    }
+
+    @Test
+    void addClothingItemAddsItemToOutfit() {
+        ClothingItem shirt = item(5L, "White Shirt");
+        ClothingItem pants = item(2L, "Black Pants");
+        Outfit outfit = Outfit.builder()
+                .id(1L)
+                .name("Office Set")
+                .clothingItems(new LinkedHashSet<>(List.of(shirt)))
+                .build();
+
+        when(outfitRepository.findById(1L)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.findById(2L)).thenReturn(Optional.of(pants));
+        when(outfitRepository.save(outfit)).thenReturn(outfit);
+
+        Outfit updated = outfitService.addClothingItem(1L, 2L);
+
+        assertThat(updated.getClothingItems()).extracting(ClothingItem::getId)
+                .containsExactly(5L, 2L);
+        verify(outfitRepository).save(outfit);
+    }
+
+    @Test
+    void addClothingItemDoesNotDuplicateExistingItem() {
+        ClothingItem shirt = item(5L, "White Shirt");
+        Outfit outfit = Outfit.builder()
+                .id(1L)
+                .name("Office Set")
+                .clothingItems(new LinkedHashSet<>(List.of(shirt)))
+                .build();
+
+        when(outfitRepository.findById(1L)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.findById(5L)).thenReturn(Optional.of(shirt));
+        when(outfitRepository.save(outfit)).thenReturn(outfit);
+
+        Outfit updated = outfitService.addClothingItem(1L, 5L);
+
+        assertThat(updated.getClothingItems()).hasSize(1);
+        assertThat(updated.getClothingItems()).extracting(ClothingItem::getId)
+                .containsExactly(5L);
+    }
+
+    @Test
+    void removeClothingItemRemovesItemFromOutfit() {
+        ClothingItem shirt = item(5L, "White Shirt");
+        ClothingItem pants = item(2L, "Black Pants");
+        Outfit outfit = Outfit.builder()
+                .id(1L)
+                .name("Office Set")
+                .clothingItems(new LinkedHashSet<>(List.of(shirt, pants)))
+                .build();
+
+        when(outfitRepository.findById(1L)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.findById(2L)).thenReturn(Optional.of(pants));
+        when(outfitRepository.save(outfit)).thenReturn(outfit);
+
+        Outfit updated = outfitService.removeClothingItem(1L, 2L);
+
+        assertThat(updated.getClothingItems()).extracting(ClothingItem::getId)
+                .containsExactly(5L);
+        verify(outfitRepository).save(outfit);
+    }
+
+    @Test
+    void removeClothingItemRejectsRemovingLastItem() {
+        ClothingItem shirt = item(5L, "White Shirt");
+        Outfit outfit = Outfit.builder()
+                .id(1L)
+                .name("Office Set")
+                .clothingItems(new LinkedHashSet<>(List.of(shirt)))
+                .build();
+
+        when(outfitRepository.findById(1L)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.findById(5L)).thenReturn(Optional.of(shirt));
+
+        assertThatThrownBy(() -> outfitService.removeClothingItem(1L, 5L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("At least one clothing item is required.");
+    }
+
+    @Test
+    void markAsWornIncrementsOutfitAndItemWearCounts() {
+        ClothingItem shirt = ClothingItem.builder()
+                .id(1L)
+                .name("White Shirt")
+                .wearCount(2)
+                .build();
+        ClothingItem pants = ClothingItem.builder()
+                .id(2L)
+                .name("Black Pants")
+                .wearCount(null)
+                .build();
+        Outfit outfit = Outfit.builder()
+                .id(6L)
+                .name("Office Set")
+                .wearCount(4)
+                .clothingItems(new LinkedHashSet<>(List.of(shirt, pants)))
+                .build();
+        LocalDateTime beforeUpdate = LocalDateTime.now().minusSeconds(1);
+
+        when(outfitRepository.findById(6L)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.saveAll(any())).thenReturn(List.of(shirt, pants));
+        when(outfitRepository.save(outfit)).thenReturn(outfit);
+
+        Outfit updated = outfitService.markAsWorn(6L);
+
+        assertThat(updated.getWearCount()).isEqualTo(5);
+        assertThat(updated.getLastWornAt()).isAfter(beforeUpdate);
+        assertThat(shirt.getWearCount()).isEqualTo(3);
+        assertThat(pants.getWearCount()).isEqualTo(1);
+        assertThat(shirt.getLastWornAt()).isEqualTo(updated.getLastWornAt());
+        assertThat(pants.getLastWornAt()).isEqualTo(updated.getLastWornAt());
+        verify(clothingItemRepository).saveAll(outfit.getClothingItems());
+        verify(outfitRepository).save(outfit);
     }
 
     @Test

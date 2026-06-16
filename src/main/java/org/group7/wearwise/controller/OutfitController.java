@@ -93,6 +93,27 @@ public class OutfitController {
         return OutfitResponse.from(outfitService.updateFavorite(id, request.favorite()));
     }
 
+    @PatchMapping("/{id}/wear")
+    public OutfitResponse markAsWorn(@PathVariable Long id) {
+        return OutfitResponse.from(outfitService.markAsWorn(id));
+    }
+
+    @PatchMapping("/{outfitId}/items/{clothingItemId}")
+    public OutfitResponse addClothingItem(
+            @PathVariable Long outfitId,
+            @PathVariable Long clothingItemId
+    ) {
+        return OutfitResponse.from(outfitService.addClothingItem(outfitId, clothingItemId));
+    }
+
+    @DeleteMapping("/{outfitId}/items/{clothingItemId}")
+    public OutfitResponse removeClothingItem(
+            @PathVariable Long outfitId,
+            @PathVariable Long clothingItemId
+    ) {
+        return OutfitResponse.from(outfitService.removeClothingItem(outfitId, clothingItemId));
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteOutfit(@PathVariable Long id) {
