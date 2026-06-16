@@ -21,6 +21,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, exception.getMessage(), Map.of());
     }
 
+    @ExceptionHandler(AuthenticationFailedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAuthenticationFailed(AuthenticationFailedException exception) {
+        return build(HttpStatus.UNAUTHORIZED, exception.getMessage(), Map.of());
+    }
+
     @ExceptionHandler(ClothingItemInUseException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(ClothingItemInUseException exception) {
         return build(HttpStatus.CONFLICT, exception.getMessage(), Map.of());
