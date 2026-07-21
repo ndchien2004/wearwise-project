@@ -117,7 +117,8 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
                 status,
                 wearCount,
                 lastWornAt,
-                favorite
+                favorite,
+                null
         );
 
         System.out.println("Created successfully!");
@@ -180,7 +181,8 @@ public class ConsoleClothingItemRunner implements CommandLineRunner {
                 status,
                 wearCount,
                 lastWornAt,
-                favorite
+                favorite,
+                oldItem.getImageUrl()
         );
 
         System.out.println("Updated successfully!");

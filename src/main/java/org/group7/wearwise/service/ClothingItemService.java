@@ -18,6 +18,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -53,7 +54,8 @@ public class ClothingItemService {
             ClothingStatus status,
             Integer wearCount,
             LocalDateTime lastWornAt,
-            Boolean favorite
+            Boolean favorite,
+            String imageUrl
     ) {
         String normalizedName = normalizeRequiredText(name, "Name");
         String normalizedColor = normalizeOptionalText(color, "Color");
@@ -70,6 +72,7 @@ public class ClothingItemService {
                 .wearCount(normalizeWearCount(wearCount))
                 .lastWornAt(normalizeLastWornAt(lastWornAt))
                 .favorite(favorite != null && favorite)
+                .imageUrl(normalizeOptionalText(imageUrl, "Image URL"))
                 .owner(owner)
                 .build();
 
@@ -133,7 +136,8 @@ public class ClothingItemService {
             ClothingStatus status,
             Integer wearCount,
             LocalDateTime lastWornAt,
-            Boolean favorite
+            Boolean favorite,
+            String imageUrl
     ) {
         ClothingItem item = getItemById(ownerUsername, id);
 
@@ -147,6 +151,7 @@ public class ClothingItemService {
         item.setWearCount(normalizeWearCount(wearCount));
         item.setLastWornAt(normalizeLastWornAt(lastWornAt));
         item.setFavorite(favorite != null && favorite);
+        item.setImageUrl(normalizeOptionalText(imageUrl, "Image URL"));
 
         return clothingItemRepository.save(item);
     }
@@ -173,12 +178,22 @@ public class ClothingItemService {
     @Transactional
     public ClothingItem markAsWorn(String ownerUsername, Long id) {
         ClothingItem item = getItemById(ownerUsername, id);
+
+        // Mỗi món đồ chỉ tính tối đa 1 lượt mặc mỗi ngày.
+        if (isWornOn(item.getLastWornAt(), LocalDate.now())) {
+            return item;
+        }
+
         int currentWearCount = item.getWearCount() == null ? 0 : item.getWearCount();
 
         item.setWearCount(currentWearCount + 1);
         item.setLastWornAt(LocalDateTime.now());
 
         return clothingItemRepository.save(item);
+    }
+
+    public static boolean isWornOn(LocalDateTime lastWornAt, LocalDate date) {
+        return lastWornAt != null && lastWornAt.toLocalDate().equals(date);
     }
 
     public List<ClothingItem> searchByName(String ownerUsername, String keyword) {

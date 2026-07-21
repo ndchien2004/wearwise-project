@@ -21,6 +21,7 @@ public record ClothingItemResponse(
         Integer wearCount,
         LocalDateTime lastWornAt,
         Boolean favorite,
+        String imageUrl,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -38,6 +39,7 @@ public record ClothingItemResponse(
                 item.getWearCount(),
                 item.getLastWornAt(),
                 item.getFavorite(),
+                item.getImageUrl(),
                 item.getCreatedAt(),
                 item.getUpdatedAt()
         );

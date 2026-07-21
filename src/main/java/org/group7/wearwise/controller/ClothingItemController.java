@@ -107,7 +107,8 @@ public class ClothingItemController {
                 request.status(),
                 request.wearCount(),
                 request.lastWornAt(),
-                request.favorite()
+                request.favorite(),
+                request.imageUrl()
         );
 
         return ClothingItemResponse.from(item);
@@ -131,7 +132,8 @@ public class ClothingItemController {
                 request.status(),
                 request.wearCount(),
                 request.lastWornAt(),
-                request.favorite()
+                request.favorite(),
+                request.imageUrl()
         );
 
         return ClothingItemResponse.from(item);

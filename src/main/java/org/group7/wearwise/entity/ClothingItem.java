@@ -62,6 +62,8 @@ public class ClothingItem {
 
     private Boolean favorite;
 
+    private String imageUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     private AppUser owner;

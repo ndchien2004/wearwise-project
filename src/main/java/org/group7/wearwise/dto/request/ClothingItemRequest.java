@@ -42,6 +42,9 @@ public record ClothingItemRequest(
         @PastOrPresent(message = "Last worn at cannot be in the future.")
         LocalDateTime lastWornAt,
 
-        Boolean favorite
+        Boolean favorite,
+
+        @Size(max = 255, message = "Image URL must be at most 255 characters.")
+        String imageUrl
 ) {
 }
