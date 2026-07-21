@@ -38,6 +38,10 @@ public class AppUser {
     @Builder.Default
     private String role = "USER";
 
+    /** Ảnh của người dùng dùng cho thử đồ ảo — chỉ lưu URL (Cloudinary). */
+    @Column(length = 512)
+    private String bodyPhotoUrl;
+
     private LocalDateTime createdAt;
 
     @PrePersist
