@@ -1,0 +1,188 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import * as itemsApi from '../api/clothingItems';
+import * as tryOnApi from '../api/tryOn';
+import ItemCard from '../components/ItemCard';
+import ItemFormModal from '../components/ItemFormModal';
+import { Button, EmptyState, ErrorBanner, Field, Loading, Toast } from '../components/ui';
+import { useConfirm } from '../context/ConfirmContext';
+import {
+  CATEGORY_LABELS,
+  CONDITION_LABELS,
+  SEASON_LABELS,
+  STATUS_LABELS,
+  STYLE_LABELS,
+} from '../utils/labels';
+
+const EMPTY_FILTERS = {
+  keyword: '',
+  category: '',
+  season: '',
+  style: '',
+  condition: '',
+  status: '',
+  favorite: '',
+};
+
+export default function WardrobePage() {
+  const navigate = useNavigate();
+  const confirm = useConfirm();
+  const [items, setItems] = useState(null);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [triedIds, setTriedIds] = useState(() => new Set());
+  const [modal, setModal] = useState(null); // null | { item?: object }
+
+  // Các món đã từng thử đồ (để hiện badge "🪞 Đã thử" trên card).
+  const loadTriedIds = useCallback(() => {
+    tryOnApi
+      .listTryOns()
+      .then((results) => setTriedIds(new Set(results.map((r) => r.clothingItemId).filter(Boolean))))
+      .catch(() => setTriedIds(new Set()));
+  }, []);
+
+  const load = useCallback(async (activeFilters) => {
+    try {
+      setItems(await itemsApi.findItems(activeFilters));
+    } catch (err) {
+      setError(err.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => load(filters), filters.keyword ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [filters, load]);
+
+  useEffect(() => {
+    loadTriedIds();
+  }, [loadTriedIds]);
+
+  const setFilter = (key) => (e) => setFilters((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleSave = async (payload) => {
+    const editing = Boolean(modal?.item);
+    if (editing) {
+      await itemsApi.updateItem(modal.item.id, payload);
+    } else {
+      await itemsApi.createItem(payload);
+    }
+    setModal(null);
+    await load(filters);
+    setNotice(editing ? `Đã cập nhật "${payload.name}"! ✏️` : `Đã thêm "${payload.name}" vào tủ đồ! 🎉`);
+  };
+
+  const handleDelete = async (item) => {
+    const ok = await confirm({
+      title: 'Xóa món đồ?',
+      message: `"${item.name}" sẽ bị xóa khỏi tủ đồ. Hành động này không thể hoàn tác.`,
+      confirmLabel: '🗑️ Xóa luôn',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await itemsApi.deleteItem(item.id);
+      await load(filters);
+      setNotice(`Đã xóa "${item.name}" khỏi tủ đồ. 🗑️`);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleToggleFavorite = async (item) => {
+    try {
+      const updated = await itemsApi.setItemFavorite(item.id, !item.favorite);
+      setItems((list) => list.map((i) => (i.id === updated.id ? updated : i)));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleWear = async (item) => {
+    try {
+      const updated = await itemsApi.markItemWorn(item.id);
+      setItems((list) => list.map((i) => (i.id === updated.id ? updated : i)));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const renderFilterSelect = (key, labels, placeholder) => (
+    <Field label={placeholder}>
+      <select className="nb-select" value={filters[key]} onChange={setFilter(key)}>
+        <option value="">Tất cả</option>
+        {Object.entries(labels).map(([value, text]) => (
+          <option key={value} value={value}>
+            {text}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+
+  return (
+    <div>
+      <div className="page-header">
+        <h1 className="page-title">👕 Tủ đồ</h1>
+        <Button variant="primary" onClick={() => setModal({})}>
+          ➕ Thêm món đồ
+        </Button>
+      </div>
+
+      <Toast message={notice} variant="success" onDismiss={() => setNotice(null)} />
+      <ErrorBanner error={error} onDismiss={() => setError(null)} />
+
+      <div className="filter-bar">
+        <Field label="Tìm kiếm" className="nb-field--grow">
+          <input
+            className="nb-input"
+            value={filters.keyword}
+            onChange={setFilter('keyword')}
+            placeholder="Tìm theo tên hoặc màu..."
+          />
+        </Field>
+        {renderFilterSelect('category', CATEGORY_LABELS, 'Danh mục')}
+        {renderFilterSelect('season', SEASON_LABELS, 'Mùa')}
+        {renderFilterSelect('style', STYLE_LABELS, 'Phong cách')}
+        {renderFilterSelect('condition', CONDITION_LABELS, 'Tình trạng')}
+        {renderFilterSelect('status', STATUS_LABELS, 'Trạng thái')}
+        <Field label="Yêu thích">
+          <select className="nb-select" value={filters.favorite} onChange={setFilter('favorite')}>
+            <option value="">Tất cả</option>
+            <option value="true">⭐ Yêu thích</option>
+            <option value="false">Chưa yêu thích</option>
+          </select>
+        </Field>
+        <Button size="sm" onClick={() => setFilters(EMPTY_FILTERS)}>
+          🔄 Xóa lọc
+        </Button>
+      </div>
+
+      {items === null ? (
+        <Loading />
+      ) : items.length === 0 ? (
+        <EmptyState emoji="🧺">
+          Chưa có món đồ nào. Bấm "Thêm món đồ" để bắt đầu xây dựng tủ đồ của bạn!
+        </EmptyState>
+      ) : (
+        <div className="card-grid">
+          {items.map((item) => (
+            <ItemCard
+              key={item.id}
+              item={item}
+              tried={triedIds.has(item.id)}
+              onOpen={(i) => navigate(`/wardrobe/${i.id}`)}
+              onEdit={(i) => setModal({ item: i })}
+              onDelete={handleDelete}
+              onToggleFavorite={handleToggleFavorite}
+              onWear={handleWear}
+            />
+          ))}
+        </div>
+      )}
+
+      {modal && <ItemFormModal item={modal.item} onSave={handleSave} onClose={() => setModal(null)} />}
+    </div>
+  );
+}
