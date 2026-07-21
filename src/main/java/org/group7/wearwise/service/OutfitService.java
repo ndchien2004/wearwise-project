@@ -3,6 +3,8 @@ package org.group7.wearwise.service;
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.entity.Outfit;
+import org.group7.wearwise.enums.ClothingCategory;
+import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.exception.AuthenticationFailedException;
@@ -10,12 +12,16 @@ import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.exception.OutfitNotFoundException;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
+import org.group7.wearwise.repository.OutfitPlanRepository;
 import org.group7.wearwise.repository.OutfitRepository;
 import org.group7.wearwise.repository.specification.OutfitSpecifications;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -29,15 +35,18 @@ public class OutfitService {
     private final OutfitRepository outfitRepository;
     private final ClothingItemRepository clothingItemRepository;
     private final AppUserRepository appUserRepository;
+    private final OutfitPlanRepository outfitPlanRepository;
 
     public OutfitService(
             OutfitRepository outfitRepository,
             ClothingItemRepository clothingItemRepository,
-            AppUserRepository appUserRepository
+            AppUserRepository appUserRepository,
+            OutfitPlanRepository outfitPlanRepository
     ) {
         this.outfitRepository = outfitRepository;
         this.clothingItemRepository = clothingItemRepository;
         this.appUserRepository = appUserRepository;
+        this.outfitPlanRepository = outfitPlanRepository;
     }
 
     @Transactional
@@ -119,13 +128,22 @@ public class OutfitService {
     public Outfit markAsWorn(String ownerUsername, Long id) {
         Outfit outfit = getOutfitById(ownerUsername, id);
         LocalDateTime wornAt = LocalDateTime.now();
+        LocalDate today = wornAt.toLocalDate();
+
+        // Mỗi outfit chỉ tính tối đa 1 lượt mặc mỗi ngày (bấm lại trong ngày không cộng thêm).
+        if (ClothingItemService.isWornOn(outfit.getLastWornAt(), today)) {
+            return outfit;
+        }
 
         outfit.setWearCount(normalizeWearCount(outfit.getWearCount()) + 1);
         outfit.setLastWornAt(wornAt);
 
+        // Món đồ đã tính lượt hôm nay (mặc lẻ hoặc thuộc outfit khác) thì không cộng lại.
         outfit.getClothingItems().forEach(item -> {
-            item.setWearCount(normalizeWearCount(item.getWearCount()) + 1);
-            item.setLastWornAt(wornAt);
+            if (!ClothingItemService.isWornOn(item.getLastWornAt(), today)) {
+                item.setWearCount(normalizeWearCount(item.getWearCount()) + 1);
+                item.setLastWornAt(wornAt);
+            }
         });
 
         clothingItemRepository.saveAll(outfit.getClothingItems());
@@ -168,9 +186,93 @@ public class OutfitService {
         return outfitRepository.save(outfit);
     }
 
+    @Transactional(readOnly = true)
+    public List<OutfitSuggestion> suggestOutfits(String ownerUsername, double temperature, boolean raining, int limit) {
+        if (limit <= 0 || limit > 20) {
+            throw new IllegalArgumentException("Limit must be between 1 and 20.");
+        }
+
+        boolean cold = temperature < 20;
+        boolean hot = temperature >= 26;
+
+        return findOutfits(ownerUsername, null, null, null, null)
+                .stream()
+                .map(outfit -> scoreOutfit(outfit, cold, hot, raining))
+                .sorted(Comparator
+                        .comparingInt(OutfitSuggestion::score).reversed()
+                        .thenComparing(
+                                suggestion -> suggestion.outfit().getLastWornAt(),
+                                Comparator.nullsFirst(Comparator.naturalOrder())
+                        ))
+                .limit(limit)
+                .toList();
+    }
+
+    private OutfitSuggestion scoreOutfit(Outfit outfit, boolean cold, boolean hot, boolean raining) {
+        int score = 0;
+        List<String> reasons = new ArrayList<>();
+
+        Season targetSeason = cold ? Season.WINTER : hot ? Season.SUMMER : null;
+
+        if (targetSeason != null && outfit.getSeason() == targetSeason) {
+            score += 3;
+            reasons.add("SEASON_MATCH");
+        } else if (outfit.getSeason() == Season.ALL_SEASON) {
+            score += 2;
+            reasons.add("ALL_SEASON");
+        } else if (targetSeason != null && outfit.getSeason() != targetSeason) {
+            score -= 3;
+            reasons.add("SEASON_MISMATCH");
+        } else {
+            score += 1;
+            reasons.add("MILD_WEATHER");
+        }
+
+        boolean hasJacket = outfit.getClothingItems()
+                .stream()
+                .anyMatch(item -> item.getCategory() == ClothingCategory.JACKET);
+
+        if ((cold || raining) && hasJacket) {
+            score += 2;
+            reasons.add("HAS_JACKET");
+        } else if (raining && !hasJacket) {
+            score -= 1;
+            reasons.add("NO_JACKET_IN_RAIN");
+        } else if (hot && hasJacket) {
+            score -= 1;
+            reasons.add("JACKET_TOO_WARM");
+        }
+
+        if (Boolean.TRUE.equals(outfit.getFavorite())) {
+            score += 1;
+            reasons.add("FAVORITE");
+        }
+
+        LocalDateTime lastWornAt = outfit.getLastWornAt();
+        if (lastWornAt == null || lastWornAt.isBefore(LocalDateTime.now().minusDays(7))) {
+            score += 1;
+            reasons.add("NOT_RECENTLY_WORN");
+        }
+
+        boolean allItemsAvailable = outfit.getClothingItems()
+                .stream()
+                .allMatch(item -> item.getStatus() == ClothingStatus.AVAILABLE);
+
+        if (allItemsAvailable) {
+            score += 1;
+            reasons.add("ALL_ITEMS_AVAILABLE");
+        } else {
+            score -= 2;
+            reasons.add("ITEMS_UNAVAILABLE");
+        }
+
+        return new OutfitSuggestion(outfit, score, List.copyOf(reasons));
+    }
+
     @Transactional
     public void deleteOutfit(String ownerUsername, Long id) {
         Outfit outfit = getOutfitById(ownerUsername, id);
+        outfitPlanRepository.deleteAll(outfitPlanRepository.findAllByOutfit_Id(outfit.getId()));
         outfitRepository.delete(outfit);
     }
 

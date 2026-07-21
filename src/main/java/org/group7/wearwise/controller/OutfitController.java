@@ -5,6 +5,7 @@ import org.group7.wearwise.dto.request.FavoriteRequest;
 import org.group7.wearwise.dto.request.OutfitRequest;
 import org.group7.wearwise.dto.response.OutfitOptionsResponse;
 import org.group7.wearwise.dto.response.OutfitResponse;
+import org.group7.wearwise.dto.response.OutfitSuggestionResponse;
 import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
@@ -46,6 +47,19 @@ public class OutfitController {
         return outfitService.findOutfits(authentication.getName(), keyword, season, style, favorite)
                 .stream()
                 .map(OutfitResponse::from)
+                .toList();
+    }
+
+    @GetMapping("/suggestions")
+    public List<OutfitSuggestionResponse> suggestOutfits(
+            Authentication authentication,
+            @RequestParam double temperature,
+            @RequestParam(defaultValue = "false") boolean raining,
+            @RequestParam(defaultValue = "5") int limit
+    ) {
+        return outfitService.suggestOutfits(authentication.getName(), temperature, raining, limit)
+                .stream()
+                .map(OutfitSuggestionResponse::from)
                 .toList();
     }
 
