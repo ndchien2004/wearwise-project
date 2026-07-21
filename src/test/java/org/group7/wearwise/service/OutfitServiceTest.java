@@ -8,6 +8,7 @@ import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
+import org.group7.wearwise.repository.OutfitPlanRepository;
 import org.group7.wearwise.repository.OutfitRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +45,9 @@ class OutfitServiceTest {
 
     @Mock
     private ClothingItemRepository clothingItemRepository;
+
+    @Mock
+    private OutfitPlanRepository outfitPlanRepository;
 
     @InjectMocks
     private OutfitService outfitService;
@@ -264,6 +269,57 @@ class OutfitServiceTest {
         assertThat(pants.getLastWornAt()).isEqualTo(updated.getLastWornAt());
         verify(clothingItemRepository).saveAll(outfit.getClothingItems());
         verify(outfitRepository).save(outfit);
+    }
+
+    @Test
+    void markAsWornCountsOutfitOnlyOncePerDay() {
+        Outfit outfit = Outfit.builder()
+                .id(7L)
+                .name("Office Set")
+                .wearCount(4)
+                .lastWornAt(LocalDateTime.now())
+                .clothingItems(new LinkedHashSet<>(List.of(item(1L, "White Shirt"))))
+                .build();
+
+        when(outfitRepository.findByIdAndOwner_Username(7L, OWNER)).thenReturn(Optional.of(outfit));
+
+        Outfit updated = outfitService.markAsWorn(OWNER, 7L);
+
+        assertThat(updated.getWearCount()).isEqualTo(4);
+        verify(outfitRepository, never()).save(any(Outfit.class));
+    }
+
+    @Test
+    void markAsWornSkipsItemsAlreadyWornToday() {
+        ClothingItem wornToday = ClothingItem.builder()
+                .id(1L)
+                .name("White Shirt")
+                .wearCount(2)
+                .lastWornAt(LocalDateTime.now())
+                .build();
+        ClothingItem notWornToday = ClothingItem.builder()
+                .id(2L)
+                .name("Black Pants")
+                .wearCount(1)
+                .lastWornAt(LocalDateTime.now().minusDays(2))
+                .build();
+        Outfit outfit = Outfit.builder()
+                .id(8L)
+                .name("Casual Set")
+                .wearCount(0)
+                .lastWornAt(LocalDateTime.now().minusDays(1))
+                .clothingItems(new LinkedHashSet<>(List.of(wornToday, notWornToday)))
+                .build();
+
+        when(outfitRepository.findByIdAndOwner_Username(8L, OWNER)).thenReturn(Optional.of(outfit));
+        when(clothingItemRepository.saveAll(any())).thenReturn(List.of(wornToday, notWornToday));
+        when(outfitRepository.save(outfit)).thenReturn(outfit);
+
+        Outfit updated = outfitService.markAsWorn(OWNER, 8L);
+
+        assertThat(updated.getWearCount()).isEqualTo(1);
+        assertThat(wornToday.getWearCount()).isEqualTo(2);
+        assertThat(notWornToday.getWearCount()).isEqualTo(2);
     }
 
     @Test

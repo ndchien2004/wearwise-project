@@ -68,7 +68,8 @@ class ClothingItemControllerTest {
                 ClothingStatus.AVAILABLE,
                 2,
                 null,
-                true
+                true,
+                null
         ))
                 .thenReturn(createdItem);
 
@@ -240,7 +241,8 @@ class ClothingItemControllerTest {
                 ClothingStatus.LAUNDRY,
                 6,
                 null,
-                false
+                false,
+                null
         ))
                 .thenReturn(updatedItem);
 

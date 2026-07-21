@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -73,6 +74,7 @@ class ClothingItemServiceTest {
                 ClothingStatus.AVAILABLE,
                 null,
                 null,
+                null,
                 null
         );
 
@@ -98,7 +100,8 @@ class ClothingItemServiceTest {
                 ClothingStatus.AVAILABLE,
                 0,
                 null,
-                false
+                false,
+                null
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Name is required.");
     }
@@ -160,6 +163,23 @@ class ClothingItemServiceTest {
         assertThat(updatedItem.getWearCount()).isEqualTo(3);
         assertThat(updatedItem.getLastWornAt()).isAfter(beforeUpdate);
         verify(clothingItemRepository).save(item);
+    }
+
+    @Test
+    void markAsWornCountsOnlyOncePerDay() {
+        ClothingItem item = ClothingItem.builder()
+                .id(3L)
+                .name("Black Jeans")
+                .wearCount(5)
+                .lastWornAt(LocalDateTime.now())
+                .build();
+
+        when(clothingItemRepository.findByIdAndOwner_Username(3L, OWNER)).thenReturn(Optional.of(item));
+
+        ClothingItem updatedItem = clothingItemService.markAsWorn(OWNER, 3L);
+
+        assertThat(updatedItem.getWearCount()).isEqualTo(5);
+        verify(clothingItemRepository, never()).save(any(ClothingItem.class));
     }
 
     @Test
@@ -277,7 +297,8 @@ class ClothingItemServiceTest {
                 ClothingStatus.AVAILABLE,
                 1,
                 LocalDateTime.now().plusDays(1),
-                false
+                false,
+                null
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Last worn at cannot be in the future.");
     }
