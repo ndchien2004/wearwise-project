@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 400">
+  <!-- Ảnh ghép phối đồ: áo thun + quần jean (+ giày, mũ) — flat-lay neobrutalism -->
+  <rect width="520" height="400" fill="#f6f1e5"/>
+  <rect x="6" y="6" width="508" height="388" fill="none" stroke="#111" stroke-width="8"/>
+
+  <!-- họa tiết nền -->
+  <circle cx="52" cy="330" r="8" fill="#5ce1e6" stroke="#111" stroke-width="3"/>
+  <path d="M470 84 l8 16 -17 -4 z" fill="#ff8fd3" stroke="#111" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M38 200 q8 -12 16 0 q8 12 16 0" fill="none" stroke="#111" stroke-width="4"/>
+  <path d="M456 336 l7 14 15 2 -11 11 3 15 -14 -7 -14 7 3 -15 -11 -11 15 -2 z"
+        fill="#ffd43b" stroke="#111" stroke-width="3" stroke-linejoin="round"/>
+
+  <!-- banner tiêu đề -->
+  <g transform="rotate(-3 130 46)">
+    <rect x="28" y="24" width="204" height="44" fill="#ffd43b" stroke="#111" stroke-width="6" rx="8"/>
+    <rect x="34" y="30" width="204" height="44" fill="none" stroke="#111" stroke-width="0"/>
+    <text x="130" y="55" text-anchor="middle" font-family="Archivo, 'Be Vietnam Pro', sans-serif"
+          font-size="26" font-weight="900" fill="#111">PHỐI ĐỒ ✦</text>
+  </g>
+
+  <!-- MŨ (thu nhỏ, góc phải trên) -->
+  <g transform="translate(360 30) rotate(8) scale(0.5)">
+    <g transform="translate(9 9)" fill="#111">
+      <path d="M52 140 Q52 62 120 62 Q188 62 188 140 Z"/>
+      <path d="M48 140 Q120 184 192 140 L198 154 Q120 200 42 154 Z"/>
+    </g>
+    <path d="M52 140 Q52 62 120 62 Q188 62 188 140 Z" fill="#7ed957" stroke="#111" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M120 62 L120 140" stroke="#111" stroke-width="4"/>
+    <path d="M86 72 Q90 104 84 140" fill="none" stroke="#111" stroke-width="4"/>
+    <path d="M154 72 Q150 104 156 140" fill="none" stroke="#111" stroke-width="4"/>
+    <circle cx="120" cy="60" r="8" fill="#ffd43b" stroke="#111" stroke-width="4"/>
+    <path d="M48 140 Q120 184 192 140 L198 154 Q120 200 42 154 Z" fill="#2f9e44" stroke="#111" stroke-width="7" stroke-linejoin="round"/>
+  </g>
+
+  <!-- ÁO THUN (trái) -->
+  <g transform="translate(30 88) rotate(-5) scale(0.92)">
+    <path d="M78 52 L34 80 L48 116 L84 98 L84 200 L156 200 L156 98 L192 116 L206 80 L162 52 L145 48 Q120 72 95 48 Z"
+          transform="translate(9 9)" fill="#111"/>
+    <path d="M78 52 L34 80 L48 116 L84 98 L84 200 L156 200 L156 98 L192 116 L206 80 L162 52 L145 48 Q120 72 95 48 Z"
+          fill="#ffffff" stroke="#111" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M92 50 Q120 82 148 50" fill="none" stroke="#111" stroke-width="5"/>
+    <path d="M90 188 L150 188" stroke="#111" stroke-width="3" stroke-dasharray="7 6"/>
+    <rect x="128" y="112" width="26" height="28" fill="#ffd43b" stroke="#111" stroke-width="4" rx="3"/>
+  </g>
+
+  <!-- dấu cộng -->
+  <g transform="translate(252 178)">
+    <rect x="-10" y="-34" width="20" height="68" fill="#ff8fd3" stroke="#111" stroke-width="5" rx="5"/>
+    <rect x="-34" y="-10" width="68" height="20" fill="#ff8fd3" stroke="#111" stroke-width="5" rx="5"/>
+  </g>
+
+  <!-- QUẦN JEAN (phải) -->
+  <g transform="translate(292 96) rotate(5) scale(0.92)">
+    <path d="M74 28 L166 28 L176 210 L130 210 L120 112 L110 210 L64 210 Z"
+          transform="translate(9 9)" fill="#111"/>
+    <path d="M74 28 L166 28 L176 210 L130 210 L120 112 L110 210 L64 210 Z"
+          fill="#4dabf7" stroke="#111" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M71 54 L169 54" stroke="#111" stroke-width="5"/>
+    <circle cx="120" cy="42" r="6" fill="#ffd43b" stroke="#111" stroke-width="4"/>
+    <path d="M70 62 Q92 86 106 64" fill="none" stroke="#ffd43b" stroke-width="4" stroke-dasharray="8 6"/>
+    <path d="M170 62 Q148 86 134 64" fill="none" stroke="#ffd43b" stroke-width="4" stroke-dasharray="8 6"/>
+    <path d="M70 60 L74 198" stroke="#ffd43b" stroke-width="3" stroke-dasharray="8 6"/>
+    <path d="M170 60 L166 198" stroke="#ffd43b" stroke-width="3" stroke-dasharray="8 6"/>
+  </g>
+
+  <!-- GIÀY (thu nhỏ, góc trái dưới) -->
+  <g transform="translate(56 292) rotate(-6) scale(0.42)">
+    <g transform="translate(9 9)" fill="#111">
+      <path d="M40 156 L46 96 Q48 82 66 80 L114 76 Q146 74 168 98 L202 132 Q212 142 210 156 Z"/>
+      <rect x="30" y="152" width="184" height="34" rx="14"/>
+    </g>
+    <path d="M40 156 L46 96 Q48 82 66 80 L114 76 Q146 74 168 98 L202 132 Q212 142 210 156 Z"
+          fill="#ff8fd3" stroke="#111" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M168 98 L202 132 Q212 142 210 156 L148 156 Q150 118 168 98 Z"
+          fill="#ffffff" stroke="#111" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M70 92 L112 108 M76 106 L118 122 M82 120 L124 136" stroke="#111" stroke-width="5" stroke-linecap="round"/>
+    <rect x="30" y="152" width="184" height="34" rx="14" fill="#ffd43b" stroke="#111" stroke-width="7"/>
+  </g>
+</svg>

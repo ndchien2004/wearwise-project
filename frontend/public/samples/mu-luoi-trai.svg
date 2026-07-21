@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <!-- Mũ lưỡi trai — phong cách neobrutalism -->
+  <rect width="240" height="240" fill="#f6f1e5"/>
+  <circle cx="34" cy="46" r="6" fill="#ff8fd3" stroke="#111" stroke-width="3"/>
+  <path d="M200 196 l6 12 -13 -3 z" fill="#ffd43b" stroke="#111" stroke-width="3" stroke-linejoin="round"/>
+  <!-- bóng đổ cứng -->
+  <g transform="translate(9 9)" fill="#111">
+    <path d="M52 140 Q52 62 120 62 Q188 62 188 140 Z"/>
+    <path d="M48 140 Q120 184 192 140 L198 154 Q120 200 42 154 Z"/>
+  </g>
+  <!-- vòm mũ -->
+  <path d="M52 140 Q52 62 120 62 Q188 62 188 140 Z"
+        fill="#7ed957" stroke="#111" stroke-width="7" stroke-linejoin="round"/>
+  <!-- múi mũ -->
+  <path d="M120 62 L120 140" stroke="#111" stroke-width="4"/>
+  <path d="M86 72 Q90 104 84 140" fill="none" stroke="#111" stroke-width="4"/>
+  <path d="M154 72 Q150 104 156 140" fill="none" stroke="#111" stroke-width="4"/>
+  <!-- nút đỉnh mũ -->
+  <circle cx="120" cy="60" r="8" fill="#ffd43b" stroke="#111" stroke-width="4"/>
+  <!-- lưỡi trai -->
+  <path d="M48 140 Q120 184 192 140 L198 154 Q120 200 42 154 Z"
+        fill="#2f9e44" stroke="#111" stroke-width="7" stroke-linejoin="round"/>
+  <!-- ngôi sao trang trí -->
+  <path d="M120 92 l6 12 13 2 -9 10 2 13 -12 -6 -12 6 2 -13 -9 -10 13 -2 z"
+        fill="#ffd43b" stroke="#111" stroke-width="4" stroke-linejoin="round"/>
+</svg>

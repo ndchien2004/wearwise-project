@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <!-- Áo thun trắng — phong cách neobrutalism -->
+  <rect width="240" height="240" fill="#f6f1e5"/>
+  <circle cx="30" cy="34" r="6" fill="#ffd43b" stroke="#111" stroke-width="3"/>
+  <path d="M196 26 l6 12 -13 -3 z" fill="#ff8fd3" stroke="#111" stroke-width="3" stroke-linejoin="round"/>
+  <!-- bóng đổ cứng -->
+  <path d="M78 52 L34 80 L48 116 L84 98 L84 200 L156 200 L156 98 L192 116 L206 80 L162 52 L145 48 Q120 72 95 48 Z"
+        transform="translate(9 9)" fill="#111"/>
+  <!-- thân áo -->
+  <path d="M78 52 L34 80 L48 116 L84 98 L84 200 L156 200 L156 98 L192 116 L206 80 L162 52 L145 48 Q120 72 95 48 Z"
+        fill="#ffffff" stroke="#111" stroke-width="7" stroke-linejoin="round"/>
+  <!-- viền cổ áo -->
+  <path d="M92 50 Q120 82 148 50" fill="none" stroke="#111" stroke-width="5"/>
+  <!-- đường may -->
+  <path d="M84 98 L80 58" stroke="#111" stroke-width="3" stroke-dasharray="7 6"/>
+  <path d="M156 98 L160 58" stroke="#111" stroke-width="3" stroke-dasharray="7 6"/>
+  <path d="M90 188 L150 188" stroke="#111" stroke-width="3" stroke-dasharray="7 6"/>
+  <!-- túi ngực -->
+  <rect x="128" y="112" width="26" height="28" fill="#ffd43b" stroke="#111" stroke-width="4" rx="3"/>
+</svg>

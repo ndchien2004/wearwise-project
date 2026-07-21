@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <!-- Quần jean xanh — phong cách neobrutalism -->
+  <rect width="240" height="240" fill="#f6f1e5"/>
+  <path d="M206 200 l6 12 -13 -3 z" fill="#7ed957" stroke="#111" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="32" cy="206" r="6" fill="#5ce1e6" stroke="#111" stroke-width="3"/>
+  <!-- bóng đổ cứng -->
+  <path d="M74 28 L166 28 L176 210 L130 210 L120 112 L110 210 L64 210 Z"
+        transform="translate(9 9)" fill="#111"/>
+  <!-- thân quần -->
+  <path d="M74 28 L166 28 L176 210 L130 210 L120 112 L110 210 L64 210 Z"
+        fill="#4dabf7" stroke="#111" stroke-width="7" stroke-linejoin="round"/>
+  <!-- cạp quần -->
+  <path d="M71 54 L169 54" stroke="#111" stroke-width="5"/>
+  <circle cx="120" cy="42" r="6" fill="#ffd43b" stroke="#111" stroke-width="4"/>
+  <!-- khóa quần -->
+  <path d="M114 58 Q122 74 118 96" fill="none" stroke="#111" stroke-width="4"/>
+  <!-- túi quần + chỉ may vàng -->
+  <path d="M70 62 Q92 86 106 64" fill="none" stroke="#ffd43b" stroke-width="4" stroke-dasharray="8 6"/>
+  <path d="M170 62 Q148 86 134 64" fill="none" stroke="#ffd43b" stroke-width="4" stroke-dasharray="8 6"/>
+  <path d="M70 60 L74 198" stroke="#ffd43b" stroke-width="3" stroke-dasharray="8 6"/>
+  <path d="M170 60 L166 198" stroke="#ffd43b" stroke-width="3" stroke-dasharray="8 6"/>
+  <!-- gấu quần -->
+  <path d="M66 196 L108 196 M132 196 L174 196" stroke="#111" stroke-width="4"/>
+</svg>
