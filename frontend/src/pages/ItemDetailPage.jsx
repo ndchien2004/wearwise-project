@@ -15,6 +15,9 @@ import {
   SEASON_LABELS,
   STATUS_LABELS,
   STYLE_LABELS,
+  TONE_BADGE_COLORS,
+  TONE_EMOJIS,
+  TONE_LABELS,
   label,
 } from '../utils/labels';
 import { daysSince, formatDateTime, isWornToday } from '../utils/date';
@@ -73,6 +76,7 @@ export default function ItemDetailPage() {
       const updated = await itemsApi.updateItem(item.id, {
         name: item.name,
         color: item.color,
+        colorTone: item.colorTone,
         category: item.category,
         season: item.season,
         style: item.style,
@@ -238,6 +242,11 @@ export default function ItemDetailPage() {
             </Badge>
             <Badge color="purple">{label(STYLE_LABELS, item.style)}</Badge>
             {item.color && <Badge>🎨 {item.color}</Badge>}
+            {item.colorTone && (
+              <Badge color={TONE_BADGE_COLORS[item.colorTone]}>
+                {TONE_EMOJIS[item.colorTone]} {label(TONE_LABELS, item.colorTone)}
+              </Badge>
+            )}
             {item.favorite && <Badge color="pink">⭐ Yêu thích</Badge>}
           </div>
 

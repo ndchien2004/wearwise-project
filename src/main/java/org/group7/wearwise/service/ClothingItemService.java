@@ -5,6 +5,7 @@ import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
+import org.group7.wearwise.enums.ColorTone;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.exception.AuthenticationFailedException;
@@ -47,6 +48,7 @@ public class ClothingItemService {
             String ownerUsername,
             String name,
             String color,
+            ColorTone colorTone,
             ClothingCategory category,
             Season season,
             Style style,
@@ -64,6 +66,7 @@ public class ClothingItemService {
         ClothingItem item = ClothingItem.builder()
                 .name(normalizedName)
                 .color(normalizedColor)
+                .colorTone(colorTone)
                 .category(requireCategory(category))
                 .season(requireSeason(season))
                 .style(requireStyle(style))
@@ -89,6 +92,7 @@ public class ClothingItemService {
                         null,
                         null,
                         null,
+                        null,
                         null
                 )
         );
@@ -102,7 +106,8 @@ public class ClothingItemService {
             Style style,
             ClothingCondition condition,
             ClothingStatus status,
-            Boolean favorite
+            Boolean favorite,
+            ColorTone colorTone
     ) {
         return clothingItemRepository.findAll(
                 ClothingItemSpecifications.matchesFilters(
@@ -113,7 +118,8 @@ public class ClothingItemService {
                         style,
                         condition,
                         status,
-                        favorite
+                        favorite,
+                        colorTone
                 )
         );
     }
@@ -129,6 +135,7 @@ public class ClothingItemService {
             Long id,
             String name,
             String color,
+            ColorTone colorTone,
             ClothingCategory category,
             Season season,
             Style style,
@@ -143,6 +150,7 @@ public class ClothingItemService {
 
         item.setName(normalizeRequiredText(name, "Name"));
         item.setColor(normalizeOptionalText(color, "Color"));
+        item.setColorTone(colorTone);
         item.setCategory(requireCategory(category));
         item.setSeason(requireSeason(season));
         item.setStyle(requireStyle(style));

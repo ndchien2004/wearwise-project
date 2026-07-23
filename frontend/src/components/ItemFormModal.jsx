@@ -7,11 +7,14 @@ import {
   SEASON_LABELS,
   STATUS_LABELS,
   STYLE_LABELS,
+  TONE_EMOJIS,
+  TONE_LABELS,
 } from '../utils/labels';
 
 const EMPTY_FORM = {
   name: '',
   color: '',
+  colorTone: '',
   category: 'SHIRT',
   season: 'ALL_SEASON',
   style: 'CASUAL',
@@ -36,6 +39,7 @@ export default function ItemFormModal({ item, onSave, onClose }) {
       ? {
           name: item.name ?? '',
           color: item.color ?? '',
+          colorTone: item.colorTone ?? '',
           category: item.category,
           season: item.season,
           style: item.style,
@@ -80,6 +84,7 @@ export default function ItemFormModal({ item, onSave, onClose }) {
       await onSave({
         name: form.name.trim(),
         color: form.color.trim() || null,
+        colorTone: form.colorTone || null,
         category: form.category,
         season: form.season,
         style: form.style,
@@ -126,11 +131,24 @@ export default function ItemFormModal({ item, onSave, onClose }) {
           <Field label="Màu sắc">
             <input className="nb-input" value={form.color} onChange={set('color')} placeholder="vd: Trắng" />
           </Field>
-          <Field label="Danh mục *">{renderSelect('category', CATEGORY_LABELS)}</Field>
+          <Field label="Tone màu">
+            <select className="nb-select" value={form.colorTone} onChange={set('colorTone')}>
+              <option value="">— Chưa phân loại —</option>
+              {Object.entries(TONE_LABELS).map(([value, text]) => (
+                <option key={value} value={value}>
+                  {TONE_EMOJIS[value]} {text}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
 
         <div className="two-col">
+          <Field label="Danh mục *">{renderSelect('category', CATEGORY_LABELS)}</Field>
           <Field label="Mùa *">{renderSelect('season', SEASON_LABELS)}</Field>
+        </div>
+
+        <div className="two-col">
           <Field label="Phong cách *">{renderSelect('style', STYLE_LABELS)}</Field>
         </div>
 

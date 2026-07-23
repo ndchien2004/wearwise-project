@@ -41,6 +41,34 @@ export const STYLE_LABELS = {
   SPORT: 'Thể thao',
 };
 
+export const TONE_LABELS = {
+  WARM: 'Tông ấm',
+  COOL: 'Tông lạnh',
+  NEUTRAL: 'Trung tính',
+  PASTEL: 'Pastel',
+  BRIGHT: 'Rực rỡ',
+  DARK: 'Tông tối',
+};
+
+export const TONE_EMOJIS = {
+  WARM: '🔥',
+  COOL: '🧊',
+  NEUTRAL: '🤍',
+  PASTEL: '🌸',
+  BRIGHT: '🌈',
+  DARK: '🖤',
+};
+
+// Màu badge cho từng tone (dùng với <Badge color=...>).
+export const TONE_BADGE_COLORS = {
+  WARM: 'orange',
+  COOL: 'cyan',
+  NEUTRAL: undefined,
+  PASTEL: 'pink',
+  BRIGHT: 'yellow',
+  DARK: 'purple',
+};
+
 export const CONDITION_LABELS = {
   GOOD: 'Còn tốt',
   DAMAGED: 'Hư hỏng',

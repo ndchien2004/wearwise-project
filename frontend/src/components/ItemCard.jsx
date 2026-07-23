@@ -9,6 +9,9 @@ import {
   STATUS_BADGES,
   STATUS_LABELS,
   STYLE_LABELS,
+  TONE_BADGE_COLORS,
+  TONE_EMOJIS,
+  TONE_LABELS,
   label,
 } from '../utils/labels';
 import { formatDateTime, isWornToday } from '../utils/date';
@@ -28,9 +31,16 @@ export default function ItemCard({ item, tried, onOpen, onEdit, onDelete, onTogg
       onClick={() => onOpen(item)}
       title="Bấm để xem chi tiết"
     >
-      {item.imageUrl && (
+      {item.imageUrl ? (
         <div className="item-photo">
           <img src={item.imageUrl} alt={item.name} />
+        </div>
+      ) : (
+        <div
+          className="item-photo item-photo--placeholder"
+          style={{ background: CATEGORY_COLORS[item.category] || 'var(--yellow)' }}
+        >
+          {CATEGORY_EMOJIS[item.category] || '👗'}
         </div>
       )}
       <div className="item-card-top">
@@ -39,7 +49,7 @@ export default function ItemCard({ item, tried, onOpen, onEdit, onDelete, onTogg
             {CATEGORY_EMOJIS[item.category] || '👗'}
           </div>
           <div style={{ minWidth: 0 }}>
-            <div className="item-name">{item.name}</div>
+            <div className="item-name" title={item.name}>{item.name}</div>
             <div className="item-meta">
               {item.color ? `Màu: ${item.color} · ` : ''}
               Đã mặc {item.wearCount ?? 0} lần
@@ -62,6 +72,11 @@ export default function ItemCard({ item, tried, onOpen, onEdit, onDelete, onTogg
           {SEASON_EMOJIS[item.season]} {label(SEASON_LABELS, item.season)}
         </Badge>
         <Badge color="purple">{label(STYLE_LABELS, item.style)}</Badge>
+        {item.colorTone && (
+          <Badge color={TONE_BADGE_COLORS[item.colorTone]}>
+            {TONE_EMOJIS[item.colorTone]} {label(TONE_LABELS, item.colorTone)}
+          </Badge>
+        )}
         <Badge color={item.condition === 'DAMAGED' ? 'red' : undefined}>
           {label(CONDITION_LABELS, item.condition)}
         </Badge>

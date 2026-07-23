@@ -61,6 +61,7 @@ class ClothingItemControllerTest {
                 OWNER,
                 "White Shirt",
                 "White",
+                null,
                 ClothingCategory.SHIRT,
                 Season.ALL_SEASON,
                 Style.FORMAL,
@@ -108,7 +109,8 @@ class ClothingItemControllerTest {
                 Style.SPORT,
                 ClothingCondition.GOOD,
                 ClothingStatus.AVAILABLE,
-                true
+                true,
+                null
         ))
                 .thenReturn(List.of(sneaker));
 
@@ -234,6 +236,7 @@ class ClothingItemControllerTest {
                 3L,
                 "Black Jeans",
                 "Black",
+                null,
                 ClothingCategory.PANTS,
                 Season.ALL_SEASON,
                 Style.CASUAL,

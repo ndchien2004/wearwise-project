@@ -4,6 +4,7 @@ import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
+import org.group7.wearwise.enums.ColorTone;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.springframework.data.jpa.domain.Specification;
@@ -23,7 +24,8 @@ public final class ClothingItemSpecifications {
             Style style,
             ClothingCondition condition,
             ClothingStatus status,
-            Boolean favorite
+            Boolean favorite,
+            ColorTone colorTone
     ) {
         return (root, query, criteriaBuilder) -> {
             var predicate = criteriaBuilder.equal(root.get("owner").get("username"), ownerUsername);
@@ -58,6 +60,10 @@ public final class ClothingItemSpecifications {
 
             if (favorite != null) {
                 predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("favorite"), favorite));
+            }
+
+            if (colorTone != null) {
+                predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("colorTone"), colorTone));
             }
 
             return predicate;

@@ -9,6 +9,7 @@ import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
+import org.group7.wearwise.enums.ColorTone;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.service.ClothingItemService;
@@ -47,9 +48,10 @@ public class ClothingItemController {
             @RequestParam(required = false) Style style,
             @RequestParam(required = false) ClothingCondition condition,
             @RequestParam(required = false) ClothingStatus status,
-            @RequestParam(required = false) Boolean favorite
+            @RequestParam(required = false) Boolean favorite,
+            @RequestParam(required = false) ColorTone colorTone
     ) {
-        return clothingItemService.findItems(authentication.getName(), keyword, category, season, style, condition, status, favorite)
+        return clothingItemService.findItems(authentication.getName(), keyword, category, season, style, condition, status, favorite, colorTone)
                 .stream()
                 .map(ClothingItemResponse::from)
                 .toList();
@@ -100,6 +102,7 @@ public class ClothingItemController {
                 authentication.getName(),
                 request.name(),
                 request.color(),
+                request.colorTone(),
                 request.category(),
                 request.season(),
                 request.style(),
@@ -125,6 +128,7 @@ public class ClothingItemController {
                 id,
                 request.name(),
                 request.color(),
+                request.colorTone(),
                 request.category(),
                 request.season(),
                 request.style(),

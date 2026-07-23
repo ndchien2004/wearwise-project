@@ -67,6 +67,7 @@ class ClothingItemServiceTest {
                 OWNER,
                 "  White Shirt  ",
                 "  White  ",
+                null,
                 ClothingCategory.SHIRT,
                 Season.ALL_SEASON,
                 Style.FORMAL,
@@ -93,6 +94,7 @@ class ClothingItemServiceTest {
                 OWNER,
                 " ",
                 "White",
+                null,
                 ClothingCategory.SHIRT,
                 Season.ALL_SEASON,
                 Style.FORMAL,
@@ -224,7 +226,8 @@ class ClothingItemServiceTest {
                 Style.SPORT,
                 ClothingCondition.GOOD,
                 ClothingStatus.AVAILABLE,
-                true
+                true,
+                null
         );
 
         assertThat(items).containsExactly(sneaker);
@@ -290,6 +293,7 @@ class ClothingItemServiceTest {
                 OWNER,
                 "White Shirt",
                 "White",
+                null,
                 ClothingCategory.SHIRT,
                 Season.ALL_SEASON,
                 Style.FORMAL,

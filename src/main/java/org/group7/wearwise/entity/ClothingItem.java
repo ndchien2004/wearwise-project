@@ -5,6 +5,7 @@ import lombok.*;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
+import org.group7.wearwise.enums.ColorTone;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.hibernate.annotations.ColumnDefault;
@@ -28,6 +29,10 @@ public class ClothingItem {
     private String name;
 
     private String color;
+
+    /** Tone màu (tùy chọn) — phục vụ lọc theo tone và gợi ý phối màu. */
+    @Enumerated(EnumType.STRING)
+    private ColorTone colorTone;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

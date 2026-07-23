@@ -4,6 +4,7 @@ import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
+import org.group7.wearwise.enums.ColorTone;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.repository.AppUserRepository;
@@ -45,10 +46,10 @@ public class DemoDataSeeder implements CommandLineRunner {
                         .role("USER")
                         .build()));
 
-        clothingItemService.createItem(ownerUsername, "White Oxford Shirt", "White", ClothingCategory.SHIRT, Season.ALL_SEASON, Style.FORMAL, ClothingCondition.GOOD, ClothingStatus.AVAILABLE, 5, null, true, "/samples/ao-thun-trang.svg");
-        clothingItemService.createItem(ownerUsername, "Black Jeans", "Black", ClothingCategory.PANTS, Season.ALL_SEASON, Style.CASUAL, ClothingCondition.GOOD, ClothingStatus.AVAILABLE, 8, null, false, "/samples/quan-jean-xanh.svg");
-        clothingItemService.createItem(ownerUsername, "Running Sneakers", "Gray", ClothingCategory.SHOES, Season.SUMMER, Style.SPORT, ClothingCondition.GOOD, ClothingStatus.AVAILABLE, 12, null, true, "/samples/giay-sneaker.svg");
-        clothingItemService.createItem(ownerUsername, "Denim Jacket", "Blue", ClothingCategory.JACKET, Season.WINTER, Style.STREETWEAR, ClothingCondition.GOOD, ClothingStatus.LAUNDRY, 3, null, false, null);
-        clothingItemService.createItem(ownerUsername, "Silver Watch", "Silver", ClothingCategory.ACCESSORY, Season.ALL_SEASON, Style.FORMAL, ClothingCondition.GOOD, ClothingStatus.AVAILABLE, 10, null, true, null);
+        clothingItemService.createItem(ownerUsername, "White Oxford Shirt", "White", ColorTone.NEUTRAL, ClothingCategory.SHIRT, Season.ALL_SEASON, Style.FORMAL, ClothingCondition.GOOD, ClothingStatus.AVAILABLE, 5, null, true, "/samples/ao-thun-trang.svg");
+        clothingItemService.createItem(ownerUsername, "Black Jeans", "Black", ColorTone.DARK, ClothingCategory.PANTS, Season.ALL_SEASON, Style.CASUAL, ClothingCondition.GOOD, ClothingStatus.AVAILABLE, 8, null, false, "/samples/quan-jean-xanh.svg");
+        clothingItemService.createItem(ownerUsername, "Running Sneakers", "Gray", ColorTone.NEUTRAL, ClothingCategory.SHOES, Season.SUMMER, Style.SPORT, ClothingCondition.GOOD, ClothingStatus.AVAILABLE, 12, null, true, "/samples/giay-sneaker.svg");
+        clothingItemService.createItem(ownerUsername, "Denim Jacket", "Blue", ColorTone.COOL, ClothingCategory.JACKET, Season.WINTER, Style.STREETWEAR, ClothingCondition.GOOD, ClothingStatus.LAUNDRY, 3, null, false, null);
+        clothingItemService.createItem(ownerUsername, "Silver Watch", "Silver", ColorTone.NEUTRAL, ClothingCategory.ACCESSORY, Season.ALL_SEASON, Style.FORMAL, ClothingCondition.GOOD, ClothingStatus.AVAILABLE, 10, null, true, null);
     }
 }

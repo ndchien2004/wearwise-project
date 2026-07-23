@@ -12,6 +12,7 @@ import {
   SEASON_LABELS,
   STATUS_LABELS,
   STYLE_LABELS,
+  TONE_LABELS,
 } from '../utils/labels';
 
 const EMPTY_FILTERS = {
@@ -22,6 +23,7 @@ const EMPTY_FILTERS = {
   condition: '',
   status: '',
   favorite: '',
+  colorTone: '',
 };
 
 export default function WardrobePage() {
@@ -143,6 +145,7 @@ export default function WardrobePage() {
           />
         </Field>
         {renderFilterSelect('category', CATEGORY_LABELS, 'Danh mục')}
+        {renderFilterSelect('colorTone', TONE_LABELS, 'Tone màu')}
         {renderFilterSelect('season', SEASON_LABELS, 'Mùa')}
         {renderFilterSelect('style', STYLE_LABELS, 'Phong cách')}
         {renderFilterSelect('condition', CONDITION_LABELS, 'Tình trạng')}

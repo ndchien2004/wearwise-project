@@ -4,6 +4,7 @@ import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
+import org.group7.wearwise.enums.ColorTone;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 
@@ -13,6 +14,7 @@ public record ClothingItemResponse(
         Long id,
         String name,
         String color,
+        ColorTone colorTone,
         ClothingCategory category,
         Season season,
         Style style,
@@ -31,6 +33,7 @@ public record ClothingItemResponse(
                 item.getId(),
                 item.getName(),
                 item.getColor(),
+                item.getColorTone(),
                 item.getCategory(),
                 item.getSeason(),
                 item.getStyle(),

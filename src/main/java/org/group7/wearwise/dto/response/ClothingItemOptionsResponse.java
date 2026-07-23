@@ -3,6 +3,7 @@ package org.group7.wearwise.dto.response;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
+import org.group7.wearwise.enums.ColorTone;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 
@@ -13,7 +14,8 @@ public record ClothingItemOptionsResponse(
         List<Season> seasons,
         List<Style> styles,
         List<ClothingCondition> conditions,
-        List<ClothingStatus> statuses
+        List<ClothingStatus> statuses,
+        List<ColorTone> colorTones
 ) {
 
     public static ClothingItemOptionsResponse current() {
@@ -22,7 +24,8 @@ public record ClothingItemOptionsResponse(
                 List.of(Season.values()),
                 List.of(Style.values()),
                 List.of(ClothingCondition.values()),
-                List.of(ClothingStatus.values())
+                List.of(ClothingStatus.values()),
+                List.of(ColorTone.values())
         );
     }
 }

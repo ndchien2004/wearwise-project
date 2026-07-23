@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
+import org.group7.wearwise.enums.ColorTone;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 
@@ -20,6 +21,8 @@ public record ClothingItemRequest(
 
         @Size(max = 255, message = "Color must be at most 255 characters.")
         String color,
+
+        ColorTone colorTone,
 
         @NotNull(message = "Category is required.")
         ClothingCategory category,
