@@ -59,6 +59,44 @@ export function Modal({ title, wide, onClose, children }) {
   );
 }
 
+/** Phân trang đơn giản: nút ← số trang → . page là 0-based. */
+export function Pagination({ page, pageCount, onChange }) {
+  if (pageCount <= 1) return null;
+  const pages = Array.from({ length: pageCount }, (_, i) => i);
+  return (
+    <div className="pagination">
+      <button
+        type="button"
+        className="nb-btn nb-btn--sm"
+        disabled={page === 0}
+        onClick={() => onChange(page - 1)}
+        aria-label="Trang trước"
+      >
+        ←
+      </button>
+      {pages.map((p) => (
+        <button
+          key={p}
+          type="button"
+          className={`nb-btn nb-btn--sm ${p === page ? 'nb-btn--dark' : ''}`}
+          onClick={() => onChange(p)}
+        >
+          {p + 1}
+        </button>
+      ))}
+      <button
+        type="button"
+        className="nb-btn nb-btn--sm"
+        disabled={page >= pageCount - 1}
+        onClick={() => onChange(page + 1)}
+        aria-label="Trang sau"
+      >
+        →
+      </button>
+    </div>
+  );
+}
+
 export function EmptyState({ emoji = '🗂️', children }) {
   return (
     <div className="empty-state">

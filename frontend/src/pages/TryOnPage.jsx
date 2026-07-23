@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import * as itemsApi from '../api/clothingItems';
 import * as tryOnApi from '../api/tryOn';
-import { Badge, Button, EmptyState, ErrorBanner, Loading } from '../components/ui';
+import { Badge, Button, EmptyState, ErrorBanner, Loading, Pagination } from '../components/ui';
 import { useConfirm } from '../context/ConfirmContext';
 import { CATEGORY_EMOJIS } from '../utils/labels';
 import { formatDateTime } from '../utils/date';
@@ -26,6 +26,9 @@ export default function TryOnPage() {
   const [notice, setNotice] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [generatingId, setGeneratingId] = useState(null);
+  const [itemPage, setItemPage] = useState(0);
+
+  const ITEMS_PER_PAGE = 9; // 3 cột x 3 dòng
 
   useEffect(() => {
     tryOnApi.getTryOnProfile().then(setProfile).catch((err) => setError(err.message));
@@ -34,6 +37,12 @@ export default function TryOnPage() {
   }, []);
 
   const wearableItems = items.filter((item) => item.imageUrl);
+  const itemPageCount = Math.ceil(wearableItems.length / ITEMS_PER_PAGE);
+  const safeItemPage = Math.min(itemPage, Math.max(0, itemPageCount - 1));
+  const pagedWearableItems = wearableItems.slice(
+    safeItemPage * ITEMS_PER_PAGE,
+    (safeItemPage + 1) * ITEMS_PER_PAGE
+  );
 
   const handlePickFile = () => fileInputRef.current?.click();
 
@@ -199,30 +208,33 @@ export default function TryOnPage() {
               rồi quay lại thử nhé.
             </EmptyState>
           ) : (
-            <div className="tryon-item-grid">
-              {wearableItems.map((item) => (
-                <div key={item.id} className="tryon-item">
-                  <div className="tryon-item-photo">
-                    <img src={item.imageUrl} alt={item.name} />
+            <>
+              <div className="tryon-item-grid">
+                {pagedWearableItems.map((item) => (
+                  <div key={item.id} className="tryon-item">
+                    <div className="tryon-item-photo">
+                      <img src={item.imageUrl} alt={item.name} />
+                    </div>
+                    <div className="tryon-item-name" title={item.name}>
+                      {CATEGORY_EMOJIS[item.category]} {item.name}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="green"
+                      onClick={() => handleTryOn(item)}
+                      disabled={generatingId !== null}
+                    >
+                      {generatingId === item.id ? '⏳ Đang ghép...' : '✨ Thử lên người'}
+                    </Button>
                   </div>
-                  <div className="tryon-item-name" title={item.name}>
-                    {CATEGORY_EMOJIS[item.category]} {item.name}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="green"
-                    onClick={() => handleTryOn(item)}
-                    disabled={generatingId !== null}
-                  >
-                    {generatingId === item.id ? '⏳ Đang ghép...' : '✨ Thử lên người'}
-                  </Button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              <Pagination page={safeItemPage} pageCount={itemPageCount} onChange={setItemPage} />
+            </>
           )}
           {generatingId !== null && (
             <p style={{ fontWeight: 600, color: 'var(--muted)', marginTop: 12, fontSize: 13.5 }}>
-              ⏳ Kling AI đang ghép trang phục — có thể mất tới 1–2 phút, vui lòng đợi...
+              ⏳ Đang ghép trang phục — có thể mất tới 1–2 phút, vui lòng đợi...
             </p>
           )}
         </div>

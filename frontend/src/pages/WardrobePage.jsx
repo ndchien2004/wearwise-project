@@ -4,7 +4,7 @@ import * as itemsApi from '../api/clothingItems';
 import * as tryOnApi from '../api/tryOn';
 import ItemCard from '../components/ItemCard';
 import ItemFormModal from '../components/ItemFormModal';
-import { Button, EmptyState, ErrorBanner, Field, Loading, Toast } from '../components/ui';
+import { Button, EmptyState, ErrorBanner, Field, Loading, Pagination, Toast } from '../components/ui';
 import { useConfirm } from '../context/ConfirmContext';
 import {
   CATEGORY_LABELS,
@@ -35,6 +35,9 @@ export default function WardrobePage() {
   const [notice, setNotice] = useState(null);
   const [triedIds, setTriedIds] = useState(() => new Set());
   const [modal, setModal] = useState(null); // null | { item?: object }
+  const [page, setPage] = useState(0);
+
+  const PER_PAGE = 12; // 4 cột x 3 dòng
 
   // Các món đã từng thử đồ (để hiện badge "🪞 Đã thử" trên card).
   const loadTriedIds = useCallback(() => {
@@ -60,6 +63,11 @@ export default function WardrobePage() {
   useEffect(() => {
     loadTriedIds();
   }, [loadTriedIds]);
+
+  // Đổi bộ lọc thì quay về trang 1.
+  useEffect(() => {
+    setPage(0);
+  }, [filters]);
 
   const setFilter = (key) => (e) => setFilters((f) => ({ ...f, [key]: e.target.value }));
 
@@ -169,20 +177,30 @@ export default function WardrobePage() {
           Chưa có món đồ nào. Bấm "Thêm món đồ" để bắt đầu xây dựng tủ đồ của bạn!
         </EmptyState>
       ) : (
-        <div className="card-grid">
-          {items.map((item) => (
-            <ItemCard
-              key={item.id}
-              item={item}
-              tried={triedIds.has(item.id)}
-              onOpen={(i) => navigate(`/wardrobe/${i.id}`)}
-              onEdit={(i) => setModal({ item: i })}
-              onDelete={handleDelete}
-              onToggleFavorite={handleToggleFavorite}
-              onWear={handleWear}
-            />
-          ))}
-        </div>
+        (() => {
+          const pageCount = Math.ceil(items.length / PER_PAGE);
+          const safePage = Math.min(page, pageCount - 1);
+          const pageItems = items.slice(safePage * PER_PAGE, (safePage + 1) * PER_PAGE);
+          return (
+            <>
+              <div className="card-grid">
+                {pageItems.map((item) => (
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    tried={triedIds.has(item.id)}
+                    onOpen={(i) => navigate(`/wardrobe/${i.id}`)}
+                    onEdit={(i) => setModal({ item: i })}
+                    onDelete={handleDelete}
+                    onToggleFavorite={handleToggleFavorite}
+                    onWear={handleWear}
+                  />
+                ))}
+              </div>
+              <Pagination page={safePage} pageCount={pageCount} onChange={setPage} />
+            </>
+          );
+        })()
       )}
 
       {modal && <ItemFormModal item={modal.item} onSave={handleSave} onClose={() => setModal(null)} />}

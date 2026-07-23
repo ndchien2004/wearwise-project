@@ -1,21 +1,37 @@
+import { useState } from 'react';
 import { Badge, Button } from './ui';
-import {
-  CATEGORY_EMOJIS,
-  SEASON_EMOJIS,
-  SEASON_LABELS,
-  STYLE_LABELS,
-  label,
-} from '../utils/labels';
-import { formatDateTime, isWornToday } from '../utils/date';
+import { isWornToday } from '../utils/date';
 
 export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, onToggleFavorite, onWear }) {
   const collageImages = outfit.clothingItems.filter((item) => item.imageUrl).slice(0, 4);
   const wornToday = isWornToday(outfit.lastWornAt);
+  const [flipped, setFlipped] = useState(false);
+
+  // Ảnh lật được khi có cả ảnh đại diện (mặt trước) lẫn ảnh các món (mặt sau).
+  const flippable = Boolean(outfit.imageUrl) && collageImages.length > 0;
 
   const stop = (handler) => (e) => {
     e.stopPropagation();
     handler(outfit);
   };
+
+  const handleFlip = (e) => {
+    e.stopPropagation();
+    setFlipped((v) => !v);
+  };
+
+  const renderCollage = () => (
+    <div
+      className="outfit-collage"
+      style={collageImages.length === 1 ? { gridTemplateColumns: '1fr' } : undefined}
+    >
+      {collageImages.map((item) => (
+        <div key={item.id} className="collage-cell" title={item.name}>
+          <img src={item.imageUrl} alt={item.name} />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div
@@ -24,26 +40,40 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
       onClick={() => onOpen(outfit)}
       title="Bấm để xem chi tiết"
     >
-      {outfit.imageUrl ? (
-        <div className="item-photo">
+      {flippable ? (
+        <div
+          className={`outfit-flip ${flipped ? 'is-flipped' : ''}`}
+          onClick={handleFlip}
+          title={flipped ? 'Bấm để xem lại ảnh bộ' : 'Bấm để xem các món'}
+        >
+          <div className="outfit-flip-inner">
+            <div className="outfit-flip-face outfit-flip-front">
+              <img src={outfit.imageUrl} alt={outfit.name} />
+              {tried && <span className="outfit-badge-overlay">🪞 Đã thử</span>}
+              <div className="outfit-eye" aria-hidden="true">👁️</div>
+            </div>
+            <div className="outfit-flip-face outfit-flip-back">
+              {renderCollage()}
+            </div>
+          </div>
+        </div>
+      ) : outfit.imageUrl ? (
+        <div className="item-photo" style={{ position: 'relative' }}>
           <img src={outfit.imageUrl} alt={outfit.name} />
+          {tried && <span className="outfit-badge-overlay">🪞 Đã thử</span>}
         </div>
       ) : collageImages.length > 0 ? (
-        <div
-          className="outfit-collage"
-          style={collageImages.length === 1 ? { gridTemplateColumns: '1fr' } : undefined}
-        >
-          {collageImages.map((item) => (
-            <div key={item.id} className="collage-cell" title={item.name}>
-              <img src={item.imageUrl} alt={item.name} />
-            </div>
-          ))}
+        <div style={{ position: 'relative' }}>
+          {renderCollage()}
+          {tried && <span className="outfit-badge-overlay">🪞 Đã thử</span>}
         </div>
       ) : (
-        <div className="item-photo item-photo--placeholder" style={{ background: 'var(--pink)' }}>
+        <div className="item-photo item-photo--placeholder" style={{ background: 'var(--pink)', position: 'relative' }}>
           🧢
+          {tried && <span className="outfit-badge-overlay">🪞 Đã thử</span>}
         </div>
       )}
+
       <div className="item-card-top">
         <div style={{ minWidth: 0 }}>
           <div className="item-name" title={outfit.name}>🧢 {outfit.name}</div>
@@ -60,25 +90,6 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
           ⭐
         </button>
       </div>
-
-      <div className="badge-row">
-        <Badge color="blue">
-          {SEASON_EMOJIS[outfit.season]} {label(SEASON_LABELS, outfit.season)}
-        </Badge>
-        <Badge color="purple">{label(STYLE_LABELS, outfit.style)}</Badge>
-        <Badge color="orange">Đã mặc {outfit.wearCount ?? 0} lần</Badge>
-        {tried && <Badge color="pink">🪞 Đã thử</Badge>}
-      </div>
-
-      <div className="badge-row">
-        {outfit.clothingItems.map((item) => (
-          <Badge key={item.id}>
-            {CATEGORY_EMOJIS[item.category]} {item.name}
-          </Badge>
-        ))}
-      </div>
-
-      <div className="item-meta">Mặc lần cuối: {formatDateTime(outfit.lastWornAt)}</div>
 
       <div className="card-actions">
         {wornToday ? (
