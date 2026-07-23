@@ -157,7 +157,7 @@ export default function WardrobePage() {
             <option value="false">Chưa yêu thích</option>
           </select>
         </Field>
-        <Button size="sm" onClick={() => setFilters(EMPTY_FILTERS)}>
+        <Button className="filter-reset" onClick={() => setFilters(EMPTY_FILTERS)}>
           🔄 Xóa lọc
         </Button>
       </div>

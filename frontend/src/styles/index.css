@@ -482,6 +482,13 @@ a {
   min-width: 200px;
 }
 
+/* Nút "Xóa lọc" đứng riêng — cao bằng ô select, canh đáy theo hàng control */
+.filter-bar .filter-reset {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  height: 47px;
+}
+
 .empty-state {
   text-align: center;
   padding: 48px 24px;
@@ -942,6 +949,83 @@ a {
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
+}
+
+/* Hàng "Lâu chưa đụng tới" — tên cắt gọn 1 dòng, badge phải cố định để mọi hàng cân nhau */
+.least-worn-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 10px 14px;
+}
+
+.least-worn-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.least-worn-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.least-worn-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.least-worn-row .nb-badge {
+  flex-shrink: 0;
+}
+
+/* Hàng điều khiển "Nhờ AI phối đồ": select + nút cùng đáy, cùng cao */
+.ai-control-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.ai-control-row .ai-ask-btn {
+  flex: 0 0 auto;
+  height: 47px;
+}
+
+/* Hàng gọn (danh sách ở Dashboard): tên cắt gọn, giá trị/badge phải cố định */
+.mini-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.mini-row-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-row-value {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.mini-row .nb-badge {
+  flex-shrink: 0;
 }
 
 /* ---------- Calendar ---------- */

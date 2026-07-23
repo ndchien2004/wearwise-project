@@ -69,7 +69,6 @@ export default function AnalyticsPage() {
   const tiles = [
     { label: 'Món đồ', value: stats.totalClothingItems, bg: 'var(--yellow)', emoji: '👕' },
     { label: 'Outfit', value: stats.totalOutfits, bg: 'var(--pink)', emoji: '🧢' },
-    { label: 'Tổng lượt mặc', value: stats.totalWearCount, bg: 'var(--green)', emoji: '👣' },
     { label: 'Đồ yêu thích', value: stats.favoriteClothingItems, bg: 'var(--blue)', emoji: '⭐' },
     { label: 'Outfit yêu thích', value: stats.favoriteOutfits, bg: 'var(--purple)', emoji: '💜' },
   ];
@@ -151,22 +150,20 @@ export default function AnalyticsPage() {
               {leastWorn.map((item) => {
                 const days = daysSince(item.lastWornAt);
                 return (
-                  <div
-                    key={item.id}
-                    className="nb-card nb-card--flat"
-                    style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}
-                  >
-                    <strong>
-                      {CATEGORY_EMOJIS[item.category]} {item.name}
-                    </strong>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <Badge color="orange">{item.wearCount ?? 0} lượt mặc</Badge>
-                      <Badge color={days === null ? 'red' : 'muted'}>
+                  <div key={item.id} className="least-worn-row">
+                    <div className="least-worn-main">
+                      <strong className="least-worn-name">
+                        {CATEGORY_EMOJIS[item.category]} {item.name}
+                      </strong>
+                      <span className="least-worn-sub">
                         {days === null
-                          ? 'Chưa mặc bao giờ'
-                          : `Lần cuối: ${formatDateTime(item.lastWornAt)} (${days} ngày trước)`}
-                      </Badge>
+                          ? 'Chưa mặc lần nào'
+                          : `Lần cuối: ${formatDateTime(item.lastWornAt)}`}
+                      </span>
                     </div>
+                    <Badge color={days === null ? 'red' : 'muted'}>
+                      {days === null ? 'Chưa mặc bao giờ' : `${days} ngày trước`}
+                    </Badge>
                   </div>
                 );
               })}

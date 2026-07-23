@@ -91,10 +91,6 @@ export default function DashboardPage() {
               <div className="stat-label">Outfit đã phối</div>
             </div>
           </Link>
-          <div className="stat-tile" style={{ background: 'var(--green)' }}>
-            <div className="stat-value">👣 {stats.totalWearCount}</div>
-            <div className="stat-label">Tổng lượt mặc</div>
-          </div>
           <div className="stat-tile" style={{ background: 'var(--blue)' }}>
             <div className="stat-value">⭐ {stats.favoriteClothingItems + stats.favoriteOutfits}</div>
             <div className="stat-label">Mục yêu thích</div>
@@ -158,11 +154,11 @@ export default function DashboardPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {recentlyWorn.map((item) => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontWeight: 600, flexWrap: 'wrap' }}>
-                  <span>
+                <div key={item.id} className="mini-row">
+                  <span className="mini-row-name">
                     {CATEGORY_EMOJIS[item.category]} {item.name}
                   </span>
-                  <span style={{ color: 'var(--muted)', fontSize: 13.5 }}>{formatDateTime(item.lastWornAt)}</span>
+                  <span className="mini-row-value">{formatDateTime(item.lastWornAt)}</span>
                 </div>
               ))}
             </div>
@@ -176,11 +172,11 @@ export default function DashboardPage() {
               {leastWorn.map((item) => {
                 const days = daysSince(item.lastWornAt);
                 return (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontWeight: 600, flexWrap: 'wrap' }}>
-                    <span>
+                  <div key={item.id} className="mini-row">
+                    <span className="mini-row-name">
                       {CATEGORY_EMOJIS[item.category]} {item.name}
                     </span>
-                    <Badge color="orange">
+                    <Badge color={days === null ? 'red' : 'orange'}>
                       {days === null ? 'Chưa mặc bao giờ' : `${days} ngày trước`}
                     </Badge>
                   </div>

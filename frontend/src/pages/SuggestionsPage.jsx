@@ -232,8 +232,8 @@ export default function SuggestionsPage() {
 
           <h2 className="section-heading">🤖 Nhờ AI phối đồ từ tủ của bạn</h2>
           <div className="nb-card" style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <div className="nb-field" style={{ minWidth: 200 }}>
+            <div className="ai-control-row">
+              <div className="nb-field" style={{ margin: 0, flex: '1 1 240px' }}>
                 <label className="nb-label">Tone màu muốn mặc</label>
                 <select className="nb-select" value={aiTone} onChange={(e) => setAiTone(e.target.value)}>
                   <option value="">🎲 Tùy AI chọn</option>
@@ -244,7 +244,7 @@ export default function SuggestionsPage() {
                   ))}
                 </select>
               </div>
-              <Button variant="primary" onClick={askAi} disabled={aiLoading}>
+              <Button variant="primary" className="ai-ask-btn" onClick={askAi} disabled={aiLoading}>
                 {aiLoading ? '🤖 AI đang phối đồ...' : '✨ Nhờ AI phối đồ'}
               </Button>
             </div>
