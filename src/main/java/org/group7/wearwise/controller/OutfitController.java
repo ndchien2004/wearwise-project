@@ -78,7 +78,8 @@ public class OutfitController {
                 request.season(),
                 request.style(),
                 request.favorite(),
-                request.clothingItemIds()
+                request.clothingItemIds(),
+                request.imageUrl()
         );
 
         return OutfitResponse.from(outfit);
@@ -98,7 +99,8 @@ public class OutfitController {
                 request.season(),
                 request.style(),
                 request.favorite(),
-                request.clothingItemIds()
+                request.clothingItemIds(),
+                request.imageUrl()
         );
 
         return OutfitResponse.from(outfit);

@@ -73,7 +73,8 @@ class OutfitServiceTest {
                 Season.ALL_SEASON,
                 Style.FORMAL,
                 null,
-                List.of(1L, 2L)
+                List.of(1L, 2L),
+                null
         );
 
         ArgumentCaptor<Outfit> captor = ArgumentCaptor.forClass(Outfit.class);
@@ -93,7 +94,8 @@ class OutfitServiceTest {
                 Season.ALL_SEASON,
                 Style.FORMAL,
                 false,
-                List.of(1L, 1L)
+                List.of(1L, 1L),
+                null
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Clothing item IDs must not contain duplicates.");
     }
@@ -111,7 +113,8 @@ class OutfitServiceTest {
                 Season.ALL_SEASON,
                 Style.FORMAL,
                 false,
-                List.of(1L, 99L)
+                List.of(1L, 99L),
+                null
         )).isInstanceOf(ClothingItemNotFoundException.class)
                 .hasMessageContaining("99");
     }
@@ -137,7 +140,8 @@ class OutfitServiceTest {
                 Season.SUMMER,
                 Style.SPORT,
                 true,
-                List.of(3L)
+                List.of(3L),
+                null
         );
 
         assertThat(updated.getName()).isEqualTo("Sport Set");

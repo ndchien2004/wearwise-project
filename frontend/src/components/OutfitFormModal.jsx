@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as itemsApi from '../api/clothingItems';
+import { uploadOutfitImage } from '../api/images';
 import { Button, ErrorBanner, Field, Modal } from './ui';
 import {
   CATEGORY_EMOJIS,
@@ -16,12 +17,33 @@ export default function OutfitFormModal({ outfit, onSave, onClose }) {
     season: outfit?.season ?? 'ALL_SEASON',
     style: outfit?.style ?? 'CASUAL',
     favorite: Boolean(outfit?.favorite),
+    imageUrl: outfit?.imageUrl ?? '',
   }));
   const [pickedIds, setPickedIds] = useState(() => new Set(outfit?.clothingItems?.map((i) => i.id) ?? []));
   const [allItems, setAllItems] = useState(null);
   const [pickerFilter, setPickerFilter] = useState('');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handlePickFile = () => fileInputRef.current?.click();
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const { url } = await uploadOutfitImage(file);
+      setForm((f) => ({ ...f, imageUrl: url }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     itemsApi
@@ -66,6 +88,7 @@ export default function OutfitFormModal({ outfit, onSave, onClose }) {
       await onSave({
         name: form.name.trim(),
         description: form.description.trim() || null,
+        imageUrl: form.imageUrl.trim() || null,
         season: form.season,
         style: form.style,
         favorite: form.favorite,
@@ -101,6 +124,34 @@ export default function OutfitFormModal({ outfit, onSave, onClose }) {
             placeholder="Ghi chú về outfit này..."
             maxLength={1000}
           />
+        </Field>
+
+        <Field label="Ảnh đại diện outfit">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png"
+            onChange={handleUpload}
+            style={{ display: 'none' }}
+          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+            <input
+              className="nb-input"
+              style={{ flex: 1 }}
+              value={form.imageUrl}
+              onChange={set('imageUrl')}
+              placeholder="Tải ảnh chụp cả bộ, hoặc dán URL"
+              maxLength={512}
+            />
+            <Button type="button" onClick={handlePickFile} disabled={uploading}>
+              {uploading ? '⏳ Đang tải...' : '⬆️ Tải ảnh'}
+            </Button>
+          </div>
+          {form.imageUrl.trim() && (
+            <div className="img-preview">
+              <img src={form.imageUrl.trim()} alt="Xem trước outfit" />
+            </div>
+          )}
         </Field>
 
         <div className="two-col">

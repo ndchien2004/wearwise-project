@@ -6,3 +6,10 @@ export function uploadClothingImage(file) {
   formData.append('file', file);
   return apiUpload('/api/images/clothing', formData);
 }
+
+/** Tải ảnh đại diện outfit lên Cloudinary, trả về { url }. */
+export function uploadOutfitImage(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiUpload('/api/images/outfit', formData);
+}

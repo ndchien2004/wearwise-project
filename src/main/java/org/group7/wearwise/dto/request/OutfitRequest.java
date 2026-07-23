@@ -18,6 +18,9 @@ public record OutfitRequest(
         @Size(max = 1000, message = "Description must be at most 1000 characters.")
         String description,
 
+        @Size(max = 512, message = "Image URL must be at most 512 characters.")
+        String imageUrl,
+
         @NotNull(message = "Season is required.")
         Season season,
 

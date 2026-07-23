@@ -167,7 +167,11 @@ export default function OutfitDetailPage() {
       <div className="two-col">
         <div>
           <div className="nb-card" style={{ marginBottom: 20 }}>
-            {collageImages.length > 0 ? (
+            {outfit.imageUrl ? (
+              <div className="item-photo" style={{ height: 280 }}>
+                <img src={outfit.imageUrl} alt={outfit.name} style={{ objectFit: 'contain' }} />
+              </div>
+            ) : collageImages.length > 0 ? (
               <div
                 className="outfit-collage"
                 style={collageImages.length === 1 ? { gridTemplateColumns: '1fr' } : undefined}

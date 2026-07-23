@@ -31,6 +31,7 @@ public class OutfitService {
 
     private static final int MAX_NAME_LENGTH = 255;
     private static final int MAX_DESCRIPTION_LENGTH = 1000;
+    private static final int MAX_IMAGE_URL_LENGTH = 512;
 
     private final OutfitRepository outfitRepository;
     private final ClothingItemRepository clothingItemRepository;
@@ -57,13 +58,15 @@ public class OutfitService {
             Season season,
             Style style,
             Boolean favorite,
-            List<Long> clothingItemIds
+            List<Long> clothingItemIds,
+            String imageUrl
     ) {
         AppUser owner = getOwner(ownerUsername);
 
         Outfit outfit = Outfit.builder()
                 .name(normalizeRequiredText(name, "Name", MAX_NAME_LENGTH))
                 .description(normalizeOptionalText(description, "Description", MAX_DESCRIPTION_LENGTH))
+                .imageUrl(normalizeOptionalText(imageUrl, "Image URL", MAX_IMAGE_URL_LENGTH))
                 .season(requireSeason(season))
                 .style(requireStyle(style))
                 .favorite(favorite != null && favorite)
@@ -102,13 +105,15 @@ public class OutfitService {
             Season season,
             Style style,
             Boolean favorite,
-            List<Long> clothingItemIds
+            List<Long> clothingItemIds,
+            String imageUrl
     ) {
         String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
         Outfit outfit = getOutfitById(normalizedOwnerUsername, id);
 
         outfit.setName(normalizeRequiredText(name, "Name", MAX_NAME_LENGTH));
         outfit.setDescription(normalizeOptionalText(description, "Description", MAX_DESCRIPTION_LENGTH));
+        outfit.setImageUrl(normalizeOptionalText(imageUrl, "Image URL", MAX_IMAGE_URL_LENGTH));
         outfit.setSeason(requireSeason(season));
         outfit.setStyle(requireStyle(style));
         outfit.setFavorite(favorite != null && favorite);

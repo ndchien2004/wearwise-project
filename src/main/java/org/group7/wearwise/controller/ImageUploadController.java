@@ -23,4 +23,9 @@ public class ImageUploadController {
     public ImageUploadResponse uploadClothingImage(@RequestParam("file") MultipartFile file) {
         return new ImageUploadResponse(imageUploadService.uploadClothingImage(file));
     }
+
+    @PostMapping("/outfit")
+    public ImageUploadResponse uploadOutfitImage(@RequestParam("file") MultipartFile file) {
+        return new ImageUploadResponse(imageUploadService.uploadOutfitImage(file));
+    }
 }

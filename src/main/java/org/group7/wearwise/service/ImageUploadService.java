@@ -31,13 +31,22 @@ public class ImageUploadService {
 
     /** Tải ảnh món đồ lên thư mục wearwise/items và trả về secure URL. */
     public String uploadClothingImage(MultipartFile file) {
+        return upload(file, "items");
+    }
+
+    /** Tải ảnh đại diện outfit lên thư mục wearwise/outfits và trả về secure URL. */
+    public String uploadOutfitImage(MultipartFile file) {
+        return upload(file, "outfits");
+    }
+
+    private String upload(MultipartFile file, String subFolder) {
         if (!cloudinaryService.isConfigured()) {
             throw new TryOnUnavailableException(
                     "Cloudinary chưa được cấu hình. Hãy điền cloud-name, api-key và api-secret vào application.properties.");
         }
 
         byte[] bytes = validateAndReadImage(file);
-        return cloudinaryService.uploadImage(bytes, file.getContentType(), "items");
+        return cloudinaryService.uploadImage(bytes, file.getContentType(), subFolder);
     }
 
     private byte[] validateAndReadImage(MultipartFile file) {

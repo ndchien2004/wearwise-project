@@ -64,7 +64,8 @@ class OutfitControllerTest {
                 Season.ALL_SEASON,
                 Style.FORMAL,
                 true,
-                List.of(1L)
+                List.of(1L),
+                null
         )).thenReturn(outfit);
 
         mockMvc.perform(post("/api/outfits")
@@ -139,7 +140,8 @@ class OutfitControllerTest {
                 Season.ALL_SEASON,
                 Style.FORMAL,
                 false,
-                List.of(1L, 1L)
+                List.of(1L, 1L),
+                null
         )).thenThrow(new IllegalArgumentException("Clothing item IDs must not contain duplicates."));
 
         mockMvc.perform(post("/api/outfits")
@@ -170,7 +172,8 @@ class OutfitControllerTest {
                 Season.WINTER,
                 Style.CASUAL,
                 false,
-                List.of(1L)
+                List.of(1L),
+                null
         )).thenReturn(outfit);
 
         mockMvc.perform(put("/api/outfits/3")

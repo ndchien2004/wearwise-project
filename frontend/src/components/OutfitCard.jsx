@@ -24,7 +24,11 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
       onClick={() => onOpen(outfit)}
       title="Bấm để xem chi tiết"
     >
-      {collageImages.length > 0 ? (
+      {outfit.imageUrl ? (
+        <div className="item-photo">
+          <img src={outfit.imageUrl} alt={outfit.name} />
+        </div>
+      ) : collageImages.length > 0 ? (
         <div
           className="outfit-collage"
           style={collageImages.length === 1 ? { gridTemplateColumns: '1fr' } : undefined}

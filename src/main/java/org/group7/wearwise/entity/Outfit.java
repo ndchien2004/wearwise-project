@@ -48,6 +48,10 @@ public class Outfit {
     @Column(length = 1000)
     private String description;
 
+    /** Ảnh đại diện cho cả bộ (tùy chọn) — người dùng tự tải lên. */
+    @Column(length = 512)
+    private String imageUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Season season;

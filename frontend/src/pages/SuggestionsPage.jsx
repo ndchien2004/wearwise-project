@@ -3,6 +3,7 @@ import * as aiApi from '../api/ai';
 import * as outfitsApi from '../api/outfits';
 import * as plansApi from '../api/plans';
 import { DEFAULT_CITY, getWeather, searchCity } from '../api/weather';
+import OutfitVisual from '../components/OutfitVisual';
 import { Badge, Button, EmptyState, ErrorBanner, Loading } from '../components/ui';
 import {
   CATEGORY_EMOJIS,
@@ -350,19 +351,13 @@ export default function SuggestionsPage() {
               <div className="card-grid" style={{ marginTop: 8 }}>
                 {aiRanking.map(({ outfit, reason }, index) => (
                   <div key={outfit.id} className="nb-card item-card">
+                    <OutfitVisual outfit={outfit} />
                     <div className="item-name" title={outfit.name}>
                       {index === 0 ? '🥇 ' : ''}🧢 {outfit.name}
                     </div>
                     <div className="item-meta">
                       {SEASON_EMOJIS[outfit.season]} {label(SEASON_LABELS, outfit.season)} ·{' '}
                       {label(STYLE_LABELS, outfit.style)}
-                    </div>
-                    <div className="badge-row">
-                      {outfit.clothingItems.map((item) => (
-                        <Badge key={item.id}>
-                          {CATEGORY_EMOJIS[item.category]} {item.name}
-                        </Badge>
-                      ))}
                     </div>
                     <p style={{ fontWeight: 600, fontSize: 13.5, margin: 0 }}>💡 {reason}</p>
                     <div className="card-actions">
@@ -395,6 +390,8 @@ export default function SuggestionsPage() {
             <div className="card-grid">
               {suggestions.map(({ outfit, score, reasons }, index) => (
                 <div key={outfit.id} className="nb-card nb-card--hover item-card">
+                  <OutfitVisual outfit={outfit} />
+
                   <div className="item-card-top">
                     <div style={{ minWidth: 0 }}>
                       <div className="item-name" title={outfit.name}>
@@ -415,14 +412,6 @@ export default function SuggestionsPage() {
                     {reasons.map((reason) => (
                       <Badge key={reason} color={reason.includes('MISMATCH') || reason.includes('UNAVAILABLE') || reason.includes('NO_JACKET') ? 'red' : 'green'}>
                         {label(SUGGESTION_REASON_LABELS, reason)}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  <div className="badge-row">
-                    {outfit.clothingItems.map((item) => (
-                      <Badge key={item.id}>
-                        {CATEGORY_EMOJIS[item.category]} {item.name}
                       </Badge>
                     ))}
                   </div>
