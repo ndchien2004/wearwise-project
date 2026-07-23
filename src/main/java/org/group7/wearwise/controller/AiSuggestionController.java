@@ -2,6 +2,7 @@ package org.group7.wearwise.controller;
 
 import jakarta.validation.Valid;
 import org.group7.wearwise.dto.request.AiSuggestionRequest;
+import org.group7.wearwise.dto.response.AiOutfitRankingResponse;
 import org.group7.wearwise.dto.response.AiOutfitSuggestionResponse;
 import org.group7.wearwise.service.AiSuggestionService;
 import org.springframework.security.core.Authentication;
@@ -31,6 +32,21 @@ public class AiSuggestionController {
             @Valid @RequestBody AiSuggestionRequest request
     ) {
         return aiSuggestionService.suggest(
+                authentication.getName(),
+                request.temperature(),
+                Boolean.TRUE.equals(request.raining()),
+                request.weatherDescription(),
+                request.tone()
+        );
+    }
+
+    /** Nhờ Gemini xếp hạng các outfit CÓ SẴN theo mức phù hợp thời tiết (bấm nút mới chạy). */
+    @PostMapping("/outfit-ranking")
+    public List<AiOutfitRankingResponse> rankOutfits(
+            Authentication authentication,
+            @Valid @RequestBody AiSuggestionRequest request
+    ) {
+        return aiSuggestionService.rankOutfits(
                 authentication.getName(),
                 request.temperature(),
                 Boolean.TRUE.equals(request.raining()),

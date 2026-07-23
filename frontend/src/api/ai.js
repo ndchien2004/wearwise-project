@@ -12,3 +12,11 @@ export function getAiStatus() {
 export function suggestAiOutfits(payload) {
   return apiFetch('/api/ai/outfit-suggestions', { method: 'POST', body: payload });
 }
+
+/**
+ * Nhờ AI xếp hạng các outfit CÓ SẴN theo mức phù hợp thời tiết.
+ * payload: { temperature, raining, weatherDescription, tone? }
+ */
+export function rankAiOutfits(payload) {
+  return apiFetch('/api/ai/outfit-ranking', { method: 'POST', body: payload });
+}

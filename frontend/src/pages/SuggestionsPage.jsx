@@ -42,10 +42,16 @@ export default function SuggestionsPage() {
   const [aiError, setAiError] = useState(null);
   const [creatingName, setCreatingName] = useState(null);
 
+  const [aiRanking, setAiRanking] = useState(null);
+  const [rankingLoading, setRankingLoading] = useState(false);
+  const [rankingError, setRankingError] = useState(null);
+
   const load = useCallback(async (activeCity) => {
     setWeather(null);
     setSuggestions(null);
     setError(null);
+    setAiRanking(null); // đổi thành phố thì bỏ xếp hạng AI cũ
+    setRankingError(null);
     try {
       const w = await getWeather(activeCity.latitude, activeCity.longitude);
       setWeather(w);
@@ -114,6 +120,25 @@ export default function SuggestionsPage() {
       setAiError(err.message);
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  // Nhờ AI xếp hạng các outfit CÓ SẴN theo thời tiết (bấm nút mới chạy).
+  const rankWithAi = async () => {
+    setRankingError(null);
+    setRankingLoading(true);
+    try {
+      const result = await aiApi.rankAiOutfits({
+        temperature: weather.current.temperature,
+        raining: weather.current.raining,
+        weatherDescription: weather.current.desc,
+        tone: aiTone || null,
+      });
+      setAiRanking(result);
+    } catch (err) {
+      setRankingError(err.message);
+    } finally {
+      setRankingLoading(false);
     }
   };
 
@@ -299,7 +324,66 @@ export default function SuggestionsPage() {
             )}
           </div>
 
-          <h2 className="section-heading">✨ Outfit phù hợp hôm nay</h2>
+          <div className="section-heading-row">
+            <h2 className="section-heading" style={{ margin: 0 }}>✨ Outfit phù hợp hôm nay</h2>
+            {suggestions && suggestions.length > 0 && (
+              <Button variant="primary" onClick={rankWithAi} disabled={rankingLoading}>
+                {rankingLoading ? '🤖 AI đang chọn...' : '🤖 Để AI chọn giúp'}
+              </Button>
+            )}
+          </div>
+
+          {rankingError && (
+            <div style={{ marginBottom: 14 }}>
+              <ErrorBanner error={rankingError} onDismiss={() => setRankingError(null)} />
+            </div>
+          )}
+
+          {aiRanking && (
+            <div className="nb-card" style={{ background: 'var(--yellow)', marginBottom: 22 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                <h3 className="chart-title" style={{ margin: 0 }}>🤖 AI đề xuất cho hôm nay</h3>
+                <button type="button" onClick={() => setAiRanking(null)} className="nb-btn nb-btn--sm">
+                  ✕ Ẩn
+                </button>
+              </div>
+              <div className="card-grid" style={{ marginTop: 8 }}>
+                {aiRanking.map(({ outfit, reason }, index) => (
+                  <div key={outfit.id} className="nb-card item-card">
+                    <div className="item-name" title={outfit.name}>
+                      {index === 0 ? '🥇 ' : ''}🧢 {outfit.name}
+                    </div>
+                    <div className="item-meta">
+                      {SEASON_EMOJIS[outfit.season]} {label(SEASON_LABELS, outfit.season)} ·{' '}
+                      {label(STYLE_LABELS, outfit.style)}
+                    </div>
+                    <div className="badge-row">
+                      {outfit.clothingItems.map((item) => (
+                        <Badge key={item.id}>
+                          {CATEGORY_EMOJIS[item.category]} {item.name}
+                        </Badge>
+                      ))}
+                    </div>
+                    <p style={{ fontWeight: 600, fontSize: 13.5, margin: 0 }}>💡 {reason}</p>
+                    <div className="card-actions">
+                      <Button size="sm" variant="primary" onClick={() => planToday(outfit)}>
+                        📅 Lên lịch hôm nay
+                      </Button>
+                      {isWornToday(outfit.lastWornAt) ? (
+                        <Button size="sm" disabled>
+                          ✅ Đã mặc hôm nay
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="green" onClick={() => wearNow(outfit)}>
+                          👣 Mặc luôn
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {suggestions === null ? (
             <Loading>Đang chấm điểm outfit...</Loading>
