@@ -166,6 +166,14 @@ public class OutfitService {
                 .anyMatch(existingItem -> existingItem.getId().equals(clothingItemId));
 
         if (!alreadyAdded) {
+            boolean categoryTaken = outfit.getClothingItems()
+                    .stream()
+                    .anyMatch(existingItem -> existingItem.getCategory() == item.getCategory());
+            if (categoryTaken) {
+                throw new IllegalArgumentException(
+                        "Outfit đã có 1 " + categoryLabel(item.getCategory())
+                                + ". Mỗi loại chỉ chọn 1 món.");
+            }
             outfit.getClothingItems().add(item);
         }
 
@@ -296,12 +304,29 @@ public class OutfitService {
         }
 
         LinkedHashSet<ClothingItem> resolvedItems = new LinkedHashSet<>();
+        java.util.EnumMap<ClothingCategory, ClothingItem> byCategory = new java.util.EnumMap<>(ClothingCategory.class);
         for (Long clothingItemId : uniqueIds) {
             ClothingItem item = getClothingItemById(ownerUsername, clothingItemId);
+            // Mỗi outfit chỉ 1 món cho mỗi loại (1 áo, 1 quần, 1 giày, ...).
+            if (byCategory.putIfAbsent(item.getCategory(), item) != null) {
+                throw new IllegalArgumentException(
+                        "Mỗi outfit chỉ được chọn 1 " + categoryLabel(item.getCategory())
+                                + ". Hãy bỏ bớt món trùng loại.");
+            }
             resolvedItems.add(item);
         }
 
         return resolvedItems;
+    }
+
+    private String categoryLabel(ClothingCategory category) {
+        return switch (category) {
+            case SHIRT -> "áo";
+            case PANTS -> "quần";
+            case SHOES -> "đôi giày";
+            case JACKET -> "áo khoác";
+            case ACCESSORY -> "phụ kiện";
+        };
     }
 
     private ClothingItem getClothingItemById(String ownerUsername, Long clothingItemId) {

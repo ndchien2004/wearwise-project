@@ -7,7 +7,6 @@ import {
   SEASON_LABELS,
   STATUS_LABELS,
   STYLE_LABELS,
-  TONE_EMOJIS,
   TONE_LABELS,
 } from '../utils/labels';
 
@@ -136,7 +135,7 @@ export default function ItemFormModal({ item, onSave, onClose }) {
               <option value="">— Chưa phân loại —</option>
               {Object.entries(TONE_LABELS).map(([value, text]) => (
                 <option key={value} value={value}>
-                  {TONE_EMOJIS[value]} {text}
+                  {text}
                 </option>
               ))}
             </select>

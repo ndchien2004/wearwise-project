@@ -63,11 +63,20 @@ export default function OutfitFormModal({ outfit, onSave, onClose }) {
     );
   }, [allItems, pickerFilter]);
 
-  const togglePick = (id) => {
+  // Mỗi loại chỉ 1 món: chọn món mới cùng loại sẽ thay món đang chọn.
+  const togglePick = (item) => {
     setPickedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(item.id)) {
+        next.delete(item.id);
+        return next;
+      }
+      (allItems ?? []).forEach((other) => {
+        if (other.category === item.category && next.has(other.id)) {
+          next.delete(other.id);
+        }
+      });
+      next.add(item.id);
       return next;
     });
   };
@@ -176,6 +185,9 @@ export default function OutfitFormModal({ outfit, onSave, onClose }) {
         </div>
 
         <Field label={`Chọn món đồ * (đã chọn ${pickedIds.size})`}>
+          <p style={{ fontWeight: 600, color: 'var(--muted)', fontSize: 13, margin: '0 0 8px' }}>
+            💡 Mỗi loại chỉ chọn 1 món (1 áo, 1 quần, 1 giày...). Chọn món cùng loại sẽ thay món đang chọn.
+          </p>
           <input
             className="nb-input"
             value={pickerFilter}
@@ -195,7 +207,7 @@ export default function OutfitFormModal({ outfit, onSave, onClose }) {
                 <div
                   key={item.id}
                   className={`picker-row ${pickedIds.has(item.id) ? 'is-picked' : ''}`}
-                  onClick={() => togglePick(item.id)}
+                  onClick={() => togglePick(item)}
                 >
                   <span>{pickedIds.has(item.id) ? '✅' : '⬜'}</span>
                   {item.imageUrl ? (

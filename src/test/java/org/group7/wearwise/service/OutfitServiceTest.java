@@ -3,6 +3,7 @@ package org.group7.wearwise.service;
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.entity.Outfit;
+import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
@@ -98,6 +99,26 @@ class OutfitServiceTest {
                 null
         )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Clothing item IDs must not contain duplicates.");
+    }
+
+    @Test
+    void createOutfitRejectsDuplicateCategory() {
+        when(clothingItemRepository.findByIdAndOwner_Username(1L, OWNER))
+                .thenReturn(Optional.of(item(1L, "White Shirt")));
+        when(clothingItemRepository.findByIdAndOwner_Username(5L, OWNER))
+                .thenReturn(Optional.of(item(5L, "Blue Shirt")));
+
+        assertThatThrownBy(() -> outfitService.createOutfit(
+                OWNER,
+                "Two Shirts",
+                null,
+                Season.ALL_SEASON,
+                Style.CASUAL,
+                false,
+                List.of(1L, 5L),
+                null
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("áo");
     }
 
     @Test
@@ -337,6 +358,10 @@ class OutfitServiceTest {
     }
 
     private static ClothingItem item(Long id, String name) {
-        return ClothingItem.builder().id(id).name(name).build();
+        String lower = name.toLowerCase();
+        ClothingCategory category = lower.contains("pants")
+                ? ClothingCategory.PANTS
+                : lower.contains("shoes") ? ClothingCategory.SHOES : ClothingCategory.SHIRT;
+        return ClothingItem.builder().id(id).name(name).category(category).build();
     }
 }

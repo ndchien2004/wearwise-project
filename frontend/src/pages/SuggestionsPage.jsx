@@ -11,7 +11,6 @@ import {
   SEASON_LABELS,
   STYLE_LABELS,
   SUGGESTION_REASON_LABELS,
-  TONE_EMOJIS,
   TONE_LABELS,
   label,
 } from '../utils/labels';
@@ -262,10 +261,10 @@ export default function SuggestionsPage() {
               <div className="nb-field" style={{ margin: 0, flex: '1 1 240px' }}>
                 <label className="nb-label">Tone màu muốn mặc</label>
                 <select className="nb-select" value={aiTone} onChange={(e) => setAiTone(e.target.value)}>
-                  <option value="">🎲 Tùy AI chọn</option>
+                  <option value="">Tùy AI chọn</option>
                   {Object.entries(TONE_LABELS).map(([value, text]) => (
                     <option key={value} value={value}>
-                      {TONE_EMOJIS[value]} {text}
+                      {text}
                     </option>
                   ))}
                 </select>
