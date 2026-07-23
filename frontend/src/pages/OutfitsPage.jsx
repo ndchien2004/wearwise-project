@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as outfitsApi from '../api/outfits';
+import * as tryOnApi from '../api/tryOn';
 import OutfitCard from '../components/OutfitCard';
 import OutfitFormModal from '../components/OutfitFormModal';
 import { Button, EmptyState, ErrorBanner, Field, Loading } from '../components/ui';
@@ -10,10 +12,20 @@ const EMPTY_FILTERS = { keyword: '', season: '', style: '', favorite: '' };
 
 export default function OutfitsPage() {
   const confirm = useConfirm();
+  const navigate = useNavigate();
   const [outfits, setOutfits] = useState(null);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [error, setError] = useState(null);
+  const [triedIds, setTriedIds] = useState(() => new Set());
   const [modal, setModal] = useState(null);
+
+  // Các outfit đã từng thử đồ (để hiện badge "🪞 Đã thử" trên card).
+  useEffect(() => {
+    tryOnApi
+      .listTryOns()
+      .then((results) => setTriedIds(new Set(results.map((r) => r.outfitId).filter(Boolean))))
+      .catch(() => setTriedIds(new Set()));
+  }, []);
 
   const load = useCallback(async (activeFilters) => {
     try {
@@ -134,6 +146,8 @@ export default function OutfitsPage() {
             <OutfitCard
               key={outfit.id}
               outfit={outfit}
+              tried={triedIds.has(outfit.id)}
+              onOpen={(o) => navigate(`/outfits/${o.id}`)}
               onEdit={(o) => setModal({ outfit: o })}
               onDelete={handleDelete}
               onToggleFavorite={handleToggleFavorite}

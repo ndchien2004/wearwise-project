@@ -239,7 +239,9 @@ export default function TryOnPage() {
               <div className="tryon-result-photo">
                 <img src={result.resultImageUrl} alt={result.clothingItemName || 'Ảnh thử đồ'} />
               </div>
-              <div className="item-name">{result.clothingItemName || 'Món đồ đã xóa'}</div>
+              <div className="item-name" title={result.outfitName || result.clothingItemName || ''}>
+                {result.outfitName ? `🧢 ${result.outfitName}` : result.clothingItemName || 'Món đồ đã xóa'}
+              </div>
               <div className="badge-row">
                 <Badge color="purple">🕐 {formatDateTime(result.createdAt)}</Badge>
               </div>

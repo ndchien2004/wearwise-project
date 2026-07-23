@@ -6,6 +6,7 @@ import AuthPage from './pages/AuthPage';
 import CalendarPage from './pages/CalendarPage';
 import DashboardPage from './pages/DashboardPage';
 import ItemDetailPage from './pages/ItemDetailPage';
+import OutfitDetailPage from './pages/OutfitDetailPage';
 import OutfitsPage from './pages/OutfitsPage';
 import SuggestionsPage from './pages/SuggestionsPage';
 import TryOnPage from './pages/TryOnPage';
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/wardrobe" element={<WardrobePage />} />
         <Route path="/wardrobe/:id" element={<ItemDetailPage />} />
         <Route path="/outfits" element={<OutfitsPage />} />
+        <Route path="/outfits/:id" element={<OutfitDetailPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/suggestions" element={<SuggestionsPage />} />
         <Route path="/try-on" element={<TryOnPage />} />

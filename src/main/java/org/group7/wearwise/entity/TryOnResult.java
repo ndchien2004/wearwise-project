@@ -38,11 +38,17 @@ public class TryOnResult {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Món đồ đã thử (tham chiếu mềm — có thể null nếu đồ đã bị xoá). */
+    /** Món đồ đã thử (tham chiếu mềm — có thể null nếu đồ đã bị xoá, hoặc khi thử cả outfit). */
     private Long clothingItemId;
 
     @Column(length = 255)
     private String clothingItemName;
+
+    /** Outfit đã thử (tham chiếu mềm — chỉ có khi thử nguyên bộ). */
+    private Long outfitId;
+
+    @Column(length = 255)
+    private String outfitName;
 
     /** Ảnh trang phục đã dùng để ghép (snapshot). */
     @Column(length = 512)

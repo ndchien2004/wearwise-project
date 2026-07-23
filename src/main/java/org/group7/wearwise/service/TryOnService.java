@@ -3,14 +3,17 @@ package org.group7.wearwise.service;
 import org.group7.wearwise.dto.response.TryOnProfileResponse;
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.ClothingItem;
+import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.entity.TryOnResult;
 import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
+import org.group7.wearwise.exception.OutfitNotFoundException;
 import org.group7.wearwise.exception.TryOnImageException;
 import org.group7.wearwise.exception.TryOnResultNotFoundException;
 import org.group7.wearwise.exception.TryOnUnavailableException;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
+import org.group7.wearwise.repository.OutfitRepository;
 import org.group7.wearwise.repository.TryOnResultRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +42,7 @@ public class TryOnService {
 
     private final AppUserRepository appUserRepository;
     private final ClothingItemRepository clothingItemRepository;
+    private final OutfitRepository outfitRepository;
     private final TryOnResultRepository tryOnResultRepository;
     private final CloudinaryService cloudinaryService;
     private final TryOnApiClient tryOnApiClient;
@@ -49,12 +53,14 @@ public class TryOnService {
     public TryOnService(
             AppUserRepository appUserRepository,
             ClothingItemRepository clothingItemRepository,
+            OutfitRepository outfitRepository,
             TryOnResultRepository tryOnResultRepository,
             CloudinaryService cloudinaryService,
             TryOnApiClient tryOnApiClient
     ) {
         this.appUserRepository = appUserRepository;
         this.clothingItemRepository = clothingItemRepository;
+        this.outfitRepository = outfitRepository;
         this.tryOnResultRepository = tryOnResultRepository;
         this.cloudinaryService = cloudinaryService;
         this.tryOnApiClient = tryOnApiClient;
@@ -130,9 +136,63 @@ public class TryOnService {
         return tryOnResultRepository.save(result);
     }
 
+    /** Thử nguyên một outfit: ghép tất cả món có ảnh trong outfit lên ảnh người dùng. */
+    @Transactional
+    public TryOnResult generateForOutfit(String username, Long outfitId) {
+        AppUser user = getUser(username);
+
+        if (!cloudinaryService.isConfigured() || !tryOnApiClient.isConfigured()) {
+            throw new TryOnUnavailableException(
+                    "Tính năng thử đồ ảo chưa được cấu hình. Vui lòng thêm API key của Cloudinary và tryon-api.com.");
+        }
+
+        String bodyPhotoUrl = user.getBodyPhotoUrl();
+        if (bodyPhotoUrl == null || bodyPhotoUrl.isBlank()) {
+            throw new TryOnImageException("Bạn cần tải ảnh của mình lên trước khi thử đồ.");
+        }
+
+        Outfit outfit = outfitRepository.findByIdAndOwner_Username(outfitId, user.getUsername())
+                .orElseThrow(() -> new OutfitNotFoundException(outfitId));
+
+        List<String> garmentUrls = outfit.getClothingItems().stream()
+                .map(ClothingItem::getImageUrl)
+                .filter(url -> url != null && !url.isBlank())
+                .toList();
+
+        if (garmentUrls.isEmpty()) {
+            throw new TryOnImageException(
+                    "Outfit này chưa có món đồ nào có ảnh minh họa. Hãy thêm ảnh cho các món trong bộ trước khi thử.");
+        }
+
+        // 1. Ghép toàn bộ trang phục của outfit lên ảnh người dùng.
+        String resultUrl = tryOnApiClient.generateTryOn(bodyPhotoUrl, garmentUrls);
+
+        // 2. Lưu vĩnh viễn lên Cloudinary (URL của nhà cung cấp có thể hết hạn).
+        DownloadedImage downloaded = downloadImage(resultUrl);
+        String storedUrl = cloudinaryService.uploadImage(downloaded.bytes(), downloaded.contentType(), "try-on");
+
+        // 3. Lưu bản ghi gắn với outfit (chỉ URL).
+        TryOnResult result = TryOnResult.builder()
+                .owner(user)
+                .outfitId(outfit.getId())
+                .outfitName(outfit.getName())
+                .garmentImageUrl(garmentUrls.get(0))
+                .resultImageUrl(storedUrl)
+                .build();
+
+        return tryOnResultRepository.save(result);
+    }
+
     @Transactional(readOnly = true)
     public List<TryOnResult> listResults(String username) {
         return tryOnResultRepository.findByOwner_UsernameOrderByCreatedAtDescIdDesc(normalizeUsername(username));
+    }
+
+    /** Lịch sử ảnh thử đồ của riêng một outfit (theo soft ref outfitId). */
+    @Transactional(readOnly = true)
+    public List<TryOnResult> listResultsForOutfit(String username, Long outfitId) {
+        return tryOnResultRepository.findByOwner_UsernameAndOutfitIdOrderByCreatedAtDescIdDesc(
+                normalizeUsername(username), outfitId);
     }
 
     /** Lịch sử ảnh thử đồ của riêng một món đồ (theo soft ref clothingItemId). */

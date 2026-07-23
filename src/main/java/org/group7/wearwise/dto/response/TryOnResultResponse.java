@@ -8,6 +8,8 @@ public record TryOnResultResponse(
         Long id,
         Long clothingItemId,
         String clothingItemName,
+        Long outfitId,
+        String outfitName,
         String garmentImageUrl,
         String resultImageUrl,
         LocalDateTime createdAt
@@ -18,6 +20,8 @@ public record TryOnResultResponse(
                 result.getId(),
                 result.getClothingItemId(),
                 result.getClothingItemName(),
+                result.getOutfitId(),
+                result.getOutfitName(),
                 result.getGarmentImageUrl(),
                 result.getResultImageUrl(),
                 result.getCreatedAt()

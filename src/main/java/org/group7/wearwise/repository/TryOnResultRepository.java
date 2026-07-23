@@ -12,5 +12,7 @@ public interface TryOnResultRepository extends JpaRepository<TryOnResult, Long> 
 
     List<TryOnResult> findByOwner_UsernameAndClothingItemIdOrderByCreatedAtDescIdDesc(String username, Long clothingItemId);
 
+    List<TryOnResult> findByOwner_UsernameAndOutfitIdOrderByCreatedAtDescIdDesc(String username, Long outfitId);
+
     Optional<TryOnResult> findByIdAndOwner_Username(Long id, String username);
 }

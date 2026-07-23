@@ -17,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 
 /**
  * Client cho tryon-api.com — dịch vụ ghép trang phục ảo.
@@ -70,15 +71,26 @@ public class TryOnApiClient {
      * @return URL ảnh kết quả (do tryon-api host — nên tải về lưu lại ngay đề phòng hết hạn).
      */
     public String generateTryOn(String humanImageUrl, String clothImageUrl) {
+        return generateTryOn(humanImageUrl, List.of(clothImageUrl));
+    }
+
+    /**
+     * Ghép nhiều món trang phục (nguyên outfit) lên ảnh người trong một lần gọi.
+     */
+    public String generateTryOn(String humanImageUrl, List<String> clothImageUrls) {
         if (!isConfigured()) {
             throw new TryOnUnavailableException(
                     "Dịch vụ thử đồ chưa được cấu hình. Hãy điền wearwise.tryon.api-key vào application.properties.");
+        }
+        if (clothImageUrls == null || clothImageUrls.isEmpty()) {
+            throw new TryOnImageException("Cần ít nhất một ảnh trang phục để thử.");
         }
 
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("model", model);
         payload.putArray("person_images").add(humanImageUrl);
-        payload.putArray("garment_images").add(clothImageUrl);
+        var garments = payload.putArray("garment_images");
+        clothImageUrls.forEach(garments::add);
         if (!category.isBlank()) {
             payload.put("category", category);
         }

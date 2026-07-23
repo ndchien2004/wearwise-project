@@ -63,6 +63,22 @@ public class TryOnController {
                 .toList();
     }
 
+    /** Thử nguyên một outfit (ghép tất cả món có ảnh) lên ảnh của người dùng. */
+    @PostMapping("/outfits/{outfitId}")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TryOnResultResponse generateForOutfit(Authentication authentication, @PathVariable Long outfitId) {
+        return TryOnResultResponse.from(tryOnService.generateForOutfit(authentication.getName(), outfitId));
+    }
+
+    /** Lịch sử ảnh thử đồ của riêng một outfit (hiển thị ở trang chi tiết outfit). */
+    @GetMapping("/outfits/{outfitId}")
+    public List<TryOnResultResponse> listResultsForOutfit(Authentication authentication, @PathVariable Long outfitId) {
+        return tryOnService.listResultsForOutfit(authentication.getName(), outfitId)
+                .stream()
+                .map(TryOnResultResponse::from)
+                .toList();
+    }
+
     /** Bộ sưu tập ảnh thử đồ đã tạo. */
     @GetMapping
     public List<TryOnResultResponse> listResults(Authentication authentication) {

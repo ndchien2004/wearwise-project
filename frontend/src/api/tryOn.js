@@ -27,6 +27,16 @@ export function listTryOnsForItem(itemId) {
   return apiFetch(`/api/try-on/items/${itemId}`);
 }
 
+// Thử nguyên một outfit (ghép tất cả món có ảnh).
+export function generateOutfitTryOn(outfitId) {
+  return apiFetch(`/api/try-on/outfits/${outfitId}`, { method: 'POST' });
+}
+
+// Lịch sử ảnh thử đồ của riêng một outfit.
+export function listTryOnsForOutfit(outfitId) {
+  return apiFetch(`/api/try-on/outfits/${outfitId}`);
+}
+
 export function deleteTryOn(id) {
   return apiFetch(`/api/try-on/${id}`, { method: 'DELETE' });
 }
