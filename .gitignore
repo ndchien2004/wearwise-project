@@ -33,3 +33,11 @@ build/
 .vscode/
 
 .env
+
+### Secret cục bộ — KHÔNG commit API key ###
+application-secrets.properties
+src/main/resources/application-secrets.properties
+*-secrets.properties
+
+### Claude Code ###
+.claude/
