@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import * as aiApi from '../api/ai';
 import * as outfitsApi from '../api/outfits';
 import * as plansApi from '../api/plans';
 import { DEFAULT_CITY, getWeather, searchCity } from '../api/weather';
@@ -9,6 +10,8 @@ import {
   SEASON_LABELS,
   STYLE_LABELS,
   SUGGESTION_REASON_LABELS,
+  TONE_EMOJIS,
+  TONE_LABELS,
   label,
 } from '../utils/labels';
 import { isWornToday, todayIso } from '../utils/date';
@@ -32,6 +35,12 @@ export default function SuggestionsPage() {
   const [suggestions, setSuggestions] = useState(null);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
+
+  const [aiTone, setAiTone] = useState('');
+  const [aiSuggestions, setAiSuggestions] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [creatingName, setCreatingName] = useState(null);
 
   const load = useCallback(async (activeCity) => {
     setWeather(null);
@@ -86,6 +95,46 @@ export default function SuggestionsPage() {
       } else {
         setError(err.message);
       }
+    }
+  };
+
+  const askAi = async () => {
+    setAiError(null);
+    setAiSuggestions(null);
+    setAiLoading(true);
+    try {
+      const result = await aiApi.suggestAiOutfits({
+        temperature: weather.current.temperature,
+        raining: weather.current.raining,
+        weatherDescription: weather.current.desc,
+        tone: aiTone || null,
+      });
+      setAiSuggestions(result);
+    } catch (err) {
+      setAiError(err.message);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Biến một gợi ý AI thành outfit thật trong tủ.
+  const createOutfitFromAi = async (suggestion) => {
+    setAiError(null);
+    setCreatingName(suggestion.name);
+    try {
+      await outfitsApi.createOutfit({
+        name: suggestion.name,
+        description: (suggestion.reason || 'Bộ đồ do AI gợi ý').slice(0, 1000),
+        season: 'ALL_SEASON',
+        style: 'CASUAL',
+        favorite: false,
+        clothingItemIds: suggestion.items.map((item) => item.id),
+      });
+      setNotice(`Đã tạo outfit "${suggestion.name}" từ gợi ý AI! 🧢`);
+    } catch (err) {
+      setAiError(err.message);
+    } finally {
+      setCreatingName(null);
     }
   };
 
@@ -181,6 +230,75 @@ export default function SuggestionsPage() {
             ))}
           </div>
 
+          <h2 className="section-heading">🤖 Nhờ AI phối đồ từ tủ của bạn</h2>
+          <div className="nb-card" style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div className="nb-field" style={{ minWidth: 200 }}>
+                <label className="nb-label">Tone màu muốn mặc</label>
+                <select className="nb-select" value={aiTone} onChange={(e) => setAiTone(e.target.value)}>
+                  <option value="">🎲 Tùy AI chọn</option>
+                  {Object.entries(TONE_LABELS).map(([value, text]) => (
+                    <option key={value} value={value}>
+                      {TONE_EMOJIS[value]} {text}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button variant="primary" onClick={askAi} disabled={aiLoading}>
+                {aiLoading ? '🤖 AI đang phối đồ...' : '✨ Nhờ AI phối đồ'}
+              </Button>
+            </div>
+            <p style={{ fontWeight: 600, color: 'var(--muted)', fontSize: 13.5, marginTop: 10, marginBottom: 0 }}>
+              AI sẽ dựa vào thời tiết {Math.round(weather.current.temperature)}°C
+              {weather.current.raining ? ' (đang mưa)' : ''} + thuộc tính và màu sắc đồ trong tủ để phối bộ phù hợp nhất.
+            </p>
+
+            {aiError && (
+              <div style={{ marginTop: 12 }}>
+                <ErrorBanner error={aiError} onDismiss={() => setAiError(null)} />
+              </div>
+            )}
+
+            {aiSuggestions && (
+              <div className="card-grid" style={{ marginTop: 16 }}>
+                {aiSuggestions.map((suggestion) => (
+                  <div key={suggestion.name} className="nb-card item-card">
+                    <div className="item-name" title={suggestion.name}>🤖 {suggestion.name}</div>
+                    <div className="badge-row">
+                      {suggestion.items.map((item) => (
+                        <Badge key={item.id}>
+                          {CATEGORY_EMOJIS[item.category]} {item.name}
+                        </Badge>
+                      ))}
+                    </div>
+                    {suggestion.items.some((item) => item.imageUrl) && (
+                      <div className="outfit-collage">
+                        {suggestion.items.filter((item) => item.imageUrl).slice(0, 4).map((item) => (
+                          <div key={item.id} className="collage-cell" title={item.name}>
+                            <img src={item.imageUrl} alt={item.name} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--muted)', margin: 0 }}>
+                      💡 {suggestion.reason}
+                    </p>
+                    <div className="card-actions">
+                      <Button
+                        size="sm"
+                        variant="pink"
+                        onClick={() => createOutfitFromAi(suggestion)}
+                        disabled={creatingName !== null}
+                      >
+                        {creatingName === suggestion.name ? '⏳ Đang tạo...' : '🧢 Tạo outfit từ gợi ý'}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <h2 className="section-heading">✨ Outfit phù hợp hôm nay</h2>
 
           {suggestions === null ? (
@@ -195,7 +313,7 @@ export default function SuggestionsPage() {
                 <div key={outfit.id} className="nb-card nb-card--hover item-card">
                   <div className="item-card-top">
                     <div style={{ minWidth: 0 }}>
-                      <div className="item-name">
+                      <div className="item-name" title={outfit.name}>
                         {index === 0 ? '🏆 ' : ''}
                         {outfit.name}
                       </div>

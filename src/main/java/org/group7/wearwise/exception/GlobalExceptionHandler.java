@@ -36,8 +36,8 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, exception.getMessage(), Map.of());
     }
 
-    @ExceptionHandler(TryOnUnavailableException.class)
-    public ResponseEntity<ApiErrorResponse> handleTryOnUnavailable(TryOnUnavailableException exception) {
+    @ExceptionHandler({TryOnUnavailableException.class, AiUnavailableException.class})
+    public ResponseEntity<ApiErrorResponse> handleServiceUnavailable(RuntimeException exception) {
         return build(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), Map.of());
     }
 
