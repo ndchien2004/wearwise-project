@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Button } from './ui';
+import AccountModal from './AccountModal';
+import ChangePasswordModal from './ChangePasswordModal';
+import { Button, Toast } from './ui';
 
 const NAV_ITEMS = [
   { to: '/', emoji: '🏠', label: 'Tổng quan', end: true },
@@ -16,9 +18,15 @@ const NAV_ITEMS = [
 const COLLAPSE_KEY = 'wearwise_sidebar_collapsed';
 
 export default function Layout() {
-  const { username, logout } = useAuth();
+  const { username, user, logout } = useAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  // Tài khoản tạo trước khi có tính năng quên mật khẩu thì chưa có email — nhắc người dùng bổ sung.
+  const needsEmail = Boolean(user) && !user.email;
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -65,9 +73,23 @@ export default function Layout() {
         ))}
 
         <div className="sidebar-footer">
-          <div className="sidebar-user" title={username}>
+          <button
+            type="button"
+            className="sidebar-user"
+            title={needsEmail ? `${username} — chưa có email` : username}
+            onClick={() => setShowAccount(true)}
+          >
             👤 <span className="nav-label">{username}</span>
-          </div>
+            {needsEmail && <span className="sidebar-user-alert" title="Chưa có email">!</span>}
+          </button>
+          <Button
+            size="sm"
+            onClick={() => setChangingPassword(true)}
+            title={collapsed ? 'Đổi mật khẩu' : undefined}
+          >
+            <span className="nav-emoji">🔑</span>
+            <span className="nav-label">Đổi mật khẩu</span>
+          </Button>
           <Button variant="danger" size="sm" onClick={handleLogout}>
             <span className="nav-emoji">🚪</span>
             <span className="nav-label">Đăng xuất</span>
@@ -78,6 +100,14 @@ export default function Layout() {
       <main className="main-content">
         <Outlet />
       </main>
+
+      {showAccount && (
+        <AccountModal onClose={() => setShowAccount(false)} onSuccess={setToast} />
+      )}
+      {changingPassword && (
+        <ChangePasswordModal onClose={() => setChangingPassword(false)} onSuccess={setToast} />
+      )}
+      <Toast message={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

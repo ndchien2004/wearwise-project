@@ -4,6 +4,9 @@ public record AuthResponse(
         String tokenType,
         String accessToken,
         long expiresInSeconds,
-        String username
+        String refreshToken,
+        long refreshExpiresInSeconds,
+        String username,
+        String role
 ) {
 }

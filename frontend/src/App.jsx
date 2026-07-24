@@ -8,6 +8,7 @@ import DashboardPage from './pages/DashboardPage';
 import ItemDetailPage from './pages/ItemDetailPage';
 import OutfitDetailPage from './pages/OutfitDetailPage';
 import OutfitsPage from './pages/OutfitsPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import SuggestionsPage from './pages/SuggestionsPage';
 import TryOnPage from './pages/TryOnPage';
 import WardrobePage from './pages/WardrobePage';
@@ -26,6 +27,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <AuthPage />} />
+      {/* Công khai: người dùng mở link trong email khi chưa đăng nhập được. */}
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         element={
           <RequireAuth>

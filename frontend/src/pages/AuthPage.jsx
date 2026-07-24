@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as authApi from '../api/auth';
 import { useAuth } from '../context/AuthContext';
+import PasswordStrength, { checkPassword } from '../components/PasswordStrength';
 import { Button, ErrorBanner, Field } from '../components/ui';
 
 export default function AuthPage() {
@@ -9,35 +11,65 @@ export default function AuthPage() {
 
   const [mode, setMode] = useState('login');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const switchMode = (next) => {
+    setMode(next);
+    setError(null);
+    setNotice(null);
+  };
+
+  const readError = (err) => {
+    const fieldErrors = Object.values(err.fieldErrors || {});
+    return fieldErrors.length > 0 ? fieldErrors.join(' ') : err.message;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setNotice(null);
 
-    if (mode === 'register' && password !== confirmPassword) {
-      setError('Mật khẩu nhập lại không khớp.');
-      return;
+    if (mode === 'register') {
+      if (password !== confirmPassword) {
+        setError('Mật khẩu nhập lại không khớp.');
+        return;
+      }
+      if (!checkPassword(password).meetsPolicy) {
+        setError('Mật khẩu phải có ít nhất 8 ký tự, gồm cả chữ và số, không chứa khoảng trắng.');
+        return;
+      }
     }
 
     setSubmitting(true);
     try {
       if (mode === 'login') {
         await login(username.trim(), password);
+        navigate('/');
+      } else if (mode === 'register') {
+        await register(username.trim(), email.trim(), password);
+        navigate('/');
       } else {
-        await register(username.trim(), password);
+        const response = await authApi.forgotPassword(email.trim());
+        setNotice(response.message);
+        setPassword('');
       }
-      navigate('/');
     } catch (err) {
-      const fieldErrors = Object.values(err.fieldErrors || {});
-      setError(fieldErrors.length > 0 ? fieldErrors.join(' ') : err.message);
+      setError(readError(err));
     } finally {
       setSubmitting(false);
     }
   };
+
+  const submitLabel = {
+    login: '🚪 Vào tủ đồ',
+    register: '✨ Tạo tài khoản',
+    forgot: '📧 Gửi link đặt lại',
+  }[mode];
 
   return (
     <div className="auth-wrap">
@@ -52,68 +84,108 @@ export default function AuthPage() {
         <div className="auth-tabs">
           <Button
             variant={mode === 'login' ? 'primary' : undefined}
-            onClick={() => { setMode('login'); setError(null); }}
+            onClick={() => switchMode('login')}
           >
             Đăng nhập
           </Button>
           <Button
             variant={mode === 'register' ? 'pink' : undefined}
-            onClick={() => { setMode('register'); setError(null); }}
+            onClick={() => switchMode('register')}
           >
             Đăng ký
           </Button>
         </div>
 
         <ErrorBanner error={error} onDismiss={() => setError(null)} />
+        {notice && <div className="notice-banner">📬 {notice}</div>}
+
+        {mode === 'forgot' && (
+          <p className="auth-hint">
+            Nhập email đã dùng khi đăng ký. Chúng tôi sẽ gửi link đặt lại mật khẩu (có hiệu lực 30 phút).
+          </p>
+        )}
 
         <form onSubmit={handleSubmit}>
-          <Field label="Tên đăng nhập">
-            <input
-              className="nb-input"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="vd: chien.nguyen"
-              autoComplete="username"
-              required
-            />
-          </Field>
-
-          <Field label="Mật khẩu">
-            <input
-              className="nb-input"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              required
-              minLength={mode === 'register' ? 6 : undefined}
-            />
-          </Field>
-
-          {mode === 'register' && (
-            <Field label="Nhập lại mật khẩu">
+          {mode !== 'forgot' && (
+            <Field label="Tên đăng nhập">
               <input
                 className="nb-input"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="new-password"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="vd: chien.nguyen"
+                autoComplete="username"
                 required
               />
             </Field>
           )}
 
+          {(mode === 'register' || mode === 'forgot') && (
+            <Field label="Email">
+              <input
+                className="nb-input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vd: ban@gmail.com"
+                autoComplete="email"
+                required
+              />
+            </Field>
+          )}
+
+          {mode !== 'forgot' && (
+            <Field label="Mật khẩu">
+              <input
+                className="nb-input"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                required
+                minLength={mode === 'register' ? 8 : undefined}
+              />
+            </Field>
+          )}
+
+          {mode === 'register' && (
+            <>
+              <PasswordStrength password={password} />
+              <Field label="Nhập lại mật khẩu">
+                <input
+                  className="nb-input"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                  required
+                />
+              </Field>
+            </>
+          )}
+
           <button
             type="submit"
-            className={`nb-btn ${mode === 'login' ? 'nb-btn--primary' : 'nb-btn--pink'}`}
+            className={`nb-btn ${mode === 'register' ? 'nb-btn--pink' : 'nb-btn--primary'}`}
             style={{ width: '100%', marginTop: 8 }}
             disabled={submitting}
           >
-            {submitting ? 'Đang xử lý...' : mode === 'login' ? '🚪 Vào tủ đồ' : '✨ Tạo tài khoản'}
+            {submitting ? 'Đang xử lý...' : submitLabel}
           </button>
         </form>
+
+        <div className="auth-links">
+          {mode === 'forgot' ? (
+            <button type="button" className="auth-link" onClick={() => switchMode('login')}>
+              ← Quay lại đăng nhập
+            </button>
+          ) : (
+            <button type="button" className="auth-link" onClick={() => switchMode('forgot')}>
+              Quên mật khẩu?
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

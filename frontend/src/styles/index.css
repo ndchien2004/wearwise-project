@@ -245,8 +245,10 @@ a {
 }
 
 .sidebar-user {
+  font-family: var(--font-body);
   font-weight: 700;
   font-size: 14px;
+  color: var(--ink);
   background: var(--purple);
   border: var(--border);
   border-radius: var(--radius-sm);
@@ -255,6 +257,48 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-user:hover {
+  background: var(--pink);
+}
+
+/* Chấm cảnh báo khi tài khoản chưa có email */
+.sidebar-user-alert {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--red);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.account-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.account-facts dt {
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.account-facts dd {
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .main-content {
@@ -1438,6 +1482,92 @@ a {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin: 20px 0;
+}
+
+.auth-hint {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.auth-links {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.auth-link {
+  background: none;
+  border: none;
+  padding: 4px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.auth-link:hover {
+  color: #e8590c;
+}
+
+/* Thông báo trung tính (không phải lỗi) — dùng ở luồng quên/đặt lại mật khẩu */
+.notice-banner {
+  background: var(--green);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 12px 16px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+/* ---------- Thanh đo độ mạnh mật khẩu ---------- */
+
+.pw-strength {
+  margin: -6px 0 16px;
+}
+
+.pw-strength-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.pw-strength-seg {
+  height: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.pw-strength-label {
+  font-size: 13px;
+  font-weight: 800;
+  text-align: right;
+  margin-top: 4px;
+}
+
+.pw-strength-rules {
+  list-style: none;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pw-strength-rules li {
+  line-height: 1.6;
+}
+
+.pw-strength-rules .is-ok {
+  color: #2b8a3e;
+}
+
+.pw-strength-rules .is-missing {
+  color: var(--muted);
 }
 
 /* ---------- Item picker (outfit form) ---------- */

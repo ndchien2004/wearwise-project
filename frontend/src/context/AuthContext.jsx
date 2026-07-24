@@ -6,23 +6,63 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [username, setUsername] = useState(() => (getToken() ? getStoredUsername() : null));
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const onUnauthorized = () => setUsername(null);
+    const onUnauthorized = () => {
+      setUsername(null);
+      setUser(null);
+    };
     window.addEventListener('wearwise:unauthorized', onUnauthorized);
     return () => window.removeEventListener('wearwise:unauthorized', onUnauthorized);
   }, []);
 
-  const login = useCallback(async (name, password) => {
-    const response = await authApi.login(name, password);
-    storeSession(response.accessToken, response.username);
+  // Hồ sơ đầy đủ (có email) được tải riêng — token chỉ mang tên đăng nhập.
+  useEffect(() => {
+    if (!username) {
+      setUser(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    authApi
+      .getCurrentUser()
+      .then((profile) => {
+        if (!cancelled) setUser(profile);
+      })
+      .catch(() => {
+        // Lỗi mạng hoặc token hết hạn — không chặn giao diện, apiFetch đã lo phần 401.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
+
+  const applySession = useCallback((response) => {
+    storeSession(response.accessToken, response.refreshToken, response.username);
     setUsername(response.username);
   }, []);
 
-  const register = useCallback(async (name, password) => {
-    const response = await authApi.register(name, password);
-    storeSession(response.accessToken, response.username);
-    setUsername(response.username);
+  const login = useCallback(
+    async (name, password) => applySession(await authApi.login(name, password)),
+    [applySession]
+  );
+
+  const register = useCallback(
+    async (name, email, password) => applySession(await authApi.register(name, email, password)),
+    [applySession]
+  );
+
+  // Đổi mật khẩu trả về cặp token mới nên thiết bị hiện tại không bị đăng xuất.
+  const changePassword = useCallback(
+    async (currentPassword, newPassword) =>
+      applySession(await authApi.changePassword(currentPassword, newPassword)),
+    [applySession]
+  );
+
+  const updateEmail = useCallback(async (currentPassword, email) => {
+    setUser(await authApi.updateEmail(currentPassword, email));
   }, []);
 
   const logout = useCallback(async () => {
@@ -33,11 +73,21 @@ export function AuthProvider({ children }) {
     }
     clearSession();
     setUsername(null);
+    setUser(null);
   }, []);
 
   const value = useMemo(
-    () => ({ username, isAuthenticated: Boolean(username), login, register, logout }),
-    [username, login, register, logout]
+    () => ({
+      username,
+      user,
+      isAuthenticated: Boolean(username),
+      login,
+      register,
+      logout,
+      changePassword,
+      updateEmail,
+    }),
+    [username, user, login, register, logout, changePassword, updateEmail]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

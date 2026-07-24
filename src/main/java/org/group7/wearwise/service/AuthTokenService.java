@@ -1,35 +1,47 @@
 package org.group7.wearwise.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.Mac;
+import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.Date;
 import java.util.Optional;
+import java.util.UUID;
 
+/**
+ * Phát hành và kiểm chứng access token JWT (HS256) bằng thư viện JJWT.
+ *
+ * <p>Access token cố tình ngắn hạn; phiên dài được duy trì bằng refresh token
+ * (xem {@link RefreshTokenService}).</p>
+ */
 @Service
 public class AuthTokenService {
 
+    public static final String TOKEN_TYPE_ACCESS = "access";
+
+    private static final String ISSUER = "wearwise";
+    private static final String CLAIM_ROLE = "role";
+    private static final String CLAIM_TOKEN_TYPE = "typ";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final Base64.Encoder BASE64_URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
-    private static final Base64.Decoder BASE64_URL_DECODER = Base64.getUrlDecoder();
 
-    private final ObjectMapper objectMapper;
-    private final byte[] secret;
+    private final SecretKey secretKey;
+    private final JwtParser jwtParser;
     private final long expiresInSeconds;
 
     public AuthTokenService(
             @Value("${wearwise.auth.token-secret:wearwise-local-development-secret-change-me-32chars}") String tokenSecret,
-            @Value("${wearwise.auth.token-expires-in-seconds:86400}") long expiresInSeconds
+            @Value("${wearwise.auth.token-expires-in-seconds:900}") long expiresInSeconds
     ) {
         if (tokenSecret == null || tokenSecret.length() < 32) {
             throw new IllegalArgumentException("Auth token secret must be at least 32 characters.");
@@ -39,69 +51,75 @@ public class AuthTokenService {
             throw new IllegalArgumentException("Auth token expiration must be at least 1 second.");
         }
 
-        this.objectMapper = new ObjectMapper();
-        this.secret = tokenSecret.getBytes(StandardCharsets.UTF_8);
+        this.secretKey = new SecretKeySpec(tokenSecret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);
+        this.jwtParser = Jwts.parser()
+                .verifyWith(this.secretKey)
+                .requireIssuer(ISSUER)
+                .build();
         this.expiresInSeconds = expiresInSeconds;
     }
 
     public String createToken(String username) {
-        long expiresAt = Instant.now().plusSeconds(expiresInSeconds).getEpochSecond();
+        return createToken(username, "USER");
+    }
 
-        Map<String, Object> header = new LinkedHashMap<>();
-        header.put("alg", "HS256");
-        header.put("typ", "JWT");
+    public String createToken(String username, String role) {
+        Instant issuedAt = Instant.now();
 
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("sub", username);
-        payload.put("exp", expiresAt);
-
-        String headerPart = encodeJson(header);
-        String payloadPart = encodeJson(payload);
-        String signingInput = headerPart + "." + payloadPart;
-        String signaturePart = sign(signingInput);
-
-        return signingInput + "." + signaturePart;
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .issuer(ISSUER)
+                .subject(username)
+                .claim(CLAIM_ROLE, role == null || role.isBlank() ? "USER" : role)
+                .claim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_ACCESS)
+                .issuedAt(Date.from(issuedAt))
+                .expiration(Date.from(issuedAt.plusSeconds(expiresInSeconds)))
+                .signWith(secretKey, Jwts.SIG.HS256)
+                .compact();
     }
 
     public Optional<String> validateAndGetUsername(String token) {
         return validateAndGetDetails(token).map(AuthTokenDetails::username);
     }
 
+    /**
+     * Kiểm tra chữ ký, issuer, hạn dùng và loại token. Trả về {@link Optional#empty()}
+     * cho mọi token không hợp lệ — phía gọi không cần bắt exception.
+     */
     public Optional<AuthTokenDetails> validateAndGetDetails(String token) {
+        if (token == null || token.isBlank()) {
+            return Optional.empty();
+        }
+
         try {
-            String[] parts = token.split("\\.");
-            if (parts.length != 3) {
+            Claims claims = jwtParser.parseSignedClaims(token).getPayload();
+
+            if (!TOKEN_TYPE_ACCESS.equals(claims.get(CLAIM_TOKEN_TYPE, String.class))) {
                 return Optional.empty();
             }
 
-            String signingInput = parts[0] + "." + parts[1];
-            if (!constantTimeEquals(sign(signingInput), parts[2])) {
+            String username = claims.getSubject();
+            Date expiration = claims.getExpiration();
+            if (username == null || username.isBlank() || expiration == null) {
                 return Optional.empty();
             }
 
-            byte[] payloadBytes = BASE64_URL_DECODER.decode(parts[1]);
-            Map<String, Object> payload = objectMapper.readValue(payloadBytes, new TypeReference<>() {
-            });
-
-            Object username = payload.get("sub");
-            Object expiresAt = payload.get("exp");
-            if (!(username instanceof String) || !(expiresAt instanceof Number)) {
-                return Optional.empty();
-            }
-
-            if (((Number) expiresAt).longValue() <= Instant.now().getEpochSecond()) {
-                return Optional.empty();
-            }
+            Date issuedAt = claims.getIssuedAt();
+            String role = claims.get(CLAIM_ROLE, String.class);
 
             return Optional.of(new AuthTokenDetails(
-                    (String) username,
-                    Instant.ofEpochSecond(((Number) expiresAt).longValue())
+                    claims.getId(),
+                    username,
+                    role == null || role.isBlank() ? "USER" : role,
+                    issuedAt == null ? null : issuedAt.toInstant(),
+                    expiration.toInstant()
             ));
-        } catch (RuntimeException | java.io.IOException exception) {
+        } catch (JwtException | IllegalArgumentException exception) {
             return Optional.empty();
         }
     }
 
+    /** Băm token để lưu vào bảng thu hồi mà không giữ giá trị gốc. */
     public String hashToken(String token) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -113,39 +131,5 @@ public class AuthTokenService {
 
     public long getExpiresInSeconds() {
         return expiresInSeconds;
-    }
-
-    private String encodeJson(Map<String, Object> value) {
-        try {
-            return BASE64_URL_ENCODER.encodeToString(objectMapper.writeValueAsBytes(value));
-        } catch (java.io.IOException exception) {
-            throw new IllegalStateException("Unable to create auth token.", exception);
-        }
-    }
-
-    private String sign(String value) {
-        try {
-            Mac mac = Mac.getInstance(HMAC_ALGORITHM);
-            mac.init(new SecretKeySpec(secret, HMAC_ALGORITHM));
-            return BASE64_URL_ENCODER.encodeToString(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (java.security.GeneralSecurityException exception) {
-            throw new IllegalStateException("Unable to sign auth token.", exception);
-        }
-    }
-
-    private boolean constantTimeEquals(String left, String right) {
-        byte[] leftBytes = left.getBytes(StandardCharsets.UTF_8);
-        byte[] rightBytes = right.getBytes(StandardCharsets.UTF_8);
-
-        if (leftBytes.length != rightBytes.length) {
-            return false;
-        }
-
-        int result = 0;
-        for (int i = 0; i < leftBytes.length; i++) {
-            result |= leftBytes[i] ^ rightBytes[i];
-        }
-
-        return result == 0;
     }
 }

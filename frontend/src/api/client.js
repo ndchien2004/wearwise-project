@@ -1,21 +1,31 @@
 const TOKEN_KEY = 'wearwise_token';
+const REFRESH_TOKEN_KEY = 'wearwise_refresh_token';
 const USERNAME_KEY = 'wearwise_username';
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+export function getRefreshToken() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
 export function getStoredUsername() {
   return localStorage.getItem(USERNAME_KEY);
 }
 
-export function storeSession(token, username) {
+export function storeSession(token, refreshToken, username) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USERNAME_KEY, username);
+
+  if (refreshToken) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
 }
 
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USERNAME_KEY);
 }
 
@@ -25,6 +35,41 @@ export class ApiError extends Error {
     this.status = status;
     this.fieldErrors = fieldErrors;
   }
+}
+
+/**
+ * Gia hạn access token. Nhiều request cùng gặp 401 sẽ dùng chung một lần gọi /refresh
+ * thay vì mỗi request tự gọi (nếu không, refresh token xoay vòng sẽ tự vô hiệu lẫn nhau).
+ */
+let pendingRefresh = null;
+
+function refreshAccessToken() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    return Promise.resolve(null);
+  }
+
+  if (!pendingRefresh) {
+    pendingRefresh = fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+        const data = await response.json();
+        storeSession(data.accessToken, data.refreshToken, data.username);
+        return data.accessToken;
+      })
+      .catch(() => null)
+      .finally(() => {
+        pendingRefresh = null;
+      });
+  }
+
+  return pendingRefresh;
 }
 
 async function handleResponse(response) {
@@ -56,33 +101,47 @@ async function handleResponse(response) {
   return data;
 }
 
-export async function apiFetch(path, { method = 'GET', body, auth = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+/** Gửi lại request một lần sau khi gia hạn token, để access token hết hạn không làm gián đoạn thao tác. */
+async function sendWithRetry(send, auth) {
+  let response = await send(getToken());
 
-  if (auth) {
-    const token = getToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+  if (response.status === 401 && auth && getRefreshToken()) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await send(newToken);
     }
   }
-
-  const response = await fetch(path, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
 
   return handleResponse(response);
 }
 
+export async function apiFetch(path, { method = 'GET', body, auth = true } = {}) {
+  const send = (token) => {
+    const headers = { 'Content-Type': 'application/json' };
+    if (auth && token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    return fetch(path, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  };
+
+  return sendWithRetry(send, auth);
+}
+
 // Tải file (multipart) — trình duyệt tự đặt Content-Type kèm boundary, không set thủ công.
 export async function apiUpload(path, formData, { method = 'POST' } = {}) {
-  const headers = {};
-  const token = getToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
+  const send = (token) => {
+    const headers = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
 
-  const response = await fetch(path, { method, headers, body: formData });
-  return handleResponse(response);
+    return fetch(path, { method, headers, body: formData });
+  };
+
+  return sendWithRetry(send, true);
 }

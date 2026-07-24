@@ -7,16 +7,20 @@ import java.time.LocalDateTime;
 public record CurrentUserResponse(
         Long id,
         String username,
+        String email,
         String role,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        LocalDateTime passwordChangedAt
 ) {
 
     public static CurrentUserResponse from(AppUser user) {
         return new CurrentUserResponse(
                 user.getId(),
                 user.getUsername(),
+                user.getEmail(),
                 user.getRole(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                user.getPasswordChangedAt()
         );
     }
 }

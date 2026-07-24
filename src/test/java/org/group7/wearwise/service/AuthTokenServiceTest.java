@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AuthTokenServiceTest {
 
     private static final String TEST_TOKEN_SECRET = "test-secret-with-enough-length-32";
+    private static final String OTHER_TOKEN_SECRET = "another-secret-with-enough-len-32";
 
     @Test
     void createdTokenValidatesBackToUsername() {
@@ -19,16 +20,52 @@ class AuthTokenServiceTest {
     }
 
     @Test
-    void createdTokenValidatesBackToDetails() {
+    void createdTokenIsAThreePartJwt() {
         AuthTokenService authTokenService = new AuthTokenService(TEST_TOKEN_SECRET, 3600);
 
         String token = authTokenService.createToken("demo");
 
+        assertThat(token.split("\\.")).hasSize(3);
+    }
+
+    @Test
+    void createdTokenCarriesIdentityClaims() {
+        AuthTokenService authTokenService = new AuthTokenService(TEST_TOKEN_SECRET, 3600);
+
+        String token = authTokenService.createToken("demo", "ADMIN");
+
         assertThat(authTokenService.validateAndGetDetails(token))
                 .hasValueSatisfying(details -> {
                     assertThat(details.username()).isEqualTo("demo");
-                    assertThat(details.expiresAt()).isNotNull();
+                    assertThat(details.role()).isEqualTo("ADMIN");
+                    assertThat(details.tokenId()).isNotBlank();
+                    assertThat(details.issuedAt()).isNotNull();
+                    assertThat(details.expiresAt()).isNotNull().isAfter(details.issuedAt());
                 });
+    }
+
+    @Test
+    void tokenIdIsUniquePerToken() {
+        AuthTokenService authTokenService = new AuthTokenService(TEST_TOKEN_SECRET, 3600);
+
+        String firstId = authTokenService.validateAndGetDetails(authTokenService.createToken("demo"))
+                .orElseThrow()
+                .tokenId();
+        String secondId = authTokenService.validateAndGetDetails(authTokenService.createToken("demo"))
+                .orElseThrow()
+                .tokenId();
+
+        assertThat(firstId).isNotEqualTo(secondId);
+    }
+
+    @Test
+    void missingRoleClaimFallsBackToUser() {
+        AuthTokenService authTokenService = new AuthTokenService(TEST_TOKEN_SECRET, 3600);
+
+        String token = authTokenService.createToken("demo", "  ");
+
+        assertThat(authTokenService.validateAndGetDetails(token))
+                .hasValueSatisfying(details -> assertThat(details.role()).isEqualTo("USER"));
     }
 
     @Test
@@ -49,6 +86,22 @@ class AuthTokenServiceTest {
         String token = authTokenService.createToken("demo") + "tampered";
 
         assertThat(authTokenService.validateAndGetUsername(token)).isEmpty();
+    }
+
+    @Test
+    void tokenSignedWithAnotherSecretIsRejected() {
+        String token = new AuthTokenService(OTHER_TOKEN_SECRET, 3600).createToken("demo");
+
+        assertThat(new AuthTokenService(TEST_TOKEN_SECRET, 3600).validateAndGetUsername(token)).isEmpty();
+    }
+
+    @Test
+    void garbageTokenIsRejectedWithoutThrowing() {
+        AuthTokenService authTokenService = new AuthTokenService(TEST_TOKEN_SECRET, 3600);
+
+        assertThat(authTokenService.validateAndGetUsername("not-a-jwt")).isEmpty();
+        assertThat(authTokenService.validateAndGetUsername("")).isEmpty();
+        assertThat(authTokenService.validateAndGetUsername(null)).isEmpty();
     }
 
     @Test

@@ -26,6 +26,20 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNAUTHORIZED, exception.getMessage(), Map.of());
     }
 
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAccountLocked(AccountLockedException exception) {
+        return ResponseEntity.status(HttpStatus.LOCKED)
+                .header("Retry-After", String.valueOf(exception.getRetryAfterSeconds()))
+                .body(ApiErrorResponse.of(HttpStatus.LOCKED.value(), exception.getMessage(), Map.of()));
+    }
+
+    @ExceptionHandler(InvalidPasswordResetTokenException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidPasswordResetToken(
+            InvalidPasswordResetTokenException exception
+    ) {
+        return build(HttpStatus.BAD_REQUEST, exception.getMessage(), Map.of());
+    }
+
     @ExceptionHandler(ClothingItemInUseException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(ClothingItemInUseException exception) {
         return build(HttpStatus.CONFLICT, exception.getMessage(), Map.of());

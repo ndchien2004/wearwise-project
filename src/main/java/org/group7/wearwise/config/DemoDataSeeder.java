@@ -42,6 +42,7 @@ public class DemoDataSeeder implements CommandLineRunner {
         appUserRepository.findByUsername(ownerUsername)
                 .orElseGet(() -> appUserRepository.save(AppUser.builder()
                         .username(ownerUsername)
+                        .email("demo@wearwise.local")
                         .passwordHash("seeded-user-login-through-api")
                         .role("USER")
                         .build()));
