@@ -471,11 +471,11 @@ export default function SuggestionsPage() {
                     <p style={{ fontWeight: 600, fontSize: 13.5, margin: 0 }}>💡 {reason}</p>
                     <div className="card-actions">
                       <Button size="sm" variant="primary" onClick={() => planToday(outfit)}>
-                        📅 Lên lịch hôm nay
+                        📅 Lên lịch
                       </Button>
                       {isWornToday(outfit.lastWornAt) ? (
                         <Button size="sm" disabled>
-                          ✅ Đã mặc hôm nay
+                          ✅ Đã mặc
                         </Button>
                       ) : (
                         <Button size="sm" variant="green" onClick={() => wearNow(outfit)}>
@@ -527,11 +527,11 @@ export default function SuggestionsPage() {
 
                   <div className="card-actions">
                     <Button size="sm" variant="primary" onClick={() => planToday(outfit)}>
-                      📅 Lên lịch hôm nay
+                      📅 Lên lịch
                     </Button>
                     {isWornToday(outfit.lastWornAt) ? (
                       <Button size="sm" disabled>
-                        ✅ Đã mặc hôm nay
+                        ✅ Đã mặc
                       </Button>
                     ) : (
                       <Button size="sm" variant="green" onClick={() => wearNow(outfit)}>

@@ -112,13 +112,20 @@ a {
 .sidebar-top {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 20px;
+  padding-right: 2px;
 }
 
 .sidebar-top .sidebar-logo {
   flex: 1;
+  min-width: 0;
   margin-bottom: 0;
+  font-size: 21px;
+  padding: 9px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-toggle {

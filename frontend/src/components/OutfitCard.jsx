@@ -94,11 +94,11 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
       <div className="card-actions">
         {wornToday ? (
           <Button size="sm" disabled onClick={(e) => e.stopPropagation()}>
-            ✅ Đã mặc hôm nay
+            ✅ Đã mặc
           </Button>
         ) : (
           <Button size="sm" variant="green" onClick={stop(onWear)}>
-            👣 Mặc hôm nay
+            👣 Mặc
           </Button>
         )}
         <Button size="sm" onClick={stop(onEdit)}>
