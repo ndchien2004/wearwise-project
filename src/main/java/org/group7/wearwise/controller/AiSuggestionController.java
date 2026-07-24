@@ -2,8 +2,10 @@ package org.group7.wearwise.controller;
 
 import jakarta.validation.Valid;
 import org.group7.wearwise.dto.request.AiSuggestionRequest;
+import org.group7.wearwise.dto.request.AiWeeklyPlanRequest;
 import org.group7.wearwise.dto.response.AiOutfitRankingResponse;
 import org.group7.wearwise.dto.response.AiOutfitSuggestionResponse;
+import org.group7.wearwise.dto.response.AiWeeklyDayPlanResponse;
 import org.group7.wearwise.service.AiSuggestionService;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,6 +53,19 @@ public class AiSuggestionController {
                 request.temperature(),
                 Boolean.TRUE.equals(request.raining()),
                 request.weatherDescription(),
+                request.tone()
+        );
+    }
+
+    /** Nhờ Gemini lên kế hoạch mặc cho nhiều ngày dựa vào dự báo thời tiết. */
+    @PostMapping("/weekly-plan")
+    public List<AiWeeklyDayPlanResponse> planWeek(
+            Authentication authentication,
+            @Valid @RequestBody AiWeeklyPlanRequest request
+    ) {
+        return aiSuggestionService.planWeek(
+                authentication.getName(),
+                request.days(),
                 request.tone()
         );
     }

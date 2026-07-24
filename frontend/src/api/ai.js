@@ -20,3 +20,11 @@ export function suggestAiOutfits(payload) {
 export function rankAiOutfits(payload) {
   return apiFetch('/api/ai/outfit-ranking', { method: 'POST', body: payload });
 }
+
+/**
+ * Nhờ AI lên kế hoạch mặc cho nhiều ngày dựa vào dự báo thời tiết.
+ * payload: { days: [{ date, tempMin, tempMax, rainChance, description }], tone? }
+ */
+export function planAiWeek(payload) {
+  return apiFetch('/api/ai/weekly-plan', { method: 'POST', body: payload });
+}

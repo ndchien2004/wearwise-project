@@ -46,12 +46,19 @@ export default function SuggestionsPage() {
   const [rankingLoading, setRankingLoading] = useState(false);
   const [rankingError, setRankingError] = useState(null);
 
+  const [weekPlan, setWeekPlan] = useState(null);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planError, setPlanError] = useState(null);
+  const [planningDate, setPlanningDate] = useState(null);
+
   const load = useCallback(async (activeCity) => {
     setWeather(null);
     setSuggestions(null);
     setError(null);
     setAiRanking(null); // đổi thành phố thì bỏ xếp hạng AI cũ
     setRankingError(null);
+    setWeekPlan(null);
+    setPlanError(null);
     try {
       const w = await getWeather(activeCity.latitude, activeCity.longitude);
       setWeather(w);
@@ -139,6 +146,47 @@ export default function SuggestionsPage() {
       setRankingError(err.message);
     } finally {
       setRankingLoading(false);
+    }
+  };
+
+  // Nhờ AI lên kế hoạch mặc cho các ngày trong dự báo.
+  const planWeekWithAi = async () => {
+    setPlanError(null);
+    setPlanLoading(true);
+    try {
+      const result = await aiApi.planAiWeek({
+        days: weather.daily.map((d) => ({
+          date: d.date,
+          tempMin: d.tempMin,
+          tempMax: d.tempMax,
+          rainChance: d.rainChance,
+          description: d.desc,
+        })),
+        tone: aiTone || null,
+      });
+      setWeekPlan(result);
+    } catch (err) {
+      setPlanError(err.message);
+    } finally {
+      setPlanLoading(false);
+    }
+  };
+
+  // Thêm 1 ngày trong kế hoạch AI vào lịch phối đồ.
+  const addPlanDay = async (day) => {
+    setPlanError(null);
+    setPlanningDate(day.date);
+    try {
+      await plansApi.createPlan({ date: day.date, outfitId: day.outfit.id, note: 'Theo kế hoạch AI' });
+      setNotice(`Đã thêm "${day.outfit.name}" vào lịch ngày ${day.date}! 📅`);
+    } catch (err) {
+      if (err.message?.includes('already planned')) {
+        setNotice(`Ngày ${day.date} đã có kế hoạch rồi 📅`);
+      } else {
+        setPlanError(err.message);
+      }
+    } finally {
+      setPlanningDate(null);
     }
   };
 
@@ -254,6 +302,44 @@ export default function SuggestionsPage() {
               </div>
             ))}
           </div>
+
+          <div className="section-heading-row">
+            <h2 className="section-heading" style={{ margin: 0 }}>🗓️ Kế hoạch mặc cả tuần</h2>
+            <Button variant="primary" onClick={planWeekWithAi} disabled={planLoading}>
+              {planLoading ? '🤖 AI đang lên lịch...' : '✨ Để AI lên kế hoạch'}
+            </Button>
+          </div>
+
+          {planError && (
+            <div style={{ marginBottom: 14 }}>
+              <ErrorBanner error={planError} onDismiss={() => setPlanError(null)} />
+            </div>
+          )}
+
+          {weekPlan && (
+            <div className="card-grid" style={{ marginBottom: 22 }}>
+              {weekPlan.map((day) => (
+                <div key={day.date} className="nb-card item-card">
+                  <Badge color="blue">
+                    📅 {new Date(`${day.date}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })}
+                  </Badge>
+                  <OutfitVisual outfit={day.outfit} />
+                  <div className="item-name" title={day.outfit.name}>🧢 {day.outfit.name}</div>
+                  <p style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--muted)', margin: 0 }}>💡 {day.reason}</p>
+                  <div className="card-actions">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => addPlanDay(day)}
+                      disabled={planningDate !== null}
+                    >
+                      {planningDate === day.date ? '⏳ Đang thêm...' : '📅 Thêm vào lịch'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <h2 className="section-heading">🤖 Nhờ AI phối đồ từ tủ của bạn</h2>
           <div className="nb-card" style={{ marginBottom: 20 }}>
