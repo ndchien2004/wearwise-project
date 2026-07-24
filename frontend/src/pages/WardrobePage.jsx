@@ -71,6 +71,27 @@ export default function WardrobePage() {
 
   const setFilter = (key) => (e) => setFilters((f) => ({ ...f, [key]: e.target.value }));
 
+  const toastOk = (message) => setNotice({ message, variant: 'success' });
+  const toastErr = (message) => setNotice({ message, variant: 'error' });
+
+  // PUT cần đủ payload; gửi lại các trường hiện có, chỉ đổi phần cần đổi.
+  const patchItem = (item, changes) =>
+    itemsApi.updateItem(item.id, {
+      name: item.name,
+      color: item.color,
+      colorTone: item.colorTone,
+      category: item.category,
+      season: item.season,
+      style: item.style,
+      condition: item.condition,
+      status: item.status,
+      wearCount: item.wearCount,
+      lastWornAt: item.lastWornAt,
+      favorite: item.favorite,
+      imageUrl: item.imageUrl,
+      ...changes,
+    });
+
   const handleSave = async (payload) => {
     const editing = Boolean(modal?.item);
     if (editing) {
@@ -80,7 +101,7 @@ export default function WardrobePage() {
     }
     setModal(null);
     await load(filters);
-    setNotice(editing ? `Đã cập nhật "${payload.name}"! ✏️` : `Đã thêm "${payload.name}" vào tủ đồ! 🎉`);
+    toastOk(editing ? `Đã cập nhật "${payload.name}"! ✏️` : `Đã thêm "${payload.name}" vào tủ đồ! 🎉`);
   };
 
   const handleDelete = async (item) => {
@@ -94,9 +115,9 @@ export default function WardrobePage() {
     try {
       await itemsApi.deleteItem(item.id);
       await load(filters);
-      setNotice(`Đã xóa "${item.name}" khỏi tủ đồ. 🗑️`);
+      toastOk(`Đã xóa "${item.name}" khỏi tủ đồ. 🗑️`);
     } catch (err) {
-      setError(err.message);
+      toastErr(err.message);
     }
   };
 
@@ -105,7 +126,7 @@ export default function WardrobePage() {
       const updated = await itemsApi.setItemFavorite(item.id, !item.favorite);
       setItems((list) => list.map((i) => (i.id === updated.id ? updated : i)));
     } catch (err) {
-      setError(err.message);
+      toastErr(err.message);
     }
   };
 
@@ -113,8 +134,20 @@ export default function WardrobePage() {
     try {
       const updated = await itemsApi.markItemWorn(item.id);
       setItems((list) => list.map((i) => (i.id === updated.id ? updated : i)));
+      toastOk(`Đã ghi nhận mặc "${item.name}" hôm nay! 👣`);
     } catch (err) {
-      setError(err.message);
+      toastErr(err.message);
+    }
+  };
+
+  // Giặt xong: đưa món về trạng thái Sẵn sàng.
+  const handleWashed = async (item) => {
+    try {
+      const updated = await patchItem(item, { status: 'AVAILABLE' });
+      setItems((list) => list.map((i) => (i.id === updated.id ? updated : i)));
+      toastOk(`"${item.name}" đã giặt xong, sẵn sàng mặc! ✅`);
+    } catch (err) {
+      toastErr(err.message);
     }
   };
 
@@ -140,7 +173,11 @@ export default function WardrobePage() {
         </Button>
       </div>
 
-      <Toast message={notice} variant="success" onDismiss={() => setNotice(null)} />
+      <Toast
+        message={notice?.message}
+        variant={notice?.variant || 'success'}
+        onDismiss={() => setNotice(null)}
+      />
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
       <div className="filter-bar">
@@ -194,6 +231,7 @@ export default function WardrobePage() {
                     onDelete={handleDelete}
                     onToggleFavorite={handleToggleFavorite}
                     onWear={handleWear}
+                    onWashed={handleWashed}
                   />
                 ))}
               </div>

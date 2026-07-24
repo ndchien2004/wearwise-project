@@ -187,6 +187,9 @@ public class ClothingItemService {
     public ClothingItem markAsWorn(String ownerUsername, Long id) {
         ClothingItem item = getItemById(ownerUsername, id);
 
+        // Đồ đang giặt / chưa dùng được / hư hỏng thì không mặc được.
+        assertWearable(item);
+
         // Mỗi món đồ chỉ tính tối đa 1 lượt mặc mỗi ngày.
         if (isWornOn(item.getLastWornAt(), LocalDate.now())) {
             return item;
@@ -202,6 +205,22 @@ public class ClothingItemService {
 
     public static boolean isWornOn(LocalDateTime lastWornAt, LocalDate date) {
         return lastWornAt != null && lastWornAt.toLocalDate().equals(date);
+    }
+
+    /** Ném lỗi nếu món đồ đang giặt / chưa dùng được / hư hỏng — không thể mặc. */
+    public static void assertWearable(ClothingItem item) {
+        if (item.getStatus() == ClothingStatus.LAUNDRY) {
+            throw new IllegalArgumentException(
+                    "\"" + item.getName() + "\" đang giặt nên chưa mặc được. Hãy bấm \"Giặt xong\" khi đã giặt xong.");
+        }
+        if (item.getStatus() == ClothingStatus.UNAVAILABLE) {
+            throw new IllegalArgumentException(
+                    "\"" + item.getName() + "\" đang ở trạng thái chưa dùng được nên chưa mặc được.");
+        }
+        if (item.getCondition() == ClothingCondition.DAMAGED) {
+            throw new IllegalArgumentException(
+                    "\"" + item.getName() + "\" đang hư hỏng nên không nên mặc. Hãy sửa lại hoặc bỏ đánh dấu hư hỏng.");
+        }
     }
 
     public List<ClothingItem> searchByName(String ownerUsername, String keyword) {

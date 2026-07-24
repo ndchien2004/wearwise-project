@@ -135,6 +135,9 @@ public class OutfitService {
         LocalDateTime wornAt = LocalDateTime.now();
         LocalDate today = wornAt.toLocalDate();
 
+        // Không mặc được nguyên bộ nếu có món đang giặt / hỏng / chưa dùng được.
+        outfit.getClothingItems().forEach(ClothingItemService::assertWearable);
+
         // Mỗi outfit chỉ tính tối đa 1 lượt mặc mỗi ngày (bấm lại trong ngày không cộng thêm).
         if (ClothingItemService.isWornOn(outfit.getLastWornAt(), today)) {
             return outfit;

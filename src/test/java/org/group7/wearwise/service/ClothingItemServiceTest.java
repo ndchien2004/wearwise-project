@@ -168,6 +168,44 @@ class ClothingItemServiceTest {
     }
 
     @Test
+    void markAsWornRejectsItemInLaundry() {
+        ClothingItem item = ClothingItem.builder()
+                .id(1L)
+                .name("Áo đang giặt")
+                .category(ClothingCategory.SHIRT)
+                .season(Season.SUMMER)
+                .style(Style.CASUAL)
+                .condition(ClothingCondition.GOOD)
+                .status(ClothingStatus.LAUNDRY)
+                .build();
+        when(clothingItemRepository.findByIdAndOwner_Username(1L, OWNER)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> clothingItemService.markAsWorn(OWNER, 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("đang giặt");
+        verify(clothingItemRepository, never()).save(any(ClothingItem.class));
+    }
+
+    @Test
+    void markAsWornRejectsDamagedItem() {
+        ClothingItem item = ClothingItem.builder()
+                .id(2L)
+                .name("Giày hỏng")
+                .category(ClothingCategory.SHOES)
+                .season(Season.SUMMER)
+                .style(Style.CASUAL)
+                .condition(ClothingCondition.DAMAGED)
+                .status(ClothingStatus.AVAILABLE)
+                .build();
+        when(clothingItemRepository.findByIdAndOwner_Username(2L, OWNER)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> clothingItemService.markAsWorn(OWNER, 2L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("hư hỏng");
+        verify(clothingItemRepository, never()).save(any(ClothingItem.class));
+    }
+
+    @Test
     void markAsWornCountsOnlyOncePerDay() {
         ClothingItem item = ClothingItem.builder()
                 .id(3L)

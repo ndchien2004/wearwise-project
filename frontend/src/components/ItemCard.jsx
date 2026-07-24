@@ -16,8 +16,9 @@ import {
 } from '../utils/labels';
 import { formatDateTime, isWornToday } from '../utils/date';
 
-export default function ItemCard({ item, tried, onOpen, onEdit, onDelete, onToggleFavorite, onWear }) {
+export default function ItemCard({ item, tried, onOpen, onEdit, onDelete, onToggleFavorite, onWear, onWashed }) {
   const wornToday = isWornToday(item.lastWornAt);
+  const inLaundry = item.status === 'LAUNDRY';
 
   const stop = (handler) => (e) => {
     e.stopPropagation();
@@ -89,13 +90,17 @@ export default function ItemCard({ item, tried, onOpen, onEdit, onDelete, onTogg
       <div className="item-meta">Mặc lần cuối: {formatDateTime(item.lastWornAt)}</div>
 
       <div className="card-actions">
-        {wornToday ? (
+        {inLaundry ? (
+          <Button size="sm" variant="green" onClick={stop(onWashed)}>
+            ✅ Giặt xong
+          </Button>
+        ) : wornToday ? (
           <Button size="sm" disabled onClick={(e) => e.stopPropagation()}>
-            ✅ Đã mặc hôm nay
+            ✅ Đã mặc
           </Button>
         ) : (
           <Button size="sm" variant="green" onClick={stop(onWear)}>
-            👣 Mặc hôm nay
+            👣 Mặc
           </Button>
         )}
         <Button size="sm" onClick={stop(onEdit)}>
