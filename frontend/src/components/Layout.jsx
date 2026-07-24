@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui';
@@ -12,9 +13,20 @@ const NAV_ITEMS = [
   { to: '/analytics', emoji: '📊', label: 'Thống kê' },
 ];
 
+const COLLAPSE_KEY = 'wearwise_sidebar_collapsed';
+
 export default function Layout() {
   const { username, logout } = useAuth();
   const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0');
+      return next;
+    });
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -22,10 +34,21 @@ export default function Layout() {
   };
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-logo">
-          Wear<span>Wise</span>
+    <div className={`app-shell ${collapsed ? 'is-collapsed' : ''}`}>
+      <aside className={`sidebar ${collapsed ? 'is-collapsed' : ''}`}>
+        <div className="sidebar-top">
+          <div className="sidebar-logo">
+            {collapsed ? 'W' : <>Wear<span>Wise</span></>}
+          </div>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={toggleCollapsed}
+            title={collapsed ? 'Mở rộng' : 'Thu gọn'}
+            aria-label={collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'}
+          >
+            {collapsed ? '»' : '«'}
+          </button>
         </div>
 
         {NAV_ITEMS.map((item) => (
@@ -34,18 +57,20 @@ export default function Layout() {
             to={item.to}
             end={item.end}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            title={collapsed ? item.label : undefined}
           >
             <span className="nav-emoji">{item.emoji}</span>
-            {item.label}
+            <span className="nav-label">{item.label}</span>
           </NavLink>
         ))}
 
         <div className="sidebar-footer">
           <div className="sidebar-user" title={username}>
-            👤 {username}
+            👤 <span className="nav-label">{username}</span>
           </div>
           <Button variant="danger" size="sm" onClick={handleLogout}>
-            Đăng xuất
+            <span className="nav-emoji">🚪</span>
+            <span className="nav-label">Đăng xuất</span>
           </Button>
         </div>
       </aside>

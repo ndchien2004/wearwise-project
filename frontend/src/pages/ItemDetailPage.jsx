@@ -108,6 +108,8 @@ export default function ItemDetailPage() {
     }
   };
 
+  const handleWashed = () => patchItem({ status: 'AVAILABLE' });
+
   const handleToggleFavorite = async () => {
     setBusy(true);
     setError(null);
@@ -213,7 +215,7 @@ export default function ItemDetailPage() {
 
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
-      <div className="two-col">
+      <div className="detail-masonry">
         <div className="nb-card">
           {item.imageUrl ? (
             <div className="item-photo" style={{ height: 280 }}>
@@ -251,7 +253,11 @@ export default function ItemDetailPage() {
           </div>
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-            {wornToday ? (
+            {item.status === 'LAUNDRY' ? (
+              <Button variant="green" onClick={handleWashed} disabled={busy}>
+                ✅ Giặt xong
+              </Button>
+            ) : wornToday ? (
               <Button disabled>✅ Đã mặc hôm nay</Button>
             ) : (
               <Button variant="green" onClick={handleWear} disabled={busy}>
@@ -264,9 +270,8 @@ export default function ItemDetailPage() {
           </div>
         </div>
 
-        <div>
-          <div className="nb-card" style={{ marginBottom: 20 }}>
-            <h3 className="chart-title">🚦 Trạng thái</h3>
+        <div className="nb-card">
+          <h3 className="chart-title">🚦 Trạng thái</h3>
             <p style={{ fontWeight: 600, color: 'var(--muted)', fontSize: 13.5, marginBottom: 10 }}>
               Hiện tại: <strong>{label(STATUS_LABELS, item.status)}</strong> ·{' '}
               <strong>{label(CONDITION_LABELS, item.condition)}</strong>
@@ -419,7 +424,6 @@ export default function ItemDetailPage() {
               </div>
             )}
           </div>
-        </div>
       </div>
 
       {editing && <ItemFormModal item={item} onSave={handleEditSave} onClose={() => setEditing(false)} />}

@@ -4,7 +4,7 @@ import * as outfitsApi from '../api/outfits';
 import * as plansApi from '../api/plans';
 import { DEFAULT_CITY, getWeather, searchCity } from '../api/weather';
 import OutfitVisual from '../components/OutfitVisual';
-import { Badge, Button, EmptyState, ErrorBanner, Loading } from '../components/ui';
+import { Badge, Button, EmptyState, ErrorBanner, Loading, Toast } from '../components/ui';
 import {
   CATEGORY_EMOJIS,
   SEASON_EMOJIS,
@@ -27,6 +27,23 @@ function loadSavedCity() {
   }
 }
 
+// Lưu kết quả AI vào sessionStorage để không mất khi chuyển tab rồi quay lại.
+const ssGet = (key) => {
+  try {
+    return JSON.parse(sessionStorage.getItem(key) || 'null');
+  } catch {
+    return null;
+  }
+};
+const ssSet = (key, value) => {
+  try {
+    if (value == null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* bỏ qua nếu sessionStorage không dùng được */
+  }
+};
+
 export default function SuggestionsPage() {
   const [city, setCity] = useState(loadSavedCity);
   const [cityQuery, setCityQuery] = useState('');
@@ -36,28 +53,41 @@ export default function SuggestionsPage() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
 
-  const [aiTone, setAiTone] = useState('');
-  const [aiSuggestions, setAiSuggestions] = useState(null);
+  const [aiTone, setAiTone] = useState(() => sessionStorage.getItem('ww_ai_tone') || '');
+  const [aiSuggestions, setAiSuggestions] = useState(() => ssGet('ww_ai_compose'));
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [creatingName, setCreatingName] = useState(null);
 
-  const [aiRanking, setAiRanking] = useState(null);
+  const [aiRanking, setAiRanking] = useState(() => ssGet('ww_ai_ranking'));
   const [rankingLoading, setRankingLoading] = useState(false);
   const [rankingError, setRankingError] = useState(null);
 
-  const [weekPlan, setWeekPlan] = useState(null);
+  const [weekPlan, setWeekPlan] = useState(() => ssGet('ww_ai_weekplan'));
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState(null);
   const [planningDate, setPlanningDate] = useState(null);
+
+  // Lưu kết quả AI để chuyển tab rồi quay lại vẫn còn.
+  useEffect(() => ssSet('ww_ai_weekplan', weekPlan), [weekPlan]);
+  useEffect(() => ssSet('ww_ai_ranking', aiRanking), [aiRanking]);
+  useEffect(() => ssSet('ww_ai_compose', aiSuggestions), [aiSuggestions]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('ww_ai_tone', aiTone);
+    } catch {
+      /* bỏ qua */
+    }
+  }, [aiTone]);
+
+  const toastOk = (message) => setNotice({ message, variant: 'success' });
+  const toastErr = (message) => setNotice({ message, variant: 'error' });
 
   const load = useCallback(async (activeCity) => {
     setWeather(null);
     setSuggestions(null);
     setError(null);
-    setAiRanking(null); // đổi thành phố thì bỏ xếp hạng AI cũ
     setRankingError(null);
-    setWeekPlan(null);
     setPlanError(null);
     try {
       const w = await getWeather(activeCity.latitude, activeCity.longitude);
@@ -94,19 +124,21 @@ export default function SuggestionsPage() {
     localStorage.setItem(CITY_KEY, JSON.stringify(c));
     setCityQuery('');
     setCityResults([]);
+    // Đổi thành phố thì kết quả AI cũ không còn phù hợp — xóa đi.
+    setWeekPlan(null);
+    setAiRanking(null);
   };
 
   const planToday = async (outfit) => {
-    setNotice(null);
     setError(null);
     try {
       await plansApi.createPlan({ date: todayIso(), outfitId: outfit.id, note: 'Theo gợi ý thời tiết' });
-      setNotice(`Đã thêm "${outfit.name}" vào lịch hôm nay! 📅`);
+      toastOk(`Đã thêm "${outfit.name}" vào lịch hôm nay! 📅`);
     } catch (err) {
       if (err.message?.includes('already planned')) {
-        setNotice(`"${outfit.name}" đã có trong lịch hôm nay rồi 📅`);
+        toastOk(`"${outfit.name}" đã có trong lịch hôm nay rồi 📅`);
       } else {
-        setError(err.message);
+        toastErr(err.message);
       }
     }
   };
@@ -178,12 +210,12 @@ export default function SuggestionsPage() {
     setPlanningDate(day.date);
     try {
       await plansApi.createPlan({ date: day.date, outfitId: day.outfit.id, note: 'Theo kế hoạch AI' });
-      setNotice(`Đã thêm "${day.outfit.name}" vào lịch ngày ${day.date}! 📅`);
+      toastOk(`Đã thêm "${day.outfit.name}" vào lịch ngày ${day.date}! 📅`);
     } catch (err) {
       if (err.message?.includes('already planned')) {
-        setNotice(`Ngày ${day.date} đã có kế hoạch rồi 📅`);
+        toastOk(`Ngày ${day.date} đã có kế hoạch rồi 📅`);
       } else {
-        setPlanError(err.message);
+        toastErr(err.message);
       }
     } finally {
       setPlanningDate(null);
@@ -203,7 +235,7 @@ export default function SuggestionsPage() {
         favorite: false,
         clothingItemIds: suggestion.items.map((item) => item.id),
       });
-      setNotice(`Đã tạo outfit "${suggestion.name}" từ gợi ý AI! 🧢`);
+      toastOk(`Đã tạo outfit "${suggestion.name}" từ gợi ý AI! 🧢`);
     } catch (err) {
       setAiError(err.message);
     } finally {
@@ -212,16 +244,15 @@ export default function SuggestionsPage() {
   };
 
   const wearNow = async (outfit) => {
-    setNotice(null);
     setError(null);
     try {
       const updated = await outfitsApi.markOutfitWorn(outfit.id);
       setSuggestions((list) =>
         list.map((s) => (s.outfit.id === updated.id ? { ...s, outfit: updated } : s))
       );
-      setNotice(`Đã ghi nhận bạn mặc "${outfit.name}" hôm nay! 👣`);
+      toastOk(`Đã ghi nhận bạn mặc "${outfit.name}" hôm nay! 👣`);
     } catch (err) {
-      setError(err.message);
+      toastErr(err.message);
     }
   };
 
@@ -254,19 +285,12 @@ export default function SuggestionsPage() {
         </div>
       </div>
 
+      <Toast
+        message={notice?.message}
+        variant={notice?.variant || 'success'}
+        onDismiss={() => setNotice(null)}
+      />
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
-      {notice && (
-        <div className="error-banner" style={{ background: 'var(--green)' }}>
-          {notice}
-          <button
-            type="button"
-            onClick={() => setNotice(null)}
-            style={{ float: 'right', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 900 }}
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       {weather === null ? (
         <Loading>Đang xem trời hôm nay...</Loading>
