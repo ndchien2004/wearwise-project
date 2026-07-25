@@ -61,10 +61,6 @@ export function AuthProvider({ children }) {
     [applySession]
   );
 
-  const updateEmail = useCallback(async (currentPassword, email) => {
-    setUser(await authApi.updateEmail(currentPassword, email));
-  }, []);
-
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -85,9 +81,8 @@ export function AuthProvider({ children }) {
       register,
       logout,
       changePassword,
-      updateEmail,
     }),
-    [username, user, login, register, logout, changePassword, updateEmail]
+    [username, user, login, register, logout, changePassword]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

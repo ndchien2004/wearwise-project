@@ -254,16 +254,33 @@ a {
   border-radius: var(--radius-sm);
   padding: 8px 12px;
   box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 8px;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   width: 100%;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
+}
+
+.sidebar-user .nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-user:hover {
   background: var(--pink);
+}
+
+.sidebar-user.active {
+  background: var(--ink);
+  color: #fff;
+}
+
+.sidebar.is-collapsed .sidebar-user {
+  justify-content: center;
 }
 
 /* Chấm cảnh báo khi tài khoản chưa có email */
@@ -299,6 +316,172 @@ a {
 .account-facts dd {
   font-weight: 700;
   overflow-wrap: anywhere;
+}
+
+/* ---------- Trang tài khoản ---------- */
+
+.profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.profile-avatar {
+  flex-shrink: 0;
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 900;
+  background: var(--purple);
+  border: var(--border);
+  border-radius: 50%;
+  box-shadow: var(--shadow);
+}
+
+.profile-hero-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-hero-name {
+  font-size: 26px;
+  overflow-wrap: anywhere;
+}
+
+/* Ô chỉ đọc cho dữ liệu không đổi được (email) */
+.profile-locked-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: 10px 14px;
+}
+
+.profile-locked-value {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.profile-locked-badge {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--yellow);
+  padding: 2px 10px;
+}
+
+/* ---------- Chia sẻ trang phục ---------- */
+
+.share-code-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  background: var(--yellow);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.share-code {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  overflow-wrap: anywhere;
+}
+
+.share-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.share-input-field {
+  flex: 1;
+  min-width: 220px;
+  margin-bottom: 0;
+}
+
+.share-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 10px 12px;
+}
+
+.share-row.is-inactive {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.share-row-main {
+  flex: 1;
+  min-width: 140px;
+}
+
+.share-row-name {
+  display: block;
+  font-weight: 800;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.share-row-name:hover {
+  text-decoration: underline;
+}
+
+.share-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.share-row-code {
+  font-family: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--ink);
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+
+.share-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .main-content {
@@ -1365,6 +1548,129 @@ a {
 .calendar-plan-chip.is-done {
   background: var(--green);
   text-decoration: line-through;
+}
+
+.calendar-plan-chip:hover,
+.calendar-plan-chip:focus-visible,
+.calendar-plan-chip.is-previewing {
+  background: var(--yellow);
+  outline: none;
+}
+
+/* ---------- Thẻ xem nhanh outfit khi hover chip trong lịch ---------- */
+
+.plan-preview {
+  position: fixed;
+  z-index: 1200;
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: default;
+}
+
+.plan-preview-media {
+  height: 132px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.plan-preview-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.plan-preview-collage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+}
+
+.plan-preview-collage img {
+  height: 100%;
+}
+
+.plan-preview-media--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  background: var(--pink);
+}
+
+.plan-preview-name {
+  font-weight: 800;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.plan-preview-meta {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.plan-preview-note {
+  font-size: 12.5px;
+  font-weight: 600;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  padding: 4px 6px;
+  overflow-wrap: anywhere;
+}
+
+.plan-preview-thumbs {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.plan-preview-thumb {
+  display: block;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--paper);
+  flex-shrink: 0;
+}
+
+.plan-preview-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.plan-preview-thumb-emoji {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+
+.plan-preview-more {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.plan-preview-cta {
+  width: 100%;
+  justify-content: center;
 }
 
 /* ---------- Charts ---------- */

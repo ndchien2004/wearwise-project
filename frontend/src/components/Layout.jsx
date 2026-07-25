@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import AccountModal from './AccountModal';
 import ChangePasswordModal from './ChangePasswordModal';
 import { Button, Toast } from './ui';
 
@@ -13,6 +12,7 @@ const NAV_ITEMS = [
   { to: '/suggestions', emoji: '🌦️', label: 'Gợi ý thời tiết' },
   { to: '/try-on', emoji: '🪞', label: 'Thử đồ ảo' },
   { to: '/analytics', emoji: '📊', label: 'Thống kê' },
+  { to: '/share', emoji: '🔗', label: 'Chia sẻ' },
 ];
 
 const COLLAPSE_KEY = 'wearwise_sidebar_collapsed';
@@ -22,7 +22,6 @@ export default function Layout() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
   const [changingPassword, setChangingPassword] = useState(false);
-  const [showAccount, setShowAccount] = useState(false);
   const [toast, setToast] = useState(null);
 
   // Tài khoản tạo trước khi có tính năng quên mật khẩu thì chưa có email — nhắc người dùng bổ sung.
@@ -73,15 +72,15 @@ export default function Layout() {
         ))}
 
         <div className="sidebar-footer">
-          <button
-            type="button"
-            className="sidebar-user"
+          <NavLink
+            to="/profile"
+            className={({ isActive }) => `sidebar-user ${isActive ? 'active' : ''}`}
             title={needsEmail ? `${username} — chưa có email` : username}
-            onClick={() => setShowAccount(true)}
           >
-            👤 <span className="nav-label">{username}</span>
+            <span className="nav-emoji">👤</span>
+            <span className="nav-label">{username}</span>
             {needsEmail && <span className="sidebar-user-alert" title="Chưa có email">!</span>}
-          </button>
+          </NavLink>
           <Button
             size="sm"
             onClick={() => setChangingPassword(true)}
@@ -101,9 +100,6 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      {showAccount && (
-        <AccountModal onClose={() => setShowAccount(false)} onSuccess={setToast} />
-      )}
       {changingPassword && (
         <ChangePasswordModal onClose={() => setChangingPassword(false)} onSuccess={setToast} />
       )}

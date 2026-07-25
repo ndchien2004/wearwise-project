@@ -23,13 +23,6 @@ export function logout() {
   });
 }
 
-export function updateEmail(currentPassword, email) {
-  return apiFetch('/api/auth/me/email', {
-    method: 'PUT',
-    body: { currentPassword, email },
-  });
-}
-
 export function forgotPassword(email) {
   return apiFetch('/api/auth/forgot-password', { method: 'POST', body: { email }, auth: false });
 }
