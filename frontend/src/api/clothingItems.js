@@ -67,3 +67,8 @@ export function getMostWornItems(limit = 5) {
 export function getRecentlyWornItems(limit = 5) {
   return apiFetch(`/api/clothing-items/recently-worn?limit=${limit}`);
 }
+
+/** Thêm nhiều món cùng lúc (một giao dịch: sai một món thì hủy cả lô). */
+export function createItems(items) {
+  return apiFetch('/api/clothing-items/batch', { method: 'POST', body: { items } });
+}

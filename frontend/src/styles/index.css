@@ -2210,3 +2210,72 @@ a {
   .main-content { padding: 20px 16px 48px; }
   .bar-row { grid-template-columns: 90px 1fr 40px; }
 }
+
+/* ---------- Bảng soát lại sau khi quét nhiều món ---------- */
+
+.bulk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding-right: 4px;
+}
+
+.bulk-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: var(--border-w) solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 8px 10px;
+}
+
+/* Món bị bỏ tick vẫn thấy được để tick lại, nhưng lùi hẳn về sau */
+.bulk-row.is-skipped {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.bulk-pick {
+  display: flex;
+  align-items: center;
+  padding-top: 8px;
+}
+
+.bulk-pick input {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.bulk-fields {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.bulk-fields .nb-input,
+.bulk-fields .bulk-select {
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.bulk-name {
+  flex: 2 1 180px;
+  min-width: 140px;
+}
+
+.bulk-color {
+  flex: 1 1 90px;
+  min-width: 80px;
+}
+
+.bulk-select {
+  flex: 1 1 110px;
+  min-width: 100px;
+}

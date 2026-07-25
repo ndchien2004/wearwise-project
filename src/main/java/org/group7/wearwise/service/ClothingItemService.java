@@ -32,6 +32,8 @@ public class ClothingItemService {
 
     private static final int MAX_TEXT_LENGTH = 255;
     private static final int MAX_LIST_LIMIT = 50;
+    /** Trần một lô thêm hàng loạt — khớp với số món tối đa AI nhận từ một ảnh. */
+    private static final int MAX_BATCH_SIZE = 12;
 
     private final ClothingItemRepository clothingItemRepository;
     private final OutfitRepository outfitRepository;
@@ -87,6 +89,55 @@ public class ClothingItemService {
                 .build();
 
         return clothingItemRepository.save(item);
+    }
+
+    /**
+     * Tạo nhiều món trong một giao dịch — dùng cho luồng quét ảnh hàng loạt.
+     * Một món sai dữ liệu thì hủy cả lô, tránh cảnh người dùng phải dò xem món nào đã vào món nào chưa.
+     */
+    @Transactional
+    public List<ClothingItem> createItems(String ownerUsername, List<ClothingItemDraft> drafts) {
+        if (drafts == null || drafts.isEmpty()) {
+            throw new BusinessRuleException(ErrorCode.INVALID_REQUEST, "Chưa chọn món nào để thêm.");
+        }
+
+        if (drafts.size() > MAX_BATCH_SIZE) {
+            throw new BusinessRuleException(
+                    ErrorCode.INVALID_REQUEST, "Mỗi lần chỉ thêm được tối đa " + MAX_BATCH_SIZE + " món.");
+        }
+
+        return drafts.stream()
+                .map(draft -> createItem(
+                        ownerUsername,
+                        draft.name(),
+                        draft.color(),
+                        draft.colorTone(),
+                        draft.category(),
+                        draft.season(),
+                        draft.style(),
+                        draft.condition(),
+                        draft.status(),
+                        0,
+                        null,
+                        draft.favorite(),
+                        draft.imageUrl()
+                ))
+                .toList();
+    }
+
+    /** Dữ liệu tối thiểu để tạo một món trong lô. */
+    public record ClothingItemDraft(
+            String name,
+            String color,
+            ColorTone colorTone,
+            ClothingCategory category,
+            Season season,
+            Style style,
+            ClothingCondition condition,
+            ClothingStatus status,
+            Boolean favorite,
+            String imageUrl
+    ) {
     }
 
     public List<ClothingItem> getAllItems(String ownerUsername) {

@@ -1,6 +1,7 @@
 package org.group7.wearwise.controller;
 
 import jakarta.validation.Valid;
+import org.group7.wearwise.dto.request.ClothingItemBatchRequest;
 import org.group7.wearwise.dto.request.ClothingItemRequest;
 import org.group7.wearwise.dto.request.FavoriteRequest;
 import org.group7.wearwise.dto.response.ClothingItemOptionsResponse;
@@ -116,6 +117,34 @@ public class ClothingItemController {
         );
 
         return ClothingItemResponse.from(item);
+    }
+
+    /** Thêm nhiều món cùng lúc — dùng sau khi quét ảnh nhiều món bằng AI. */
+    @PostMapping("/batch")
+    @ResponseStatus(HttpStatus.CREATED)
+    public List<ClothingItemResponse> createItems(
+            Authentication authentication,
+            @Valid @RequestBody ClothingItemBatchRequest request
+    ) {
+        List<ClothingItemService.ClothingItemDraft> drafts = request.items().stream()
+                .map(item -> new ClothingItemService.ClothingItemDraft(
+                        item.name(),
+                        item.color(),
+                        item.colorTone(),
+                        item.category(),
+                        item.season(),
+                        item.style(),
+                        item.condition(),
+                        item.status(),
+                        item.favorite(),
+                        item.imageUrl()
+                ))
+                .toList();
+
+        return clothingItemService.createItems(authentication.getName(), drafts)
+                .stream()
+                .map(ClothingItemResponse::from)
+                .toList();
     }
 
     @PutMapping("/{id}")

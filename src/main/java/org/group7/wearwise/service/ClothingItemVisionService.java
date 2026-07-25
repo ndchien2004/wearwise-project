@@ -24,6 +24,8 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -54,6 +56,12 @@ public class ClothingItemVisionService {
     /** Đủ cho 6 trường ngắn; chặn trên để một câu trả lời lạc đề không đốt token. */
     private static final int MAX_OUTPUT_TOKENS = 200;
 
+    /** Trần số món nhận từ một ảnh: nhiều hơn thì bảng xác nhận cũng không ai soát nổi. */
+    static final int MAX_ITEMS_PER_IMAGE = 12;
+
+    /** Mỗi món tốn khoảng 60 token output, cộng dư ra cho phần dấu ngoặc của mảng. */
+    private static final int MAX_BATCH_OUTPUT_TOKENS = 60 * MAX_ITEMS_PER_IMAGE + 100;
+
     private static final long MAX_UPLOAD_BYTES = 10L * 1024 * 1024;
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/jpg", "image/png");
 
@@ -68,9 +76,21 @@ public class ClothingItemVisionService {
             Nếu ảnh có nhiều món, mô tả món chiếm nhiều diện tích nhất.
             """;
 
+    /**
+     * Nhấn mạnh "từng món riêng biệt" vì mặc định model hay gộp cả bộ thành một mô tả duy nhất.
+     */
+    private static final String BATCH_PROMPT = """
+            Liệt kê TỪNG món quần áo nhìn thấy trong ảnh thành một phần tử riêng của mảng.
+            Bỏ qua móc treo, hộp, người mẫu và phông nền — chỉ lấy quần áo, giày, phụ kiện.
+            Không gộp nhiều món thành một; không lặp lại cùng một món hai lần.
+            name: tên gọi ngắn bằng tiếng Việt, tối đa 6 từ, gồm loại đồ và màu (vd "Áo thun trắng").
+            color: tên màu chủ đạo bằng tiếng Việt, 1-2 từ.
+            """;
+
     private final GeminiClient geminiClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final JsonNode responseSchema = buildResponseSchema();
+    private final JsonNode batchResponseSchema = buildBatchResponseSchema();
 
     public ClothingItemVisionService(GeminiClient geminiClient) {
         this.geminiClient = geminiClient;
@@ -81,31 +101,66 @@ public class ClothingItemVisionService {
     }
 
     public ClothingItemSuggestionResponse analyze(MultipartFile file) {
+        String raw = callGemini(file, PROMPT, responseSchema, MAX_OUTPUT_TOKENS);
+        return parse(readJson(raw));
+    }
+
+    /**
+     * Nhận diện <b>nhiều món</b> trong cùng một ảnh (vd chụp cả kệ tủ).
+     *
+     * <p>Đây là lý do tính năng này đáng làm: Gemini tính ảnh 1089 token cố định bất kể ảnh
+     * chứa một món hay mười món, nên chi phí mỗi món giảm theo đúng số món nhận ra được.
+     * Chỉ phần output dài thêm, mà mỗi món chỉ tốn khoảng 60 token.</p>
+     */
+    public List<ClothingItemSuggestionResponse> analyzeBatch(MultipartFile file) {
+        String raw = callGemini(file, BATCH_PROMPT, batchResponseSchema, MAX_BATCH_OUTPUT_TOKENS);
+        JsonNode json = readJson(raw);
+
+        if (!json.isArray()) {
+            log.warn("Gemini không trả về mảng khi quét nhiều món: {}", raw);
+            throw new AiUnavailableException("AI trả về dữ liệu không hợp lệ. Hãy thử lại hoặc nhập tay.");
+        }
+
+        List<ClothingItemSuggestionResponse> suggestions = new ArrayList<>();
+        for (JsonNode node : json) {
+            ClothingItemSuggestionResponse suggestion = parse(node);
+            // Món không đọc được tên lẫn danh mục thì bỏ, đưa lên giao diện chỉ gây nhiễu.
+            if (suggestion.name() != null || suggestion.category() != null) {
+                suggestions.add(suggestion);
+            }
+            if (suggestions.size() >= MAX_ITEMS_PER_IMAGE) {
+                break;
+            }
+        }
+
+        return suggestions;
+    }
+
+    private String callGemini(MultipartFile file, String prompt, JsonNode schema, int maxOutputTokens) {
         if (!geminiClient.isConfigured()) {
             throw new AiUnavailableException(
                     "Tính năng AI chưa được cấu hình. Hãy điền wearwise.gemini.api-key vào application.properties.");
         }
 
         byte[] shrunk = shrink(readImage(file));
-        String raw = geminiClient.generateJson(
-                PROMPT,
+        return geminiClient.generateJson(
+                prompt,
                 new GeminiClient.InlineImage("image/jpeg", shrunk),
-                responseSchema,
-                MAX_OUTPUT_TOKENS
+                schema,
+                maxOutputTokens
         );
-
-        return parse(raw);
     }
 
-    private ClothingItemSuggestionResponse parse(String raw) {
-        JsonNode json;
+    private JsonNode readJson(String raw) {
         try {
-            json = objectMapper.readTree(raw);
+            return objectMapper.readTree(raw);
         } catch (IOException exception) {
             log.warn("Gemini trả về JSON không đọc được: {}", raw);
             throw new AiUnavailableException("AI trả về dữ liệu không hợp lệ. Hãy thử lại hoặc nhập tay.");
         }
+    }
 
+    private ClothingItemSuggestionResponse parse(JsonNode json) {
         // responseSchema đã ép enum hợp lệ, nhưng vẫn parse phòng thủ: giá trị lạ thì bỏ trống
         // để người dùng tự chọn, thay vì làm hỏng cả form.
         return new ClothingItemSuggestionResponse(
@@ -200,6 +255,15 @@ public class ClothingItemVisionService {
      * Schema sinh thẳng từ các enum của ứng dụng nên không bao giờ lệch với model dữ liệu —
      * thêm một giá trị vào {@code Style} là prompt tự biết giá trị đó.
      */
+    /** Mảng các món, dùng cho ảnh chụp nhiều món cùng lúc. */
+    private JsonNode buildBatchResponseSchema() {
+        ObjectNode schema = objectMapper.createObjectNode();
+        schema.put("type", "ARRAY");
+        schema.put("maxItems", MAX_ITEMS_PER_IMAGE);
+        schema.set("items", buildResponseSchema());
+        return schema;
+    }
+
     private JsonNode buildResponseSchema() {
         ObjectNode schema = objectMapper.createObjectNode();
         schema.put("type", "OBJECT");

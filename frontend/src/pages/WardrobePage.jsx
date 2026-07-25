@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { getAiStatus } from '../api/ai';
 import * as itemsApi from '../api/clothingItems';
 import * as tryOnApi from '../api/tryOn';
 import ItemCard from '../components/ItemCard';
+import BulkScanModal from '../components/BulkScanModal';
 import ItemFormModal from '../components/ItemFormModal';
 import { Button, EmptyState, ErrorBanner, Field, Loading, Pagination, Toast } from '../components/ui';
 import { useConfirm } from '../context/ConfirmContext';
@@ -41,6 +43,8 @@ export default function WardrobePage() {
   const [page, setPage] = useState(0);
   const [archived, setArchived] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
+  const [bulkScan, setBulkScan] = useState(false);
+  const [aiReady, setAiReady] = useState(false);
 
   const PER_PAGE = 12; // 4 cột x 3 dòng
 
@@ -72,6 +76,13 @@ export default function WardrobePage() {
   useEffect(() => {
     loadArchived();
   }, [loadArchived]);
+
+  // Không có API key thì ẩn hẳn nút quét, tránh mời người dùng vào một tính năng sẽ báo lỗi.
+  useEffect(() => {
+    getAiStatus()
+      .then((status) => setAiReady(Boolean(status.geminiConfigured)))
+      .catch(() => setAiReady(false));
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => load(filters), filters.keyword ? 300 : 0);
@@ -227,9 +238,16 @@ export default function WardrobePage() {
     <div>
       <div className="page-header">
         <h1 className="page-title">👕 Tủ đồ</h1>
-        <Button variant="primary" onClick={() => setModal({})}>
-          ➕ Thêm món đồ
-        </Button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {aiReady && (
+            <Button variant="purple" onClick={() => setBulkScan(true)}>
+              📸 Quét nhiều món
+            </Button>
+          )}
+          <Button variant="primary" onClick={() => setModal({})}>
+            ➕ Thêm món đồ
+          </Button>
+        </div>
       </div>
 
       <Toast
@@ -347,6 +365,16 @@ export default function WardrobePage() {
       )}
 
       {modal && <ItemFormModal item={modal.item} onSave={handleSave} onClose={() => setModal(null)} />}
+      {bulkScan && (
+        <BulkScanModal
+          onClose={() => setBulkScan(false)}
+          onDone={async (count) => {
+            setBulkScan(false);
+            await load(filters);
+            toastOk(`Đã thêm ${count} món vào tủ đồ! 🎉`);
+          }}
+        />
+      )}
     </div>
   );
 }

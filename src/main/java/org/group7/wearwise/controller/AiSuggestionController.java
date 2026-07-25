@@ -43,6 +43,12 @@ public class AiSuggestionController {
         return clothingItemVisionService.analyze(file);
     }
 
+    /** Quét nhiều món trong cùng một ảnh (vd chụp cả kệ tủ) để thêm hàng loạt. */
+    @PostMapping("/clothing-items/analyze-batch")
+    public List<ClothingItemSuggestionResponse> analyzeClothingImageBatch(@RequestParam("file") MultipartFile file) {
+        return clothingItemVisionService.analyzeBatch(file);
+    }
+
     @PostMapping("/outfit-suggestions")
     public List<AiOutfitSuggestionResponse> suggestOutfits(
             Authentication authentication,

@@ -38,3 +38,10 @@ export function rankAiOutfits(payload) {
 export function planAiWeek(payload) {
   return apiFetch('/api/ai/weekly-plan', { method: 'POST', body: payload });
 }
+
+/** Quét nhiều món trong một ảnh, trả về mảng gợi ý để người dùng soát lại. */
+export function analyzeClothingImageBatch(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiUpload('/api/ai/clothing-items/analyze-batch', formData);
+}
