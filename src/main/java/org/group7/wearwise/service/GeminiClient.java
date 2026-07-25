@@ -113,6 +113,30 @@ public class GeminiClient {
         return send(payload);
     }
 
+    /**
+     * Gửi prompt thuần text nhưng ép câu trả lời theo {@code responseSchema}.
+     *
+     * <p>Dùng cho những tác vụ mà cấu trúc câu trả lời chính là ràng buộc nghiệp vụ — ví dụ mỗi
+     * bộ đồ chỉ được một áo một quần. Diễn đạt luật đó bằng lời trong prompt thì model vẫn có
+     * thể phá; đặt vào schema thì nó không có chỗ để phá.</p>
+     */
+    public String generateJson(String prompt, JsonNode responseSchema, int maxOutputTokens) {
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.putArray("contents")
+                .addObject()
+                .putArray("parts")
+                .addObject()
+                .put("text", prompt);
+
+        ObjectNode generationConfig = payload.putObject("generationConfig");
+        generationConfig.put("responseMimeType", "application/json");
+        generationConfig.set("responseSchema", responseSchema);
+        generationConfig.put("temperature", 0.4);
+        generationConfig.put("maxOutputTokens", maxOutputTokens);
+
+        return send(payload);
+    }
+
     private String send(ObjectNode payload) {
         if (!isConfigured()) {
             throw new AiUnavailableException(

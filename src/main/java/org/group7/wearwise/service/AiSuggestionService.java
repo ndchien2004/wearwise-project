@@ -2,6 +2,8 @@ package org.group7.wearwise.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.group7.wearwise.dto.request.AiWeeklyPlanRequest;
 import org.group7.wearwise.dto.response.AiOutfitRankingResponse;
 import org.group7.wearwise.dto.response.AiOutfitSuggestionResponse;
@@ -10,6 +12,7 @@ import org.group7.wearwise.dto.response.ClothingItemResponse;
 import org.group7.wearwise.dto.response.OutfitResponse;
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.entity.Outfit;
+import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.ColorTone;
@@ -38,6 +41,13 @@ public class AiSuggestionService {
     private static final Logger log = LoggerFactory.getLogger(AiSuggestionService.class);
     private static final int MAX_SUGGESTIONS = 3;
 
+    /** 3 bộ x (2 câu lý do + 5 ô id) — dư dả nhưng vẫn chặn câu trả lời lan man. */
+    private static final int MAX_SUGGESTION_OUTPUT_TOKENS = 900;
+
+    /** Áo + quần là xương sống của một bộ; các loại còn lại là tùy chọn. */
+    private static final Set<ClothingCategory> CORE_CATEGORIES =
+            java.util.EnumSet.of(ClothingCategory.SHIRT, ClothingCategory.PANTS);
+
     private final ClothingItemService clothingItemService;
     private final OutfitService outfitService;
     private final GeminiClient geminiClient;
@@ -65,20 +75,30 @@ public class AiSuggestionService {
             String weatherDescription,
             ColorTone tone
     ) {
+        // Chỉ đưa cho AI những món mặc được ngay. Trước đây đồ đang giặt / chưa dùng được vẫn
+        // lọt vào danh sách kèm lời dặn "tránh dùng", nhưng gợi ý ra món không mặc được thì cũng
+        // vô dụng như gợi ý hai cái quần.
         List<ClothingItem> wardrobe = clothingItemService.getAllItems(username)
                 .stream()
                 .filter(item -> item.getCondition() != ClothingCondition.DAMAGED)
+                .filter(item -> item.getStatus() == ClothingStatus.AVAILABLE)
                 .toList();
 
         if (wardrobe.size() < 2) {
-            throw new IllegalArgumentException("Tủ đồ chưa đủ món để phối. Hãy thêm ít nhất 2 món đồ trước nhé!");
+            throw new IllegalArgumentException(
+                    "Tủ đồ chưa đủ món sẵn sàng để phối. Hãy thêm đồ mới, hoặc đánh dấu \"Giặt xong\" "
+                            + "cho những món đang giặt.");
         }
 
         Map<Long, ClothingItem> itemsById = new LinkedHashMap<>();
         wardrobe.forEach(item -> itemsById.put(item.getId(), item));
 
         String prompt = buildPrompt(wardrobe, temperature, raining, weatherDescription, tone);
-        String rawJson = geminiClient.generateJson(prompt);
+        Set<ClothingCategory> availableCategories = wardrobe.stream()
+                .map(ClothingItem::getCategory)
+                .collect(java.util.stream.Collectors.toCollection(() -> java.util.EnumSet.noneOf(ClothingCategory.class)));
+        String rawJson = geminiClient.generateJson(
+                prompt, buildSuggestionSchema(availableCategories), MAX_SUGGESTION_OUTPUT_TOKENS);
 
         return parseSuggestions(rawJson, itemsById);
     }
@@ -372,19 +392,71 @@ public class AiSuggestionService {
 
                 Yêu cầu:
                 - Chọn 2-3 bộ trang phục phù hợp nhất với thời tiết trên.
-                - Mỗi bộ gồm 2-5 món, chỉ dùng id có trong danh sách.
-                - Mỗi bộ nên đủ áo + quần (nếu tủ có), thêm giày/áo khoác/phụ kiện khi hợp lý.
+                - Mỗi ô chỉ điền id của món ĐÚNG loại của ô đó; không có món hợp thì để null.
+                - Mỗi bộ phải có ít nhất 2 món, và nên có đủ áo + quần nếu tủ đồ có.
                 - Trời mưa hoặc lạnh thì nên có áo khoác; trời nóng thì tránh đồ dày.
-                - Ưu tiên món "Sẵn sàng"; tránh món "Đang giặt" hoặc "Chưa dùng được" trừ khi không còn lựa chọn.
                 - Phối màu hài hòa giữa các món (dựa vào màu và tone màu).
                 - "name": tên bộ đồ ngắn gọn, gợi nhớ, tiếng Việt.
                 - "reason": 1-2 câu tiếng Việt giải thích vì sao hợp thời tiết và màu sắc phối với nhau ra sao.
-
-                Chỉ trả về JSON đúng cấu trúc sau, không thêm chữ nào khác:
-                {"suggestions":[{"name":"...","itemIds":[1,2,3],"reason":"..."}]}
                 """);
 
         return prompt.toString();
+    }
+
+    /**
+     * Mỗi danh mục một ô riêng thay vì một mảng id tự do.
+     *
+     * <p>Đây mới là thứ chặn được lỗi "một bộ hai quần": prompt chỉ là lời khuyên, model vẫn có
+     * quyền phá; còn schema chỉ có đúng một ô {@code pantsId} thì nó không có chỗ để nhét cái
+     * quần thứ hai. Cùng kỹ thuật đã dùng cho phần nhận diện ảnh.</p>
+     *
+     * <p>Sinh thẳng từ {@link ClothingCategory} nên thêm danh mục mới vào enum là có ô mới,
+     * không phải sửa hai nơi.</p>
+     */
+    private JsonNode buildSuggestionSchema(Set<ClothingCategory> availableCategories) {
+        ObjectNode suggestion = objectMapper.createObjectNode();
+        suggestion.put("type", "OBJECT");
+
+        ObjectNode properties = suggestion.putObject("properties");
+        properties.putObject("name").put("type", "STRING");
+        properties.putObject("reason").put("type", "STRING");
+
+        ArrayNode required = suggestion.putArray("required");
+        required.add("name").add("reason");
+
+        for (ClothingCategory category : ClothingCategory.values()) {
+            // Tủ không có loại này thì bỏ hẳn ô đi, đừng để model phải bịa ra một id.
+            if (!availableCategories.contains(category)) {
+                continue;
+            }
+
+            ObjectNode slot = properties.putObject(slotName(category));
+            slot.put("type", "INTEGER");
+
+            // Áo và quần là xương sống của một bộ đồ. Đo thực tế: để hai ô này nullable thì
+            // model rất hay trả về bộ chỉ có áo + giày, thiếu quần. Bắt buộc điền là hết.
+            if (CORE_CATEGORIES.contains(category)) {
+                required.add(slotName(category));
+            } else {
+                slot.put("nullable", true);
+            }
+        }
+
+        ObjectNode list = objectMapper.createObjectNode();
+        list.put("type", "ARRAY");
+        list.put("maxItems", MAX_SUGGESTIONS);
+        list.set("items", suggestion);
+
+        ObjectNode schema = objectMapper.createObjectNode();
+        schema.put("type", "OBJECT");
+        schema.putObject("properties").set("suggestions", list);
+        schema.putArray("required").add("suggestions");
+        return schema;
+    }
+
+    /** SHIRT -> shirtId, PANTS -> pantsId, ... */
+    private static String slotName(ClothingCategory category) {
+        return category.name().toLowerCase(java.util.Locale.ROOT) + "Id";
     }
 
     private List<AiOutfitSuggestionResponse> parseSuggestions(String rawJson, Map<Long, ClothingItem> itemsById) {
@@ -405,19 +477,28 @@ public class AiSuggestionService {
                     break;
                 }
 
-                Set<Long> ids = new LinkedHashSet<>();
-                for (JsonNode idNode : suggestion.path("itemIds")) {
-                    if (idNode.canConvertToLong()) {
-                        ids.add(idNode.asLong());
+                // Schema đã lo phần "mỗi loại một ô", nhưng vẫn phải kiểm lại: model có thể bịa
+                // id không có thật, hoặc nhét id cái áo vào ô quần. Món sai loại thì bỏ, không
+                // sửa hộ — đoán ý AI dễ tạo ra bộ đồ mà nó không hề định gợi ý.
+                List<ClothingItemResponse> items = new ArrayList<>();
+                for (ClothingCategory category : ClothingCategory.values()) {
+                    JsonNode idNode = suggestion.path(slotName(category));
+                    if (!idNode.canConvertToLong()) {
+                        continue;
                     }
-                }
 
-                // Chỉ giữ id thật sự thuộc tủ đồ của người dùng (AI có thể bịa id).
-                List<ClothingItemResponse> items = ids.stream()
-                        .map(itemsById::get)
-                        .filter(item -> item != null)
-                        .map(ClothingItemResponse::from)
-                        .toList();
+                    ClothingItem item = itemsById.get(idNode.asLong());
+                    if (item == null) {
+                        log.debug("AI trả id không có trong tủ đồ: {}", idNode.asLong());
+                        continue;
+                    }
+                    if (item.getCategory() != category) {
+                        log.debug("AI xếp \"{}\" ({}) vào ô {}", item.getName(), item.getCategory(), category);
+                        continue;
+                    }
+
+                    items.add(ClothingItemResponse.from(item));
+                }
 
                 if (items.size() < 2) {
                     continue;
