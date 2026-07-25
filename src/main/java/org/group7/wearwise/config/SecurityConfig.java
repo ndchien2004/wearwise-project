@@ -1,5 +1,6 @@
 package org.group7.wearwise.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -23,9 +24,15 @@ import java.util.List;
 public class SecurityConfig {
 
     private final BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter;
+    private final List<String> allowedOrigins;
 
-    public SecurityConfig(BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter) {
+    public SecurityConfig(
+            BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter,
+            @Value("${wearwise.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}")
+            List<String> allowedOrigins
+    ) {
         this.bearerTokenAuthenticationFilter = bearerTokenAuthenticationFilter;
+        this.allowedOrigins = allowedOrigins;
     }
 
     @Bean
@@ -63,10 +70,17 @@ public class SecurityConfig {
                 .build();
     }
 
+    /**
+     * Origin được phép gọi API khai báo qua {@code wearwise.cors.allowed-origins} (phân tách
+     * bằng dấu phẩy). Khi deploy frontend riêng — vd Cloudflare Pages — phải thêm domain đó
+     * vào, nếu không trình duyệt sẽ chặn ngay ở bước preflight.
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173", "http://127.0.0.1:5173"));
+        // setAllowedOriginPatterns (thay vì setAllowedOrigins) để dùng được ký tự đại diện
+        // cho các domain preview dạng https://<hash>.wearwise-xyz.pages.dev.
+        configuration.setAllowedOriginPatterns(allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
 

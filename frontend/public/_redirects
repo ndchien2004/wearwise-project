@@ -1,0 +1,4 @@
+# SPA fallback: mọi đường dẫn không khớp file tĩnh đều trả về index.html để React Router
+# tự xử lý. Không có dòng này thì mở thẳng /wardrobe/5, /share/K7QM2XPA hay bấm F5 ở
+# trang con sẽ ra 404 của Cloudflare.
+/*    /index.html   200
