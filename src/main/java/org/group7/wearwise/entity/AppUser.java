@@ -49,6 +49,10 @@ public class AppUser {
     @Column(length = 512)
     private String bodyPhotoUrl;
 
+    /** Ảnh đại diện của người dùng — chỉ lưu URL (Cloudinary). */
+    @Column(length = 512)
+    private String avatarUrl;
+
     /** Số lần đăng nhập sai liên tiếp; reset về 0 khi đăng nhập thành công. */
     @Column(name = "failed_login_attempts", nullable = false)
     @Builder.Default

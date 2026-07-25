@@ -9,6 +9,7 @@ public record CurrentUserResponse(
         String username,
         String email,
         String role,
+        String avatarUrl,
         LocalDateTime createdAt,
         LocalDateTime passwordChangedAt
 ) {
@@ -19,6 +20,7 @@ public record CurrentUserResponse(
                 user.getUsername(),
                 user.getEmail(),
                 user.getRole(),
+                user.getAvatarUrl(),
                 user.getCreatedAt(),
                 user.getPasswordChangedAt()
         );

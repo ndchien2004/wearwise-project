@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import * as authApi from '../api/auth';
 import * as itemsApi from '../api/clothingItems';
 import { getStatistics } from '../api/statistics';
+import AvatarCropModal from '../components/AvatarCropModal';
 import BarChart from '../components/BarChart';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import { Badge, Button, EmptyState, Loading, Toast } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   CATEGORY_EMOJIS,
   CATEGORY_LABELS,
@@ -50,16 +53,80 @@ function mapToRows(map, labels, colorFor) {
   }));
 }
 
+const MAX_AVATAR_BYTES = 10 * 1024 * 1024;
+const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
+
 export default function ProfilePage() {
-  const { user, username } = useAuth();
+  const { user, username, updateUser } = useAuth();
+  const confirm = useConfirm();
 
   const [changingPassword, setChangingPassword] = useState(false);
   const [toast, setToast] = useState(null);
   const [stats, setStats] = useState(null);
   const [leastWorn, setLeastWorn] = useState([]);
   const [statsFailed, setStatsFailed] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [cropFile, setCropFile] = useState(null);
+  const avatarInputRef = useRef(null);
 
   const hasEmail = Boolean(user?.email);
+
+  // Toast dùng chung: object { message, variant } để báo cả thành công lẫn lỗi.
+  const showToast = (message, variant = 'success') => setToast({ message, variant });
+
+  // Chọn tệp xong: mở modal căn chỉnh/crop thay vì tải thẳng lên.
+  const handleAvatarSelected = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // cho phép chọn lại cùng một tệp lần sau
+    if (!file) return;
+
+    if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+      showToast('Ảnh đại diện phải ở định dạng JPG hoặc PNG.', 'error');
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      showToast('Ảnh quá lớn (tối đa 10MB). Hãy chọn ảnh nhẹ hơn.', 'error');
+      return;
+    }
+
+    setCropFile(file);
+  };
+
+  // Người dùng đã căn xong trong modal: tải ảnh vuông đã cắt lên.
+  const handleCropConfirm = async (blob) => {
+    setCropFile(null);
+    setUploadingAvatar(true);
+    try {
+      const profile = await authApi.uploadAvatar(blob);
+      updateUser(profile);
+      showToast('Đã cập nhật ảnh đại diện.');
+    } catch (err) {
+      showToast(err.message || 'Tải ảnh đại diện thất bại. Vui lòng thử lại.', 'error');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    const ok = await confirm({
+      title: 'Gỡ ảnh đại diện',
+      message: 'Bạn có chắc muốn gỡ ảnh đại diện hiện tại không?',
+      confirmLabel: 'Gỡ ảnh',
+      danger: true,
+    });
+    if (!ok) return;
+
+    setUploadingAvatar(true);
+    try {
+      const profile = await authApi.removeAvatar();
+      updateUser(profile);
+      showToast('Đã gỡ ảnh đại diện.');
+    } catch (err) {
+      showToast(err.message || 'Không gỡ được ảnh đại diện. Vui lòng thử lại.', 'error');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   // Thống kê nằm cùng trang tài khoản; lỗi thì chỉ ẩn khối thống kê, phần tài khoản vẫn dùng được.
   useEffect(() => {
@@ -80,9 +147,45 @@ export default function ProfilePage() {
       </div>
 
       <div className="profile-hero nb-card">
-        <div className="profile-avatar" aria-hidden="true">
-          {(username || '?').charAt(0).toUpperCase()}
+        <div className="profile-avatar-col">
+          <div className="profile-avatar-wrap">
+            <div className="profile-avatar">
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="Ảnh đại diện" />
+              ) : (
+                (username || '?').charAt(0).toUpperCase()
+              )}
+            </div>
+            <button
+              type="button"
+              className="profile-avatar-edit"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              title="Đổi ảnh đại diện"
+              aria-label="Đổi ảnh đại diện"
+            >
+              {uploadingAvatar ? '⏳' : '📷'}
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/png,image/jpeg"
+              onChange={handleAvatarSelected}
+              hidden
+            />
+          </div>
+          {user?.avatarUrl && (
+            <button
+              type="button"
+              className="auth-link profile-avatar-remove"
+              onClick={handleRemoveAvatar}
+              disabled={uploadingAvatar}
+            >
+              Gỡ ảnh
+            </button>
+          )}
         </div>
+
         <div className="profile-hero-info">
           <h2 className="profile-hero-name">{username}</h2>
           <div className="badge-row">
@@ -94,61 +197,10 @@ export default function ProfilePage() {
             {user?.createdAt && <Badge color="purple">🎂 Tham gia {formatDateTime(user.createdAt)}</Badge>}
           </div>
         </div>
-      </div>
 
-      <div className="two-col">
-        <div className="nb-card">
-          <h3 className="chart-title">✉️ Email khôi phục</h3>
-
-          {!user ? (
-            <Loading>Đang tải hồ sơ...</Loading>
-          ) : (
-            <>
-              <div className="profile-locked-field">
-                <span className="profile-locked-value">
-                  {user.email || <span style={{ color: 'var(--muted)' }}>chưa có</span>}
-                </span>
-                <span className="profile-locked-badge" title="Không thể thay đổi">🔒 Cố định</span>
-              </div>
-
-              {hasEmail ? (
-                <p className="muted-note" style={{ marginTop: 12 }}>
-                  Email được đặt một lần duy nhất lúc tạo tài khoản và không thể thay đổi. Đây là địa
-                  chỉ nhận link đặt lại mật khẩu khi bạn quên.
-                </p>
-              ) : (
-                <div className="notice-banner" style={{ background: 'var(--yellow)', marginTop: 12 }}>
-                  ⚠️ Tài khoản này được tạo trước khi email trở thành bắt buộc nên không có email, và
-                  email không thể bổ sung sau. Bạn sẽ không dùng được chức năng quên mật khẩu — hãy
-                  liên hệ quản trị viên nếu cần khôi phục.
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="nb-card">
-          <h3 className="chart-title">🔒 Bảo mật</h3>
-
-          <dl className="account-facts">
-            <dt>Tên đăng nhập</dt>
-            <dd>{username}</dd>
-            <dt>Email khôi phục</dt>
-            <dd>{user?.email || <span style={{ color: 'var(--muted)' }}>chưa có</span>}</dd>
-            {user?.createdAt && (
-              <>
-                <dt>Ngày tạo</dt>
-                <dd>{formatDateTime(user.createdAt)}</dd>
-              </>
-            )}
-          </dl>
-
-          <p className="muted-note" style={{ marginBottom: 14 }}>
-            Đổi mật khẩu sẽ đăng xuất mọi thiết bị khác, thiết bị này vẫn giữ nguyên phiên đăng nhập.
-          </p>
-
-          <Button onClick={() => setChangingPassword(true)}>🔑 Đổi mật khẩu</Button>
-        </div>
+        <Button className="profile-hero-action" onClick={() => setChangingPassword(true)}>
+          🔑 Đổi mật khẩu
+        </Button>
       </div>
 
       {/* Thống kê tủ đồ gộp vào đây thay vì đứng riêng một mục ở thanh bên. */}
@@ -244,10 +296,20 @@ export default function ProfilePage() {
         </>
       )}
 
-      {changingPassword && (
-        <ChangePasswordModal onClose={() => setChangingPassword(false)} onSuccess={setToast} />
+      {cropFile && (
+        <AvatarCropModal
+          file={cropFile}
+          onCancel={() => setCropFile(null)}
+          onConfirm={handleCropConfirm}
+        />
       )}
-      <Toast message={toast} onDismiss={() => setToast(null)} />
+      {changingPassword && (
+        <ChangePasswordModal
+          onClose={() => setChangingPassword(false)}
+          onSuccess={(msg) => showToast(msg)}
+        />
+      )}
+      <Toast message={toast?.message} variant={toast?.variant} onDismiss={() => setToast(null)} />
     </div>
   );
 }

@@ -39,6 +39,11 @@ public class ImageUploadService {
         return upload(file, "outfits");
     }
 
+    /** Tải ảnh đại diện người dùng lên thư mục wearwise/avatars và trả về secure URL. */
+    public String uploadAvatarImage(MultipartFile file) {
+        return upload(file, "avatars");
+    }
+
     private String upload(MultipartFile file, String subFolder) {
         if (!cloudinaryService.isConfigured()) {
             throw new TryOnUnavailableException(
