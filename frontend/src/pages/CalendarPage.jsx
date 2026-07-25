@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as outfitsApi from '../api/outfits';
 import * as plansApi from '../api/plans';
+import CalendarPlanChip from '../components/CalendarPlanChip';
 import { Button, ErrorBanner, Field, Modal } from '../components/ui';
 import { useConfirm } from '../context/ConfirmContext';
 import { buildMonthGrid, DOW_NAMES, formatDate, MONTH_NAMES, todayIso, toIsoDate } from '../utils/date';
@@ -224,13 +225,7 @@ export default function CalendarPage() {
             >
               <span className="calendar-daynum">{cell.date.getDate()}</span>
               {dayPlans.slice(0, 3).map((plan) => (
-                <span
-                  key={plan.id}
-                  className={`calendar-plan-chip ${plan.completed ? 'is-done' : ''}`}
-                  title={plan.outfit.name}
-                >
-                  {plan.outfit.name}
-                </span>
+                <CalendarPlanChip key={plan.id} plan={plan} />
               ))}
               {dayPlans.length > 3 && (
                 <span style={{ fontSize: 11, fontWeight: 700 }}>+{dayPlans.length - 3} nữa</span>
