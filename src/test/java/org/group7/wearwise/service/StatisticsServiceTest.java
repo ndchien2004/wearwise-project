@@ -38,8 +38,8 @@ class StatisticsServiceTest {
     void getStatisticsCombinesTotalsGroupsAndTopItems() {
         ClothingItem first = item(1L, "Shirt", 8);
         ClothingItem second = item(2L, "Shoes", 5);
-        when(clothingItemRepository.countByOwner_Username(OWNER)).thenReturn(3L);
-        when(clothingItemRepository.countByOwner_UsernameAndFavoriteTrue(OWNER)).thenReturn(2L);
+        when(clothingItemRepository.countByOwner_UsernameAndArchivedAtIsNull(OWNER)).thenReturn(3L);
+        when(clothingItemRepository.countByOwner_UsernameAndArchivedAtIsNullAndFavoriteTrue(OWNER)).thenReturn(2L);
         when(outfitRepository.countByOwner_Username(OWNER)).thenReturn(2L);
         when(outfitRepository.countByOwner_UsernameAndFavoriteTrue(OWNER)).thenReturn(1L);
         when(clothingItemRepository.sumWearCountByOwnerUsername(OWNER)).thenReturn(13L);
@@ -53,7 +53,7 @@ class StatisticsServiceTest {
                 .thenReturn(List.<Object[]>of(new Object[]{ClothingCondition.GOOD, 2L}));
         when(clothingItemRepository.countGroupedByStatus(OWNER))
                 .thenReturn(List.<Object[]>of(new Object[]{ClothingStatus.AVAILABLE, 2L}));
-        when(clothingItemRepository.findTop5ByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(OWNER, 0))
+        when(clothingItemRepository.findTop5ByOwner_UsernameAndArchivedAtIsNullAndWearCountGreaterThanOrderByWearCountDescIdAsc(OWNER, 0))
                 .thenReturn(List.of(first, second));
 
         StatisticsResponse response = statisticsService.getStatistics(OWNER);

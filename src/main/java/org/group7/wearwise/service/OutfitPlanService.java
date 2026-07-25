@@ -4,6 +4,8 @@ import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.entity.OutfitPlan;
 import org.group7.wearwise.exception.AuthenticationFailedException;
+import org.group7.wearwise.exception.BusinessRuleException;
+import org.group7.wearwise.exception.ErrorCode;
 import org.group7.wearwise.exception.OutfitPlanNotFoundException;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.OutfitPlanRepository;
@@ -61,11 +63,12 @@ public class OutfitPlanService {
         String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
         AppUser owner = getOwner(normalizedOwnerUsername);
         Outfit outfit = outfitService.getOutfitById(normalizedOwnerUsername, outfitId);
+        assertOutfitUsable(outfit);
 
         LocalDate normalizedPlanDate = requirePlanDate(planDate);
         if (outfitPlanRepository.existsByOwner_UsernameAndPlanDateAndOutfit_Id(
                 normalizedOwnerUsername, normalizedPlanDate, outfit.getId())) {
-            throw new IllegalArgumentException("This outfit is already planned for this date.");
+            throw new IllegalArgumentException("Outfit này đã được lên lịch cho ngày đó rồi.");
         }
 
         OutfitPlan plan = OutfitPlan.builder()
@@ -83,12 +86,24 @@ public class OutfitPlanService {
         String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
         OutfitPlan plan = getPlanById(normalizedOwnerUsername, id);
         Outfit outfit = outfitService.getOutfitById(normalizedOwnerUsername, outfitId);
+        assertOutfitUsable(outfit);
 
         plan.setPlanDate(requirePlanDate(planDate));
         plan.setNote(normalizeNote(note));
         plan.setOutfit(outfit);
 
         return outfitPlanRepository.save(plan);
+    }
+
+    /** Không cho lên lịch một bộ đang thiếu món — tới ngày đó cũng không mặc được. */
+    private void assertOutfitUsable(Outfit outfit) {
+        if (!OutfitService.isAvailable(outfit)) {
+            throw new BusinessRuleException(
+                    ErrorCode.OUTFIT_INCOMPLETE,
+                    "Outfit \"" + outfit.getName() + "\" đang thiếu món do có món đã bị ẩn, "
+                            + "chưa lên lịch được. Hãy sửa outfit và thay bằng món khác."
+            );
+        }
     }
 
     @Transactional

@@ -8,7 +8,9 @@ import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.exception.AuthenticationFailedException;
+import org.group7.wearwise.exception.BusinessRuleException;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
+import org.group7.wearwise.exception.ErrorCode;
 import org.group7.wearwise.exception.OutfitNotFoundException;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
@@ -139,6 +141,10 @@ public class OutfitService {
         LocalDateTime wornAt = LocalDateTime.now();
         LocalDate today = wornAt.toLocalDate();
 
+        // Bộ thiếu món (do món bị ẩn) thì chặn sớm bằng thông báo nói rõ phải thay món nào,
+        // thay vì để assertWearable báo lỗi về một món lẻ.
+        assertComplete(outfit);
+
         // Không mặc được nguyên bộ nếu có món đang giặt / hỏng / chưa dùng được.
         outfit.getClothingItems().forEach(ClothingItemService::assertWearable);
 
@@ -217,6 +223,8 @@ public class OutfitService {
 
         return findOutfits(ownerUsername, null, null, null, null)
                 .stream()
+                // Bộ đang thiếu món thì không gợi ý — có gợi ý cũng không mặc được.
+                .filter(OutfitService::isAvailable)
                 .map(outfit -> scoreOutfit(outfit, cold, hot, raining))
                 .sorted(Comparator
                         .comparingInt(OutfitSuggestion::score).reversed()
@@ -298,29 +306,65 @@ public class OutfitService {
         outfitRepository.delete(outfit);
     }
 
+    /**
+     * Outfit chỉ khả dụng khi mọi món trong bộ còn nằm trong tủ đồ. Món bị ẩn không xóa outfit
+     * mà làm bộ "không hoàn chỉnh" — người dùng vào sửa, thay bằng món khác là dùng lại được.
+     */
+    public static boolean isAvailable(Outfit outfit) {
+        return outfit.getClothingItems().stream().noneMatch(item -> item.getArchivedAt() != null);
+    }
+
+    private void assertComplete(Outfit outfit) {
+        List<String> archived = outfit.getClothingItems().stream()
+                .filter(item -> item.getArchivedAt() != null)
+                .map(ClothingItem::getName)
+                .toList();
+
+        if (!archived.isEmpty()) {
+            throw new BusinessRuleException(
+                    ErrorCode.OUTFIT_INCOMPLETE,
+                    "Outfit \"" + outfit.getName() + "\" đang thiếu món vì " + String.join(", ", archived)
+                            + " đã bị ẩn. Hãy sửa outfit và thay bằng món khác đang có trong tủ."
+            );
+        }
+    }
+
     private Set<ClothingItem> resolveClothingItems(String ownerUsername, List<Long> clothingItemIds) {
         if (clothingItemIds == null || clothingItemIds.isEmpty()) {
-            throw new IllegalArgumentException("At least one clothing item is required.");
+            throw new BusinessRuleException(
+                    ErrorCode.OUTFIT_NEEDS_ITEM, "Outfit phải có ít nhất một món đồ.");
         }
 
         if (clothingItemIds.stream().anyMatch(id -> id == null || id <= 0)) {
-            throw new IllegalArgumentException("Clothing item IDs must be positive.");
+            throw new IllegalArgumentException("Mã món đồ không hợp lệ.");
         }
 
         LinkedHashSet<Long> uniqueIds = new LinkedHashSet<>(clothingItemIds);
         if (uniqueIds.size() != clothingItemIds.size()) {
-            throw new IllegalArgumentException("Clothing item IDs must not contain duplicates.");
+            throw new IllegalArgumentException("Danh sách món đồ bị trùng lặp.");
         }
 
         LinkedHashSet<ClothingItem> resolvedItems = new LinkedHashSet<>();
         java.util.EnumMap<ClothingCategory, ClothingItem> byCategory = new java.util.EnumMap<>(ClothingCategory.class);
         for (Long clothingItemId : uniqueIds) {
             ClothingItem item = getClothingItemById(ownerUsername, clothingItemId);
+
+            // Không cho ghép món đã ẩn vào bộ: đó chính là thứ đang làm outfit không khả dụng.
+            if (item.getArchivedAt() != null) {
+                throw new BusinessRuleException(
+                        ErrorCode.CLOTHING_ITEM_ARCHIVED,
+                        "\"" + item.getName() + "\" đã bị ẩn khỏi tủ đồ nên không thêm vào outfit được. "
+                                + "Hãy khôi phục món này hoặc chọn món khác."
+                );
+            }
+
             // Mỗi outfit chỉ 1 món cho mỗi loại (1 áo, 1 quần, 1 giày, ...).
             if (byCategory.putIfAbsent(item.getCategory(), item) != null) {
-                throw new IllegalArgumentException(
+                throw new BusinessRuleException(
+                        ErrorCode.DUPLICATE_CATEGORY_IN_OUTFIT,
                         "Mỗi outfit chỉ được chọn 1 " + categoryLabel(item.getCategory())
-                                + ". Hãy bỏ bớt món trùng loại.");
+                                + ". Hãy bỏ bớt món trùng loại."
+                );
             }
             resolvedItems.add(item);
         }

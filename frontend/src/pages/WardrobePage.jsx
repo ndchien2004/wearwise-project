@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import * as itemsApi from '../api/clothingItems';
 import * as tryOnApi from '../api/tryOn';
 import ItemCard from '../components/ItemCard';
@@ -7,12 +7,15 @@ import ItemFormModal from '../components/ItemFormModal';
 import { Button, EmptyState, ErrorBanner, Field, Loading, Pagination, Toast } from '../components/ui';
 import { useConfirm } from '../context/ConfirmContext';
 import {
+  CATEGORY_COLORS,
+  CATEGORY_EMOJIS,
   CATEGORY_LABELS,
   CONDITION_LABELS,
   SEASON_LABELS,
   STATUS_LABELS,
   STYLE_LABELS,
   TONE_LABELS,
+  label,
 } from '../utils/labels';
 
 const EMPTY_FILTERS = {
@@ -36,6 +39,8 @@ export default function WardrobePage() {
   const [triedIds, setTriedIds] = useState(() => new Set());
   const [modal, setModal] = useState(null); // null | { item?: object }
   const [page, setPage] = useState(0);
+  const [archived, setArchived] = useState([]);
+  const [showArchived, setShowArchived] = useState(false);
 
   const PER_PAGE = 12; // 4 cột x 3 dòng
 
@@ -54,6 +59,19 @@ export default function WardrobePage() {
       setError(err.message);
     }
   }, []);
+
+  // Món đã ẩn nằm ở danh sách riêng, không trộn vào tủ đồ đang dùng.
+  const loadArchived = useCallback(async () => {
+    try {
+      setArchived(await itemsApi.getArchivedItems());
+    } catch {
+      setArchived([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadArchived();
+  }, [loadArchived]);
 
   useEffect(() => {
     const timer = setTimeout(() => load(filters), filters.keyword ? 300 : 0);
@@ -104,6 +122,11 @@ export default function WardrobePage() {
     toastOk(editing ? `Đã cập nhật "${payload.name}"! ✏️` : `Đã thêm "${payload.name}" vào tủ đồ! 🎉`);
   };
 
+  /**
+     * Xóa cứng trước; nếu server chặn vì món còn nằm trong outfit hoặc đã có lịch sử mặc
+     * (mã CLOTHING_ITEM_IN_USE) thì mời người dùng ẩn thay vì xóa. Không hỏi trước "xóa hay ẩn"
+     * vì phần lớn món mới thêm nhầm vẫn xóa được hẳn — hỏi sẽ thành thừa một bước.
+     */
   const handleDelete = async (item) => {
     const ok = await confirm({
       title: 'Xóa món đồ?',
@@ -112,10 +135,46 @@ export default function WardrobePage() {
       danger: true,
     });
     if (!ok) return;
+
     try {
       await itemsApi.deleteItem(item.id);
       await load(filters);
       toastOk(`Đã xóa "${item.name}" khỏi tủ đồ. 🗑️`);
+      return;
+    } catch (err) {
+      if (err.code !== 'CLOTHING_ITEM_IN_USE') {
+        toastErr(err.message);
+        return;
+      }
+
+      const outfitCount = Number(err.details?.outfitCount ?? 0);
+      const archiveOk = await confirm({
+        title: 'Ẩn món đồ thay vì xóa?',
+        message:
+          `${err.message}\n\n` +
+          (outfitCount > 0
+            ? `${outfitCount} outfit chứa món này sẽ chuyển sang mục "Không khả dụng" cho tới khi bạn thay bằng món khác.`
+            : 'Món sẽ biến khỏi tủ đồ và thống kê, nhưng lịch sử mặc vẫn được giữ nguyên.'),
+        confirmLabel: '🙈 Ẩn món đồ',
+      });
+      if (!archiveOk) return;
+
+      try {
+        await itemsApi.archiveItem(item.id);
+        await load(filters);
+        toastOk(`Đã ẩn "${item.name}". Xem lại ở mục Đã ẩn.`);
+      } catch (archiveError) {
+        toastErr(archiveError.message);
+      }
+    }
+  };
+
+  const handleRestore = async (item) => {
+    try {
+      await itemsApi.restoreItem(item.id);
+      await loadArchived();
+      await load(filters);
+      toastOk(`Đã khôi phục "${item.name}" về tủ đồ.`);
     } catch (err) {
       toastErr(err.message);
     }
@@ -239,6 +298,52 @@ export default function WardrobePage() {
             </>
           );
         })()
+      )}
+
+      {archived.length > 0 && (
+        <div className="archived-section">
+          <button
+            type="button"
+            className="archived-toggle"
+            onClick={() => setShowArchived((v) => !v)}
+            aria-expanded={showArchived}
+          >
+            {showArchived ? '▾' : '▸'} 🙈 Đã ẩn ({archived.length})
+            <span className="archived-toggle-hint">
+              Món không xóa được vì còn nằm trong outfit hoặc đã có lịch sử mặc.
+            </span>
+          </button>
+
+          {showArchived && (
+            <div className="archived-list">
+              {archived.map((item) => (
+                <div key={item.id} className="archived-row">
+                  {item.imageUrl ? (
+                    <img className="outfit-item-thumb" src={item.imageUrl} alt={item.name} />
+                  ) : (
+                    <span
+                      className="outfit-item-thumb outfit-item-thumb--emoji"
+                      style={{ background: CATEGORY_COLORS[item.category] || 'var(--yellow)' }}
+                    >
+                      {CATEGORY_EMOJIS[item.category] || '👗'}
+                    </span>
+                  )}
+                  <div className="archived-row-main">
+                    <Link className="archived-row-name" to={`/wardrobe/${item.id}`}>
+                      {item.name}
+                    </Link>
+                    <div className="archived-row-meta">
+                      {label(CATEGORY_LABELS, item.category)} · 👣 {item.wearCount ?? 0} lượt mặc
+                    </div>
+                  </div>
+                  <Button size="sm" variant="green" onClick={() => handleRestore(item)}>
+                    ↩️ Khôi phục
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {modal && <ItemFormModal item={modal.item} onSave={handleSave} onClose={() => setModal(null)} />}

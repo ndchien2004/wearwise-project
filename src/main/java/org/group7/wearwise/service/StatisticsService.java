@@ -32,8 +32,8 @@ public class StatisticsService {
     @Transactional(readOnly = true)
     public StatisticsResponse getStatistics(String ownerUsername) {
         return new StatisticsResponse(
-                clothingItemRepository.countByOwner_Username(ownerUsername),
-                clothingItemRepository.countByOwner_UsernameAndFavoriteTrue(ownerUsername),
+                clothingItemRepository.countByOwner_UsernameAndArchivedAtIsNull(ownerUsername),
+                clothingItemRepository.countByOwner_UsernameAndArchivedAtIsNullAndFavoriteTrue(ownerUsername),
                 outfitRepository.countByOwner_Username(ownerUsername),
                 outfitRepository.countByOwner_UsernameAndFavoriteTrue(ownerUsername),
                 clothingItemRepository.sumWearCountByOwnerUsername(ownerUsername),
@@ -42,7 +42,7 @@ public class StatisticsService {
                 groupedCounts(Season.class, clothingItemRepository.countGroupedBySeason(ownerUsername)),
                 groupedCounts(ClothingCondition.class, clothingItemRepository.countGroupedByCondition(ownerUsername)),
                 groupedCounts(ClothingStatus.class, clothingItemRepository.countGroupedByStatus(ownerUsername)),
-                clothingItemRepository.findTop5ByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(ownerUsername, 0)
+                clothingItemRepository.findTop5ByOwner_UsernameAndArchivedAtIsNullAndWearCountGreaterThanOrderByWearCountDescIdAsc(ownerUsername, 0)
                         .stream()
                         .map(ClothingItemResponse::from)
                         .toList()

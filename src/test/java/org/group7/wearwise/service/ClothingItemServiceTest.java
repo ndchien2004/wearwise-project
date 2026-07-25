@@ -7,7 +7,9 @@ import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.exception.BusinessRuleException;
 import org.group7.wearwise.exception.ClothingItemInUseException;
+import org.group7.wearwise.exception.ErrorCode;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
@@ -109,7 +111,7 @@ class ClothingItemServiceTest {
                 false,
                 null
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Name is required.");
+                .hasMessageContaining("required");
     }
 
     @Test
@@ -118,7 +120,7 @@ class ClothingItemServiceTest {
 
         assertThatThrownBy(() -> clothingItemService.getItemById(OWNER, 99L))
                 .isInstanceOf(ClothingItemNotFoundException.class)
-                .hasMessage("Clothing item not found with id: 99");
+                .hasMessageContaining("99");
     }
 
     @Test
@@ -185,8 +187,10 @@ class ClothingItemServiceTest {
         when(clothingItemRepository.findByIdAndOwner_Username(1L, OWNER)).thenReturn(Optional.of(item));
 
         assertThatThrownBy(() -> clothingItemService.markAsWorn(OWNER, 1L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("đang giặt");
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("đang giặt")
+                .extracting(e -> ((BusinessRuleException) e).getErrorCode())
+                .isEqualTo(ErrorCode.ITEM_NOT_WEARABLE);
         verify(clothingItemRepository, never()).save(any(ClothingItem.class));
     }
 
@@ -204,8 +208,10 @@ class ClothingItemServiceTest {
         when(clothingItemRepository.findByIdAndOwner_Username(2L, OWNER)).thenReturn(Optional.of(item));
 
         assertThatThrownBy(() -> clothingItemService.markAsWorn(OWNER, 2L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("hư hỏng");
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("hư hỏng")
+                .extracting(e -> ((BusinessRuleException) e).getErrorCode())
+                .isEqualTo(ErrorCode.ITEM_NOT_WEARABLE);
         verify(clothingItemRepository, never()).save(any(ClothingItem.class));
     }
 
@@ -280,14 +286,14 @@ class ClothingItemServiceTest {
     void getRecentlyWornItemsUsesRequestedLimit() {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         ClothingItem item = ClothingItem.builder().id(3L).name("White Shirt").build();
-        when(clothingItemRepository.findByOwner_UsernameAndLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(eq(OWNER), any(Pageable.class)))
+        when(clothingItemRepository.findByOwner_UsernameAndArchivedAtIsNullAndLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(eq(OWNER), any(Pageable.class)))
                 .thenReturn(List.of(item));
 
         List<ClothingItem> items = clothingItemService.getRecentlyWornItems(OWNER, 3);
 
         assertThat(items).containsExactly(item);
         verify(clothingItemRepository)
-                .findByOwner_UsernameAndLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(eq(OWNER), pageableCaptor.capture());
+                .findByOwner_UsernameAndArchivedAtIsNullAndLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(eq(OWNER), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getPageNumber()).isZero();
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(3);
     }
@@ -295,26 +301,26 @@ class ClothingItemServiceTest {
     @Test
     void getMostWornItemsOnlyRequestsItemsWithPositiveWearCount() {
         ClothingItem item = ClothingItem.builder().id(4L).name("Running Shoes").wearCount(9).build();
-        when(clothingItemRepository.findByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(eq(OWNER), eq(0), any(Pageable.class)))
+        when(clothingItemRepository.findByOwner_UsernameAndArchivedAtIsNullAndWearCountGreaterThanOrderByWearCountDescIdAsc(eq(OWNER), eq(0), any(Pageable.class)))
                 .thenReturn(List.of(item));
 
         List<ClothingItem> items = clothingItemService.getMostWornItems(OWNER, 2);
 
         assertThat(items).containsExactly(item);
-        verify(clothingItemRepository).findByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(eq(OWNER), eq(0), any(Pageable.class));
+        verify(clothingItemRepository).findByOwner_UsernameAndArchivedAtIsNullAndWearCountGreaterThanOrderByWearCountDescIdAsc(eq(OWNER), eq(0), any(Pageable.class));
     }
 
     @Test
     void getLeastWornItemsUsesDefaultLimitWhenLimitIsNull() {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         ClothingItem item = ClothingItem.builder().id(5L).name("Rain Jacket").wearCount(0).build();
-        when(clothingItemRepository.findByOwner_UsernameOrderByWearCountAscIdAsc(eq(OWNER), any(Pageable.class)))
+        when(clothingItemRepository.findByOwner_UsernameAndArchivedAtIsNullOrderByWearCountAscIdAsc(eq(OWNER), any(Pageable.class)))
                 .thenReturn(List.of(item));
 
         List<ClothingItem> items = clothingItemService.getLeastWornItems(OWNER, null);
 
         assertThat(items).containsExactly(item);
-        verify(clothingItemRepository).findByOwner_UsernameOrderByWearCountAscIdAsc(eq(OWNER), pageableCaptor.capture());
+        verify(clothingItemRepository).findByOwner_UsernameAndArchivedAtIsNullOrderByWearCountAscIdAsc(eq(OWNER), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(5);
     }
 
@@ -350,13 +356,80 @@ class ClothingItemServiceTest {
     }
 
     @Test
-    void deleteItemRejectsItemUsedByOutfit() {
-        ClothingItem item = ClothingItem.builder().id(7L).name("Jacket").build();
+    void deleteItemRejectsItemUsedByOutfitAndNamesTheOutfits() {
+        ClothingItem item = ClothingItem.builder().id(7L).name("Jacket").wearCount(0).build();
         when(clothingItemRepository.findByIdAndOwner_Username(7L, OWNER)).thenReturn(Optional.of(item));
-        when(outfitRepository.existsByOwner_UsernameAndClothingItems_Id(OWNER, 7L)).thenReturn(true);
+        when(outfitRepository.findByOwner_UsernameAndClothingItems_Id(OWNER, 7L))
+                .thenReturn(List.of(outfit("Bộ đi chơi"), outfit("Bộ đi làm")));
 
         assertThatThrownBy(() -> clothingItemService.deleteItem(OWNER, 7L))
                 .isInstanceOf(ClothingItemInUseException.class)
-                .hasMessageContaining("7");
+                .hasMessageContaining("Bộ đi chơi")
+                .hasMessageContaining("Bộ đi làm");
+
+        verify(clothingItemRepository, never()).delete(any(ClothingItem.class));
+    }
+
+    /** Lịch sử mặc cũng là lý do chặn xóa cứng, dù món không thuộc outfit nào. */
+    @Test
+    void deleteItemRejectsItemThatHasBeenWorn() {
+        ClothingItem item = ClothingItem.builder().id(8L).name("Áo cũ").wearCount(12).build();
+        when(clothingItemRepository.findByIdAndOwner_Username(8L, OWNER)).thenReturn(Optional.of(item));
+        when(outfitRepository.findByOwner_UsernameAndClothingItems_Id(OWNER, 8L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> clothingItemService.deleteItem(OWNER, 8L))
+                .isInstanceOf(ClothingItemInUseException.class)
+                .hasMessageContaining("12 lượt mặc");
+    }
+
+    @Test
+    void deleteItemAllowsHardDeleteWhenNothingReferencesIt() {
+        ClothingItem item = ClothingItem.builder().id(9L).name("Món mới").wearCount(0).build();
+        when(clothingItemRepository.findByIdAndOwner_Username(9L, OWNER)).thenReturn(Optional.of(item));
+        when(outfitRepository.findByOwner_UsernameAndClothingItems_Id(OWNER, 9L)).thenReturn(List.of());
+
+        clothingItemService.deleteItem(OWNER, 9L);
+
+        verify(shareRepository).deleteByClothingItem_Id(9L);
+        verify(clothingItemRepository).delete(item);
+    }
+
+    @Test
+    void archiveAndRestoreFlipTheArchivedMarker() {
+        ClothingItem item = ClothingItem.builder().id(10L).name("Áo ẩn").wearCount(3).build();
+        when(clothingItemRepository.findByIdAndOwner_Username(10L, OWNER)).thenReturn(Optional.of(item));
+        when(clothingItemRepository.save(any(ClothingItem.class))).thenAnswer(call -> call.getArgument(0));
+
+        assertThat(clothingItemService.archiveItem(OWNER, 10L).getArchivedAt()).isNotNull();
+        // Ẩn rồi ẩn lại không đổi mốc thời gian đã ghi.
+        LocalDateTime firstArchivedAt = item.getArchivedAt();
+        assertThat(clothingItemService.archiveItem(OWNER, 10L).getArchivedAt()).isEqualTo(firstArchivedAt);
+
+        assertThat(clothingItemService.restoreItem(OWNER, 10L).getArchivedAt()).isNull();
+    }
+
+    /** Món đã ẩn thì không mặc được — nếu không, thống kê sẽ nhận lượt mặc của món không còn trong tủ. */
+    @Test
+    void markAsWornRejectsArchivedItem() {
+        ClothingItem item = ClothingItem.builder()
+                .id(11L)
+                .name("Áo đã ẩn")
+                .category(ClothingCategory.SHIRT)
+                .season(Season.SUMMER)
+                .style(Style.CASUAL)
+                .condition(ClothingCondition.GOOD)
+                .status(ClothingStatus.AVAILABLE)
+                .archivedAt(LocalDateTime.now())
+                .build();
+        when(clothingItemRepository.findByIdAndOwner_Username(11L, OWNER)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> clothingItemService.markAsWorn(OWNER, 11L))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting(e -> ((BusinessRuleException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CLOTHING_ITEM_ARCHIVED);
+    }
+
+    private static org.group7.wearwise.entity.Outfit outfit(String name) {
+        return org.group7.wearwise.entity.Outfit.builder().name(name).build();
     }
 }

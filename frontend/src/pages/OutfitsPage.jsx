@@ -141,8 +141,13 @@ export default function OutfitsPage() {
           Chưa có outfit nào. Hãy phối những món đồ trong tủ thành một bộ hoàn chỉnh!
         </EmptyState>
       ) : (
-        <div className="card-grid">
-          {outfits.map((outfit) => (
+        (() => {
+          // Bộ thiếu món (do có món bị ẩn) tách xuống dưới thay vì biến mất — người dùng phải
+          // thấy được nó để vào sửa, đó là cách duy nhất đưa bộ về trạng thái dùng lại được.
+          const usable = outfits.filter((o) => o.available !== false);
+          const broken = outfits.filter((o) => o.available === false);
+
+          const renderCard = (outfit) => (
             <OutfitCard
               key={outfit.id}
               outfit={outfit}
@@ -153,8 +158,31 @@ export default function OutfitsPage() {
               onToggleFavorite={handleToggleFavorite}
               onWear={handleWear}
             />
-          ))}
-        </div>
+          );
+
+          return (
+            <>
+              {usable.length > 0 ? (
+                <div className="card-grid">{usable.map(renderCard)}</div>
+              ) : (
+                <EmptyState emoji="🧢">
+                  Mọi outfit đang thiếu món. Hãy sửa các bộ bên dưới hoặc khôi phục món đã ẩn.
+                </EmptyState>
+              )}
+
+              {broken.length > 0 && (
+                <div className="unavailable-section">
+                  <h2 className="unavailable-title">⚠️ Không khả dụng ({broken.length})</h2>
+                  <p className="unavailable-note">
+                    Các bộ này có món đã bị ẩn khỏi tủ đồ nên chưa mặc hay lên lịch được. Bấm
+                    <strong> ✏️ Sửa</strong> rồi thay bằng món đang có để dùng lại.
+                  </p>
+                  <div className="card-grid">{broken.map(renderCard)}</div>
+                </div>
+              )}
+            </>
+          );
+        })()
       )}
 
       {modal && (

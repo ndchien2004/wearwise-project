@@ -42,10 +42,17 @@ export function clearSession() {
 }
 
 export class ApiError extends Error {
-  constructor(status, message, fieldErrors = {}) {
+  /**
+   * @param code    mã lỗi ổn định từ server (vd 'CLOTHING_ITEM_IN_USE') — hãy rẽ nhánh theo mã
+   *                này thay vì so khớp `message`, vì lời văn có thể đổi bất cứ lúc nào.
+   * @param details thông tin phụ đi kèm mã lỗi, vd số outfit đang dùng món đồ không xóa được.
+   */
+  constructor(status, message, fieldErrors = {}, code = null, details = {}) {
     super(message);
     this.status = status;
     this.fieldErrors = fieldErrors;
+    this.code = code;
+    this.details = details;
   }
 }
 
@@ -110,7 +117,7 @@ async function handleResponse(response, auth) {
 
   if (!response.ok) {
     const message = data?.message || `Yêu cầu thất bại (HTTP ${response.status}).`;
-    throw new ApiError(response.status, message, data?.errors || {});
+    throw new ApiError(response.status, message, data?.errors || {}, data?.code || null, data?.details || {});
   }
 
   return data;

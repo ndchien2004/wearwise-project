@@ -12,6 +12,7 @@ import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.ShareTargetType;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.exception.BusinessRuleException;
 import org.group7.wearwise.exception.ShareNotFoundException;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
@@ -107,7 +108,7 @@ class ShareServiceTest {
     void importOutfitCopiesEveryItemWithCountersResetAndLeavesTheOriginalAlone() {
         Outfit source = outfit();
         when(shareRepository.findByCode("ABCD2345")).thenReturn(Optional.of(share(source, "ABCD2345")));
-        when(clothingItemRepository.findByOwner_UsernameAndNameIgnoreCaseAndCategory(any(), any(), any()))
+        when(clothingItemRepository.findByOwner_UsernameAndNameIgnoreCaseAndCategoryAndArchivedAtIsNull(any(), any(), any()))
                 .thenReturn(List.of());
 
         ShareImportResponse response = shareService.importShare(IMPORTER, "ABCD2345");
@@ -150,9 +151,9 @@ class ShareServiceTest {
                 .build();
 
         when(shareRepository.findByCode("ABCD2345")).thenReturn(Optional.of(share(source, "ABCD2345")));
-        when(clothingItemRepository.findByOwner_UsernameAndNameIgnoreCaseAndCategory(
+        when(clothingItemRepository.findByOwner_UsernameAndNameIgnoreCaseAndCategoryAndArchivedAtIsNull(
                 IMPORTER, "Áo thun trắng", ClothingCategory.SHIRT)).thenReturn(List.of(alreadyOwned));
-        when(clothingItemRepository.findByOwner_UsernameAndNameIgnoreCaseAndCategory(
+        when(clothingItemRepository.findByOwner_UsernameAndNameIgnoreCaseAndCategoryAndArchivedAtIsNull(
                 IMPORTER, "Quần jean", ClothingCategory.PANTS)).thenReturn(List.of());
 
         ShareImportResponse response = shareService.importShare(IMPORTER, "ABCD2345");
@@ -166,7 +167,7 @@ class ShareServiceTest {
     void importCountsHowManyPeopleCopiedTheShare() {
         Share share = share(outfit(), "ABCD2345");
         when(shareRepository.findByCode("ABCD2345")).thenReturn(Optional.of(share));
-        when(clothingItemRepository.findByOwner_UsernameAndNameIgnoreCaseAndCategory(any(), any(), any()))
+        when(clothingItemRepository.findByOwner_UsernameAndNameIgnoreCaseAndCategoryAndArchivedAtIsNull(any(), any(), any()))
                 .thenReturn(List.of());
 
         shareService.importShare(IMPORTER, "ABCD2345");
@@ -179,7 +180,7 @@ class ShareServiceTest {
         when(shareRepository.findByCode("ABCD2345")).thenReturn(Optional.of(share(outfit(), "ABCD2345")));
 
         assertThatThrownBy(() -> shareService.importShare(OWNER, "ABCD2345"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("của chính bạn");
     }
 

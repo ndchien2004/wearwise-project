@@ -85,14 +85,32 @@ class StatisticsIntegrationTest {
         assertThat(response.topWornItems()).extracting(item -> item.name())
                 .containsExactly("Item 1", "Item 2", "Item 3", "Item 4", "Item 5");
 
+        // Món đang nằm trong outfit thì không xóa cứng được.
         Long usedItemId = items.get(0).getId();
         assertThatThrownBy(() -> clothingItemService.deleteItem(OWNER, usedItemId))
                 .isInstanceOf(ClothingItemInUseException.class);
 
+        // Gỡ outfit ra vẫn chưa đủ: món đã có lịch sử mặc nên xóa cứng sẽ mất dữ liệu thống kê.
         outfitRepository.delete(outfit);
         outfitRepository.flush();
-        clothingItemService.deleteItem(OWNER, usedItemId);
-        assertThat(clothingItemRepository.existsById(usedItemId)).isFalse();
+        assertThatThrownBy(() -> clothingItemService.deleteItem(OWNER, usedItemId))
+                .isInstanceOf(ClothingItemInUseException.class)
+                .hasMessageContaining("lượt mặc");
+
+        // Đường đi đúng cho trường hợp này là ẩn — dữ liệu còn nguyên, chỉ biến khỏi thống kê.
+        clothingItemService.archiveItem(OWNER, usedItemId);
+        assertThat(clothingItemRepository.existsById(usedItemId)).isTrue();
+        assertThat(statisticsService.getStatistics(OWNER).totalClothingItems()).isEqualTo(5);
+
+        clothingItemService.restoreItem(OWNER, usedItemId);
+        assertThat(statisticsService.getStatistics(OWNER).totalClothingItems()).isEqualTo(6);
+
+        // Món chưa từng mặc và không thuộc outfit nào thì vẫn xóa cứng được như thường.
+        Long neverWornId = clothingItemRepository
+                .save(item(owner, "Chưa mặc bao giờ", ClothingCategory.SHOES, 0, false))
+                .getId();
+        clothingItemService.deleteItem(OWNER, neverWornId);
+        assertThat(clothingItemRepository.existsById(neverWornId)).isFalse();
     }
 
     private static ClothingItem item(

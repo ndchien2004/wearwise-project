@@ -31,6 +31,23 @@ export function deleteItem(id) {
   return apiFetch(`/api/clothing-items/${id}`, { method: 'DELETE' });
 }
 
+/** Ẩn món đồ (xóa mềm) — dùng khi xóa cứng bị chặn vì món còn được tham chiếu. */
+export function archiveItem(id) {
+  return apiFetch(`/api/clothing-items/${id}/archive`, { method: 'PATCH' });
+}
+
+export function restoreItem(id) {
+  return apiFetch(`/api/clothing-items/${id}/restore`, { method: 'PATCH' });
+}
+
+export function getArchivedItems() {
+  return apiFetch('/api/clothing-items/archived');
+}
+
+export function getOutfitsUsingItem(id) {
+  return apiFetch(`/api/clothing-items/${id}/outfits`);
+}
+
 export function setItemFavorite(id, favorite) {
   return apiFetch(`/api/clothing-items/${id}/favorite`, { method: 'PATCH', body: { favorite } });
 }

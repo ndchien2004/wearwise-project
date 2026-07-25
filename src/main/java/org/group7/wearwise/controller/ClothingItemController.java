@@ -5,6 +5,7 @@ import org.group7.wearwise.dto.request.ClothingItemRequest;
 import org.group7.wearwise.dto.request.FavoriteRequest;
 import org.group7.wearwise.dto.response.ClothingItemOptionsResponse;
 import org.group7.wearwise.dto.response.ClothingItemResponse;
+import org.group7.wearwise.dto.response.OutfitResponse;
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
@@ -155,6 +156,35 @@ public class ClothingItemController {
     @PatchMapping("/{id}/wear")
     public ClothingItemResponse markAsWorn(Authentication authentication, @PathVariable Long id) {
         return ClothingItemResponse.from(clothingItemService.markAsWorn(authentication.getName(), id));
+    }
+
+    /** Danh sách món đã ẩn — mục "Không khả dụng" của tủ đồ. */
+    @GetMapping("/archived")
+    public List<ClothingItemResponse> getArchivedItems(Authentication authentication) {
+        return clothingItemService.getArchivedItems(authentication.getName())
+                .stream()
+                .map(ClothingItemResponse::from)
+                .toList();
+    }
+
+    /** Ẩn món đồ (xóa mềm) khi không xóa cứng được vì đang nằm trong outfit / đã có lịch sử mặc. */
+    @PatchMapping("/{id}/archive")
+    public ClothingItemResponse archiveItem(Authentication authentication, @PathVariable Long id) {
+        return ClothingItemResponse.from(clothingItemService.archiveItem(authentication.getName(), id));
+    }
+
+    @PatchMapping("/{id}/restore")
+    public ClothingItemResponse restoreItem(Authentication authentication, @PathVariable Long id) {
+        return ClothingItemResponse.from(clothingItemService.restoreItem(authentication.getName(), id));
+    }
+
+    /** Outfit đang dùng món này — giao diện hiện danh sách trước khi người dùng xác nhận ẩn. */
+    @GetMapping("/{id}/outfits")
+    public List<OutfitResponse> getOutfitsUsingItem(Authentication authentication, @PathVariable Long id) {
+        return clothingItemService.findOutfitsUsing(authentication.getName(), id)
+                .stream()
+                .map(OutfitResponse::from)
+                .toList();
     }
 
     @DeleteMapping("/{id}")

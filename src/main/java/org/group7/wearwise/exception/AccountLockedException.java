@@ -1,12 +1,12 @@
 package org.group7.wearwise.exception;
 
 /** Tài khoản bị khóa tạm thời vì nhập sai mật khẩu quá nhiều lần. */
-public class AccountLockedException extends RuntimeException {
+public class AccountLockedException extends AppException {
 
     private final long retryAfterSeconds;
 
     public AccountLockedException(long retryAfterSeconds) {
-        super(buildMessage(retryAfterSeconds));
+        super(ErrorCode.ACCOUNT_LOCKED, buildMessage(retryAfterSeconds));
         this.retryAfterSeconds = retryAfterSeconds;
     }
 

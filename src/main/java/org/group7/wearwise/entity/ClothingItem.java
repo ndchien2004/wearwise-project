@@ -73,6 +73,14 @@ public class ClothingItem {
     @JoinColumn(name = "owner_id")
     private AppUser owner;
 
+    /**
+     * Khác NULL nghĩa là món đồ đã bị ẩn (xóa mềm): không hiện trong tủ đồ, không được chọn
+     * vào outfit mới, không tính vào thống kê — nhưng vẫn giữ nguyên lịch sử mặc và mọi outfit
+     * cũ vẫn trỏ tới nó. Dùng khi không xóa cứng được vì ràng buộc dữ liệu.
+     */
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

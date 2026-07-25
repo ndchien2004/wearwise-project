@@ -25,10 +25,19 @@ public final class ClothingItemSpecifications {
             ClothingCondition condition,
             ClothingStatus status,
             Boolean favorite,
-            ColorTone colorTone
+            ColorTone colorTone,
+            boolean archivedOnly
     ) {
         return (root, query, criteriaBuilder) -> {
             var predicate = criteriaBuilder.equal(root.get("owner").get("username"), ownerUsername);
+
+            // Món đã ẩn tách hẳn thành một danh sách riêng, không bao giờ trộn vào tủ đồ đang dùng.
+            predicate = criteriaBuilder.and(
+                    predicate,
+                    archivedOnly
+                            ? criteriaBuilder.isNotNull(root.get("archivedAt"))
+                            : criteriaBuilder.isNull(root.get("archivedAt"))
+            );
 
             if (keyword != null && !keyword.trim().isBlank()) {
                 String normalizedKeyword = keyword.trim().toLowerCase(Locale.ROOT);

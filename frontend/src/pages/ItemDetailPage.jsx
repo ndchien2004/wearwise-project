@@ -166,8 +166,44 @@ export default function ItemDetailPage() {
     try {
       await itemsApi.deleteItem(item.id);
       navigate('/wardrobe');
+      return;
+    } catch (err) {
+      setBusy(false);
+      if (err.code !== 'CLOTHING_ITEM_IN_USE') {
+        setError(err.message);
+        return;
+      }
+
+      // Xóa cứng bị chặn — mời ẩn, đường đi giữ được cả outfit lẫn lịch sử mặc.
+      const archiveOk = await confirm({
+        title: 'Ẩn món đồ thay vì xóa?',
+        message: `${err.message}\n\nMón sẽ biến khỏi tủ đồ và thống kê nhưng vẫn khôi phục lại được bất cứ lúc nào.`,
+        confirmLabel: '🙈 Ẩn món đồ',
+      });
+      if (archiveOk) await handleArchive();
+    }
+  };
+
+  const handleArchive = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setItem(await itemsApi.archiveItem(item.id));
     } catch (err) {
       setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setItem(await itemsApi.restoreItem(item.id));
+    } catch (err) {
+      setError(err.message);
+    } finally {
       setBusy(false);
     }
   };
@@ -211,8 +247,15 @@ export default function ItemDetailPage() {
           </h1>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Button variant="blue" onClick={() => setSharing(true)}>🔗 Chia sẻ</Button>
-          <Button onClick={() => setEditing(true)}>✏️ Sửa</Button>
+          {item.archived ? (
+            <Button variant="green" onClick={handleRestore} disabled={busy}>↩️ Khôi phục</Button>
+          ) : (
+            <>
+              <Button variant="blue" onClick={() => setSharing(true)}>🔗 Chia sẻ</Button>
+              <Button onClick={() => setEditing(true)}>✏️ Sửa</Button>
+              <Button onClick={handleArchive} disabled={busy}>🙈 Ẩn</Button>
+            </>
+          )}
           <Button variant="danger" onClick={handleDelete} disabled={busy}>🗑️ Xóa</Button>
         </div>
       </div>

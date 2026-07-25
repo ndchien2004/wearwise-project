@@ -16,43 +16,27 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler({ClothingItemNotFoundException.class, OutfitNotFoundException.class, OutfitPlanNotFoundException.class, TryOnResultNotFoundException.class, ShareNotFoundException.class})
-    public ResponseEntity<ApiErrorResponse> handleNotFound(RuntimeException exception) {
-        return build(HttpStatus.NOT_FOUND, exception.getMessage(), Map.of());
-    }
+    /**
+     * Một nhánh duy nhất cho mọi lỗi nghiệp vụ: HTTP status lấy từ chính {@link ErrorCode}
+     * nên không thể có chuyện hai chỗ trả status khác nhau cho cùng một loại lỗi.
+     */
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<ApiErrorResponse> handleAppException(AppException exception) {
+        ErrorCode code = exception.getErrorCode();
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(code.getStatus());
 
-    @ExceptionHandler(AuthenticationFailedException.class)
-    public ResponseEntity<ApiErrorResponse> handleAuthenticationFailed(AuthenticationFailedException exception) {
-        return build(HttpStatus.UNAUTHORIZED, exception.getMessage(), Map.of());
-    }
+        // Chuẩn HTTP: 423 kèm Retry-After để client biết chờ bao lâu.
+        if (exception instanceof AccountLockedException locked) {
+            builder.header("Retry-After", String.valueOf(locked.getRetryAfterSeconds()));
+        }
 
-    @ExceptionHandler(AccountLockedException.class)
-    public ResponseEntity<ApiErrorResponse> handleAccountLocked(AccountLockedException exception) {
-        return ResponseEntity.status(HttpStatus.LOCKED)
-                .header("Retry-After", String.valueOf(exception.getRetryAfterSeconds()))
-                .body(ApiErrorResponse.of(HttpStatus.LOCKED.value(), exception.getMessage(), Map.of()));
-    }
-
-    @ExceptionHandler(InvalidPasswordResetTokenException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidPasswordResetToken(
-            InvalidPasswordResetTokenException exception
-    ) {
-        return build(HttpStatus.BAD_REQUEST, exception.getMessage(), Map.of());
-    }
-
-    @ExceptionHandler(ClothingItemInUseException.class)
-    public ResponseEntity<ApiErrorResponse> handleConflict(ClothingItemInUseException exception) {
-        return build(HttpStatus.CONFLICT, exception.getMessage(), Map.of());
-    }
-
-    @ExceptionHandler(TryOnImageException.class)
-    public ResponseEntity<ApiErrorResponse> handleTryOnImage(TryOnImageException exception) {
-        return build(HttpStatus.BAD_REQUEST, exception.getMessage(), Map.of());
-    }
-
-    @ExceptionHandler({TryOnUnavailableException.class, AiUnavailableException.class})
-    public ResponseEntity<ApiErrorResponse> handleServiceUnavailable(RuntimeException exception) {
-        return build(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), Map.of());
+        return builder.body(ApiErrorResponse.of(
+                code.getStatus().value(),
+                code,
+                exception.getMessage(),
+                Map.of(),
+                exception.getDetails()
+        ));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -63,31 +47,32 @@ public class GlobalExceptionHandler {
             errors.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
 
-        return build(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên chưa hợp lệ. Hãy kiểm tra lại các ô đã nhập.", errors);
+        return build(ErrorCode.VALIDATION_FAILED,
+                "Dữ liệu gửi lên chưa hợp lệ. Hãy kiểm tra lại các ô đã nhập.", errors);
     }
 
+    /** Ràng buộc chưa được gắn mã riêng — vẫn trả về 400 kèm mã chung để client không phải đoán. */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException exception) {
-        return build(HttpStatus.BAD_REQUEST, exception.getMessage(), Map.of());
+        return build(ErrorCode.INVALID_REQUEST, exception.getMessage(), Map.of());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
-        String message = "Giá trị không hợp lệ cho tham số: " + exception.getName();
-        return build(HttpStatus.BAD_REQUEST, message, Map.of(exception.getName(), "Giá trị không được hỗ trợ."));
+        return build(
+                ErrorCode.INVALID_PARAMETER,
+                "Giá trị không hợp lệ cho tham số: " + exception.getName(),
+                Map.of(exception.getName(), "Giá trị không được hỗ trợ.")
+        );
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleUnreadableBody(HttpMessageNotReadableException exception) {
-        return build(HttpStatus.BAD_REQUEST, "Nội dung yêu cầu không hợp lệ.", Map.of());
+        return build(ErrorCode.MALFORMED_REQUEST, "Nội dung yêu cầu không hợp lệ.", Map.of());
     }
 
-    private ResponseEntity<ApiErrorResponse> build(
-            HttpStatus status,
-            String message,
-            Map<String, String> errors
-    ) {
-        return ResponseEntity.status(status)
-                .body(ApiErrorResponse.of(status.value(), message, errors));
+    private ResponseEntity<ApiErrorResponse> build(ErrorCode code, String message, Map<String, String> errors) {
+        HttpStatus status = code.getStatus();
+        return ResponseEntity.status(status).body(ApiErrorResponse.of(status.value(), code, message, errors));
     }
 }

@@ -33,12 +33,16 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
     </div>
   );
 
+  // Bộ có món đã bị ẩn thì không mặc được — làm mờ và chặn nút "Mặc" ngay trên card
+  // thay vì để người dùng bấm rồi nhận lỗi từ server.
+  const unavailable = outfit.available === false;
+
   return (
     <div
-      className="nb-card nb-card--hover item-card"
+      className={`nb-card nb-card--hover item-card ${unavailable ? 'is-unavailable' : ''}`}
       style={{ cursor: 'pointer' }}
       onClick={() => onOpen(outfit)}
-      title="Bấm để xem chi tiết"
+      title={unavailable ? `Thiếu món: ${outfit.archivedItemNames.join(', ')}` : 'Bấm để xem chi tiết'}
     >
       {flippable ? (
         <div
@@ -78,7 +82,9 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
         <div style={{ minWidth: 0 }}>
           <div className="item-name" title={outfit.name}>🧢 {outfit.name}</div>
           <div className="item-meta">
-            {outfit.description || `${outfit.clothingItems.length} món đồ`}
+            {unavailable
+              ? `⚠️ Thiếu: ${outfit.archivedItemNames.join(', ')}`
+              : outfit.description || `${outfit.clothingItems.length} món đồ`}
           </div>
         </div>
         <button
@@ -92,7 +98,11 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
       </div>
 
       <div className="card-actions">
-        {wornToday ? (
+        {unavailable ? (
+          <Button size="sm" disabled onClick={(e) => e.stopPropagation()} title="Bộ đang thiếu món">
+            ⚠️ Thiếu món
+          </Button>
+        ) : wornToday ? (
           <Button size="sm" disabled onClick={(e) => e.stopPropagation()}>
             ✅ Đã mặc
           </Button>
@@ -101,7 +111,7 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
             👣 Mặc
           </Button>
         )}
-        <Button size="sm" onClick={stop(onEdit)}>
+        <Button size="sm" variant={unavailable ? 'primary' : undefined} onClick={stop(onEdit)}>
           ✏️ Sửa
         </Button>
         <Button size="sm" variant="danger" onClick={stop(onDelete)}>

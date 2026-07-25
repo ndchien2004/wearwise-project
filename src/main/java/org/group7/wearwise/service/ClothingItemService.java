@@ -2,6 +2,7 @@ package org.group7.wearwise.service;
 
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.ClothingItem;
+import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
@@ -9,8 +10,10 @@ import org.group7.wearwise.enums.ColorTone;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.exception.AuthenticationFailedException;
+import org.group7.wearwise.exception.BusinessRuleException;
 import org.group7.wearwise.exception.ClothingItemInUseException;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
+import org.group7.wearwise.exception.ErrorCode;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitRepository;
@@ -97,7 +100,26 @@ public class ClothingItemService {
                         null,
                         null,
                         null,
-                        null
+                        null,
+                        false
+                )
+        );
+    }
+
+    /** Danh sách món đã ẩn — hiển thị ở mục riêng để người dùng khôi phục hoặc xóa hẳn. */
+    public List<ClothingItem> getArchivedItems(String ownerUsername) {
+        return clothingItemRepository.findAll(
+                ClothingItemSpecifications.matchesFilters(
+                        normalizeOwnerUsername(ownerUsername),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        true
                 )
         );
     }
@@ -123,7 +145,8 @@ public class ClothingItemService {
                         condition,
                         status,
                         favorite,
-                        colorTone
+                        colorTone,
+                        false
                 )
         );
     }
@@ -168,18 +191,67 @@ public class ClothingItemService {
         return clothingItemRepository.save(item);
     }
 
+    /**
+     * Xóa cứng chỉ được phép khi món đồ chưa để lại dấu vết nào: không nằm trong outfit nào và
+     * chưa từng được mặc. Ngược lại ném {@link ClothingItemInUseException} kèm danh sách outfit
+     * liên quan để giao diện mời người dùng ẩn thay vì xóa — xóa cứng lúc đó sẽ làm rỗng outfit
+     * của họ và thổi bay lịch sử mặc đã tích lũy.
+     */
     @Transactional
     public void deleteItem(String ownerUsername, Long id) {
         String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
         ClothingItem item = getItemById(normalizedOwnerUsername, id);
 
-        if (outfitRepository.existsByOwner_UsernameAndClothingItems_Id(normalizedOwnerUsername, id)) {
-            throw new ClothingItemInUseException(id);
+        List<String> outfitNames = outfitRepository
+                .findByOwner_UsernameAndClothingItems_Id(normalizedOwnerUsername, id)
+                .stream()
+                .map(Outfit::getName)
+                .toList();
+        int wearCount = item.getWearCount() == null ? 0 : item.getWearCount();
+
+        if (!outfitNames.isEmpty() || wearCount > 0) {
+            throw new ClothingItemInUseException(item.getName(), outfitNames, wearCount);
         }
 
         // Mã chia sẻ trỏ tới món này cũng hết ý nghĩa — gỡ luôn để không vướng khóa ngoại.
         shareRepository.deleteByClothingItem_Id(id);
         clothingItemRepository.delete(item);
+    }
+
+    /**
+     * Ẩn món đồ (xóa mềm). Outfit đang chứa nó không bị xóa mà chuyển sang trạng thái "không
+     * khả dụng" — người dùng vào sửa, thay bằng món khác là outfit hiện lại bình thường.
+     */
+    @Transactional
+    public ClothingItem archiveItem(String ownerUsername, Long id) {
+        ClothingItem item = getItemById(ownerUsername, id);
+
+        if (item.getArchivedAt() == null) {
+            item.setArchivedAt(LocalDateTime.now());
+            clothingItemRepository.save(item);
+        }
+
+        return item;
+    }
+
+    @Transactional
+    public ClothingItem restoreItem(String ownerUsername, Long id) {
+        ClothingItem item = getItemById(ownerUsername, id);
+
+        if (item.getArchivedAt() != null) {
+            item.setArchivedAt(null);
+            clothingItemRepository.save(item);
+        }
+
+        return item;
+    }
+
+    /** Danh sách outfit đang dùng món đồ — giao diện hiển thị trước khi người dùng quyết định ẩn. */
+    @Transactional(readOnly = true)
+    public List<Outfit> findOutfitsUsing(String ownerUsername, Long id) {
+        String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
+        getItemById(normalizedOwnerUsername, id);
+        return outfitRepository.findByOwner_UsernameAndClothingItems_Id(normalizedOwnerUsername, id);
     }
 
     @Transactional
@@ -213,63 +285,71 @@ public class ClothingItemService {
         return lastWornAt != null && lastWornAt.toLocalDate().equals(date);
     }
 
-    /** Ném lỗi nếu món đồ đang giặt / chưa dùng được / hư hỏng — không thể mặc. */
+    /** Ném lỗi nếu món đồ đã bị ẩn / đang giặt / chưa dùng được / hư hỏng — không thể mặc. */
     public static void assertWearable(ClothingItem item) {
+        if (item.getArchivedAt() != null) {
+            throw new BusinessRuleException(
+                    ErrorCode.CLOTHING_ITEM_ARCHIVED,
+                    "\"" + item.getName() + "\" đã bị ẩn khỏi tủ đồ. Hãy khôi phục món này hoặc thay bằng món khác.");
+        }
         if (item.getStatus() == ClothingStatus.LAUNDRY) {
-            throw new IllegalArgumentException(
+            throw new BusinessRuleException(
+                    ErrorCode.ITEM_NOT_WEARABLE,
                     "\"" + item.getName() + "\" đang giặt nên chưa mặc được. Hãy bấm \"Giặt xong\" khi đã giặt xong.");
         }
         if (item.getStatus() == ClothingStatus.UNAVAILABLE) {
-            throw new IllegalArgumentException(
+            throw new BusinessRuleException(
+                    ErrorCode.ITEM_NOT_WEARABLE,
                     "\"" + item.getName() + "\" đang ở trạng thái chưa dùng được nên chưa mặc được.");
         }
         if (item.getCondition() == ClothingCondition.DAMAGED) {
-            throw new IllegalArgumentException(
+            throw new BusinessRuleException(
+                    ErrorCode.ITEM_NOT_WEARABLE,
                     "\"" + item.getName() + "\" đang hư hỏng nên không nên mặc. Hãy sửa lại hoặc bỏ đánh dấu hư hỏng.");
         }
     }
 
     public List<ClothingItem> searchByName(String ownerUsername, String keyword) {
-        return clothingItemRepository.findByNameContainingIgnoreCaseAndOwner_Username(
+        return clothingItemRepository.findByNameContainingIgnoreCaseAndOwner_UsernameAndArchivedAtIsNull(
                 normalizeRequiredText(keyword, "Search keyword"),
                 normalizeOwnerUsername(ownerUsername)
         );
     }
 
     public List<ClothingItem> filterByCategory(String ownerUsername, ClothingCategory category) {
-        return clothingItemRepository.findByCategoryAndOwner_Username(
+        return clothingItemRepository.findByCategoryAndOwner_UsernameAndArchivedAtIsNull(
                 requireCategory(category),
                 normalizeOwnerUsername(ownerUsername)
         );
     }
 
     public List<ClothingItem> filterBySeason(String ownerUsername, Season season) {
-        return clothingItemRepository.findBySeasonAndOwner_Username(
+        return clothingItemRepository.findBySeasonAndOwner_UsernameAndArchivedAtIsNull(
                 requireSeason(season),
                 normalizeOwnerUsername(ownerUsername)
         );
     }
 
     public List<ClothingItem> filterByStyle(String ownerUsername, Style style) {
-        return clothingItemRepository.findByStyleAndOwner_Username(
+        return clothingItemRepository.findByStyleAndOwner_UsernameAndArchivedAtIsNull(
                 requireStyle(style),
                 normalizeOwnerUsername(ownerUsername)
         );
     }
 
     public List<ClothingItem> getFavoriteItems(String ownerUsername) {
-        return clothingItemRepository.findByFavoriteTrueAndOwner_Username(normalizeOwnerUsername(ownerUsername));
+        return clothingItemRepository.findByFavoriteTrueAndOwner_UsernameAndArchivedAtIsNull(normalizeOwnerUsername(ownerUsername));
     }
 
     public List<ClothingItem> getRecentlyWornItems(String ownerUsername, Integer limit) {
-        return clothingItemRepository.findByOwner_UsernameAndLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(
+        return clothingItemRepository.findByOwner_UsernameAndArchivedAtIsNullAndLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(
                 normalizeOwnerUsername(ownerUsername),
                 PageRequest.of(0, normalizeLimit(limit))
         );
     }
 
     public List<ClothingItem> getMostWornItems(String ownerUsername, Integer limit) {
-        return clothingItemRepository.findByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(
+        return clothingItemRepository.findByOwner_UsernameAndArchivedAtIsNullAndWearCountGreaterThanOrderByWearCountDescIdAsc(
                 normalizeOwnerUsername(ownerUsername),
                 0,
                 PageRequest.of(0, normalizeLimit(limit))
@@ -277,7 +357,7 @@ public class ClothingItemService {
     }
 
     public List<ClothingItem> getLeastWornItems(String ownerUsername, Integer limit) {
-        return clothingItemRepository.findByOwner_UsernameOrderByWearCountAscIdAsc(
+        return clothingItemRepository.findByOwner_UsernameAndArchivedAtIsNullOrderByWearCountAscIdAsc(
                 normalizeOwnerUsername(ownerUsername),
                 PageRequest.of(0, normalizeLimit(limit))
         );

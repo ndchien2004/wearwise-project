@@ -13,6 +13,8 @@ import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.ShareTargetType;
 import org.group7.wearwise.exception.AuthenticationFailedException;
+import org.group7.wearwise.exception.BusinessRuleException;
+import org.group7.wearwise.exception.ErrorCode;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.exception.OutfitNotFoundException;
 import org.group7.wearwise.exception.ShareNotFoundException;
@@ -94,11 +96,15 @@ public class ShareService {
                 .expiresAt(expiresInDays == null ? null : now.plusDays(expiresInDays));
 
         if (targetType == ShareTargetType.OUTFIT) {
-            builder.outfit(outfitRepository.findByIdAndOwner_Username(targetId, username)
-                    .orElseThrow(() -> new OutfitNotFoundException(targetId)));
+            Outfit outfit = outfitRepository.findByIdAndOwner_Username(targetId, username)
+                    .orElseThrow(() -> new OutfitNotFoundException(targetId));
+            assertShareable(outfit);
+            builder.outfit(outfit);
         } else {
-            builder.clothingItem(clothingItemRepository.findByIdAndOwner_Username(targetId, username)
-                    .orElseThrow(() -> new ClothingItemNotFoundException(targetId)));
+            ClothingItem item = clothingItemRepository.findByIdAndOwner_Username(targetId, username)
+                    .orElseThrow(() -> new ClothingItemNotFoundException(targetId));
+            assertShareable(item);
+            builder.clothingItem(item);
         }
 
         return ShareResponse.from(shareRepository.save(builder.build()), now);
@@ -142,7 +148,14 @@ public class ShareService {
         Share share = getUsableShare(code);
 
         if (share.getOwner().getUsername().equals(username)) {
-            throw new IllegalArgumentException("Đây là mã chia sẻ của chính bạn, không cần chép lại.");
+            throw new BusinessRuleException(ErrorCode.SHARE_OWN_CODE, "Đây là mã chia sẻ của chính bạn, không cần chép lại.");
+        }
+
+        // Chủ mã có thể đã ẩn món sau khi chia sẻ — chặn để người nhận không chép về bộ thiếu món.
+        if (share.getTargetType() == ShareTargetType.OUTFIT) {
+            assertShareable(share.getOutfit());
+        } else {
+            assertShareable(share.getClothingItem());
         }
 
         AppUser importer = appUserRepository.findByUsername(username)
@@ -154,6 +167,26 @@ public class ShareService {
         return share.getTargetType() == ShareTargetType.OUTFIT
                 ? importOutfit(share.getOutfit(), importer)
                 : importItem(share.getClothingItem(), importer);
+    }
+
+    /** Không chia sẻ thứ mà chính chủ cũng không mặc được — người nhận sẽ chép về một bộ thiếu món. */
+    private void assertShareable(Outfit outfit) {
+        if (!OutfitService.isAvailable(outfit)) {
+            throw new BusinessRuleException(
+                    ErrorCode.SHARE_TARGET_UNAVAILABLE,
+                    "Outfit \"" + outfit.getName() + "\" đang thiếu món do có món đã bị ẩn nên chưa chia sẻ được. "
+                            + "Hãy sửa outfit trước."
+            );
+        }
+    }
+
+    private void assertShareable(ClothingItem item) {
+        if (item.getArchivedAt() != null) {
+            throw new BusinessRuleException(
+                    ErrorCode.SHARE_TARGET_UNAVAILABLE,
+                    "\"" + item.getName() + "\" đã bị ẩn khỏi tủ đồ nên chưa chia sẻ được. Hãy khôi phục món này trước."
+            );
+        }
     }
 
     private ShareImportResponse importOutfit(Outfit source, AppUser importer) {
@@ -227,7 +260,7 @@ public class ShareService {
      */
     private Optional<ClothingItem> findExistingCopy(String ownerUsername, ClothingItem source) {
         return clothingItemRepository
-                .findByOwner_UsernameAndNameIgnoreCaseAndCategory(ownerUsername, source.getName(), source.getCategory())
+                .findByOwner_UsernameAndNameIgnoreCaseAndCategoryAndArchivedAtIsNull(ownerUsername, source.getName(), source.getCategory())
                 .stream()
                 .filter(candidate -> Objects.equals(candidate.getImageUrl(), source.getImageUrl()))
                 .findFirst();
@@ -255,11 +288,11 @@ public class ShareService {
                 .orElseThrow(() -> ShareNotFoundException.forCode(code));
 
         if (share.getRevokedAt() != null) {
-            throw new ShareNotFoundException("Mã chia sẻ này đã bị người tạo thu hồi.");
+            throw ShareNotFoundException.revoked();
         }
 
         if (!share.isUsable(LocalDateTime.now())) {
-            throw new ShareNotFoundException("Mã chia sẻ này đã hết hạn.");
+            throw ShareNotFoundException.expired();
         }
 
         return share;
@@ -283,7 +316,7 @@ public class ShareService {
 
     private String normalizeCode(String code) {
         if (code == null || code.isBlank()) {
-            throw new ShareNotFoundException("Mã chia sẻ không được để trống.");
+            throw new ShareNotFoundException(ErrorCode.SHARE_NOT_FOUND, "Mã chia sẻ không được để trống.");
         }
 
         // Người dùng hay dán cả link: chỉ lấy đoạn cuối, bỏ khoảng trắng và gạch nối.

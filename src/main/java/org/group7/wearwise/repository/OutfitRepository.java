@@ -24,6 +24,10 @@ public interface OutfitRepository extends JpaRepository<Outfit, Long>, JpaSpecif
 
     boolean existsByOwner_UsernameAndClothingItems_Id(String username, Long clothingItemId);
 
+    /** Các outfit đang chứa một món đồ — dùng khi cân nhắc xóa/ẩn món đó. */
+    @EntityGraph(attributePaths = "clothingItems")
+    List<Outfit> findByOwner_UsernameAndClothingItems_Id(String username, Long clothingItemId);
+
     long countByOwner_Username(String username);
 
     long countByOwner_UsernameAndFavoriteTrue(String username);

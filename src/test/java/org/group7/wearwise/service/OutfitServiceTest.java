@@ -6,7 +6,9 @@ import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.exception.BusinessRuleException;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
+import org.group7.wearwise.exception.ErrorCode;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitPlanRepository;
@@ -102,7 +104,7 @@ class OutfitServiceTest {
                 List.of(1L, 1L),
                 null
         )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Clothing item IDs must not contain duplicates.");
+                .hasMessageContaining("trùng lặp");
     }
 
     @Test
@@ -121,8 +123,10 @@ class OutfitServiceTest {
                 false,
                 List.of(1L, 5L),
                 null
-        )).isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("áo");
+        )).isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("áo")
+                .extracting(e -> ((BusinessRuleException) e).getErrorCode())
+                .isEqualTo(ErrorCode.DUPLICATE_CATEGORY_IN_OUTFIT);
     }
 
     @Test

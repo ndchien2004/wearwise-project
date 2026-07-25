@@ -24,6 +24,9 @@ public record ClothingItemResponse(
         LocalDateTime lastWornAt,
         Boolean favorite,
         String imageUrl,
+        /** True khi món đã bị ẩn khỏi tủ đồ (xóa mềm). */
+        boolean archived,
+        LocalDateTime archivedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -43,6 +46,8 @@ public record ClothingItemResponse(
                 item.getLastWornAt(),
                 item.getFavorite(),
                 item.getImageUrl(),
+                item.getArchivedAt() != null,
+                item.getArchivedAt(),
                 item.getCreatedAt(),
                 item.getUpdatedAt()
         );

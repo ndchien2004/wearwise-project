@@ -19,7 +19,12 @@ export default function OutfitFormModal({ outfit, onSave, onClose }) {
     favorite: Boolean(outfit?.favorite),
     imageUrl: outfit?.imageUrl ?? '',
   }));
-  const [pickedIds, setPickedIds] = useState(() => new Set(outfit?.clothingItems?.map((i) => i.id) ?? []));
+  // Món đã ẩn bị bỏ khỏi lựa chọn ngay khi mở form: giữ lại thì lưu cũng bị server từ chối,
+  // còn bỏ ra thì người dùng chỉ việc chọn món thay thế là outfit hiện lại bình thường.
+  const archivedItems = (outfit?.clothingItems ?? []).filter((i) => i.archived);
+  const [pickedIds, setPickedIds] = useState(
+    () => new Set((outfit?.clothingItems ?? []).filter((i) => !i.archived).map((i) => i.id))
+  );
   const [allItems, setAllItems] = useState(null);
   const [pickerFilter, setPickerFilter] = useState('');
   const [error, setError] = useState(null);
@@ -183,6 +188,13 @@ export default function OutfitFormModal({ outfit, onSave, onClose }) {
             </select>
           </Field>
         </div>
+
+        {archivedItems.length > 0 && (
+          <div className="notice-banner" style={{ background: 'var(--orange)' }}>
+            ⚠️ {archivedItems.map((i) => `"${i.name}"`).join(', ')} đã bị ẩn khỏi tủ đồ nên đã được
+            gỡ khỏi bộ này. Hãy chọn món thay thế bên dưới rồi lưu — outfit sẽ dùng lại được ngay.
+          </div>
+        )}
 
         <Field label={`Chọn món đồ * (đã chọn ${pickedIds.size})`}>
           <p style={{ fontWeight: 600, color: 'var(--muted)', fontSize: 13, margin: '0 0 8px' }}>
