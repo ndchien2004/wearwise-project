@@ -52,6 +52,15 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse register(String username, String email, String password) {
+        return registerWithHashedPassword(username, email, passwordEncoder.encode(password));
+    }
+
+    /**
+     * Tạo tài khoản từ mật khẩu đã được băm sẵn — dùng cho luồng đăng ký có xác thực OTP,
+     * nơi mật khẩu được băm ngay lúc yêu cầu OTP và chỉ lưu bản băm cho tới khi xác nhận.
+     */
+    @Transactional
+    public AuthResponse registerWithHashedPassword(String username, String email, String passwordHash) {
         String normalizedUsername = normalizeUsername(username);
         String normalizedEmail = normalizeEmail(email);
 
@@ -66,7 +75,7 @@ public class AuthService {
         AppUser user = AppUser.builder()
                 .username(normalizedUsername)
                 .email(normalizedEmail)
-                .passwordHash(passwordEncoder.encode(password))
+                .passwordHash(passwordHash)
                 .role("USER")
                 .build();
 
@@ -188,7 +197,7 @@ public class AuthService {
         appUserRepository.save(user);
     }
 
-    private AuthResponse issueTokens(AppUser user) {
+    public AuthResponse issueTokens(AppUser user) {
         return new AuthResponse(
                 "Bearer",
                 authTokenService.createToken(user.getUsername(), user.getRole()),

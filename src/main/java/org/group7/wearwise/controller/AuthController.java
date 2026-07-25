@@ -6,7 +6,6 @@ import org.group7.wearwise.dto.request.ChangePasswordRequest;
 import org.group7.wearwise.dto.request.ForgotPasswordRequest;
 import org.group7.wearwise.dto.request.LogoutRequest;
 import org.group7.wearwise.dto.request.RefreshTokenRequest;
-import org.group7.wearwise.dto.request.RegisterRequest;
 import org.group7.wearwise.dto.request.ResetPasswordRequest;
 import org.group7.wearwise.dto.response.AuthResponse;
 import org.group7.wearwise.dto.response.CurrentUserResponse;
@@ -40,12 +39,6 @@ public class AuthController {
     public AuthController(AuthService authService, PasswordResetService passwordResetService) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
-    }
-
-    @PostMapping("/register")
-    @ResponseStatus(HttpStatus.CREATED)
-    public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
-        return authService.register(request.username(), request.email(), request.password());
     }
 
     @PostMapping("/login")

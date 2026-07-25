@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.PasswordResetTokenRepository;
+import org.group7.wearwise.repository.PendingRegistrationRepository;
 import org.group7.wearwise.repository.RefreshTokenRepository;
 import org.group7.wearwise.repository.RevokedAuthTokenRepository;
 import org.group7.wearwise.service.AuthMailService;
@@ -55,6 +56,9 @@ class AuthSecurityIntegrationTest {
     private PasswordResetTokenRepository passwordResetTokenRepository;
 
     @Autowired
+    private PendingRegistrationRepository pendingRegistrationRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -69,6 +73,7 @@ class AuthSecurityIntegrationTest {
         revokedAuthTokenRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         passwordResetTokenRepository.deleteAll();
+        pendingRegistrationRepository.deleteAll();
         appUserRepository.deleteAll();
     }
 
@@ -89,26 +94,41 @@ class AuthSecurityIntegrationTest {
     }
 
     @Test
-    void registerEndpointIsPublicAndReturnsBothTokens() throws Exception {
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "username": "public-user",
-                                  "email": "public-user@example.com",
-                                  "password": "password123"
-                                }
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty());
+    void registrationOtpEndpointsArePublicAndVerifyReturnsBothTokens() throws Exception {
+        // Bước xin OTP là công khai và chưa tạo tài khoản.
+        postJson("/api/auth/register/request-otp", """
+                {"username": "public-user", "email": "public-user@example.com", "password": "password123"}
+                """, status().isOk());
+        assertThat(appUserRepository.findByUsername("public-user")).isEmpty();
+
+        // Nhập đúng OTP thì tạo tài khoản và trả về cả hai token.
+        String otp = captureRegistrationOtp();
+        JsonNode tokens = postJson("/api/auth/register/verify", """
+                {"email": "public-user@example.com", "otp": "%s"}
+                """.formatted(otp), status().isOk());
+
+        assertThat(tokens.get("accessToken").asText()).isNotBlank();
+        assertThat(tokens.get("refreshToken").asText()).isNotBlank();
+        assertThat(appUserRepository.findByUsername("public-user")).isPresent();
+    }
+
+    @Test
+    void registrationRejectsWrongOtp() throws Exception {
+        postJson("/api/auth/register/request-otp", """
+                {"username": "newbie", "email": "newbie@example.com", "password": "password123"}
+                """, status().isOk());
+
+        postJson("/api/auth/register/verify", """
+                {"email": "newbie@example.com", "otp": "000000"}
+                """, status().isBadRequest());
+        assertThat(appUserRepository.findByUsername("newbie")).isEmpty();
     }
 
     @Test
     void registerRejectsDuplicateEmail() throws Exception {
         saveUser("demo", "taken@example.com", "password123");
 
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post("/api/auth/register/request-otp")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -296,9 +316,7 @@ class AuthSecurityIntegrationTest {
      */
     @Test
     void emailFromRegistrationDrivesThePasswordResetFlow() throws Exception {
-        postJson("/api/auth/register", """
-                {"username": "newbie", "email": "Newbie@Example.COM", "password": "password123"}
-                """, status().isCreated());
+        registerViaOtp("newbie", "Newbie@Example.COM", "password123");
 
         String accessToken = login("newbie", "password123").get("accessToken").asText();
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + accessToken))
@@ -415,6 +433,24 @@ class AuthSecurityIntegrationTest {
         verify(authMailService).sendPasswordResetEmail(
                 anyString(), anyString(), tokenCaptor.capture(), anyLong());
         return tokenCaptor.getValue();
+    }
+
+    private String captureRegistrationOtp() {
+        ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
+        verify(authMailService).sendRegistrationOtpEmail(
+                anyString(), anyString(), otpCaptor.capture(), anyLong());
+        return otpCaptor.getValue();
+    }
+
+    /** Chạy trọn luồng đăng ký có OTP: xin mã, bắt mã từ email giả lập, rồi xác nhận. */
+    private void registerViaOtp(String username, String email, String password) throws Exception {
+        postJson("/api/auth/register/request-otp", """
+                {"username": "%s", "email": "%s", "password": "%s"}
+                """.formatted(username, email, password), status().isOk());
+        String otp = captureRegistrationOtp();
+        postJson("/api/auth/register/verify", """
+                {"email": "%s", "otp": "%s"}
+                """.formatted(email, otp), status().isOk());
     }
 
     private JsonNode login(String username, String password) throws Exception {

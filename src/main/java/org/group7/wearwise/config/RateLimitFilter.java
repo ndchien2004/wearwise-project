@@ -96,8 +96,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/ai/")) {
             return Group.AI;
         }
-        // /api/auth/me và /logout là thao tác thường của người đã đăng nhập, không phải cửa dò mật khẩu.
-        if (path.startsWith("/api/auth/") && !path.startsWith("/api/auth/me") && !path.endsWith("/logout")) {
+        // /api/auth/me, /logout, /avatar là thao tác thường của người đã đăng nhập, không phải cửa dò mật khẩu.
+        if (path.startsWith("/api/auth/")
+                && !path.startsWith("/api/auth/me")
+                && !path.startsWith("/api/auth/avatar")
+                && !path.endsWith("/logout")) {
             return Group.AUTH;
         }
         return Group.GENERAL;

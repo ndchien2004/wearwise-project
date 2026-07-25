@@ -75,6 +75,42 @@ public class AuthMailService {
         }
     }
 
+    public void sendRegistrationOtpEmail(String email, String username, String otp, long expiresInMinutes) {
+        String subject = "WearWise — Mã xác nhận đăng ký";
+        String body = """
+                Xin chào %s,
+
+                Mã xác nhận (OTP) để hoàn tất đăng ký tài khoản WearWise của bạn là:
+
+                    %s
+
+                Mã có hiệu lực trong %d phút. Hãy nhập mã này vào màn hình đăng ký để tạo tài khoản.
+
+                Nếu bạn không thực hiện đăng ký này, hãy bỏ qua email.
+
+                — WearWise
+                """.formatted(username, otp, expiresInMinutes);
+
+        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+        if (!isConfigured(mailSender)) {
+            log.warn("[WearWise] Chưa cấu hình SMTP — mã OTP đăng ký cho {}: {}", maskEmail(email), otp);
+            return;
+        }
+
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromAddress);
+            message.setTo(email);
+            message.setSubject(subject);
+            message.setText(body);
+            mailSender.send(message);
+            log.info("Đã gửi mã OTP đăng ký tới {}", maskEmail(email));
+        } catch (MailException exception) {
+            log.warn("Gửi mã OTP đăng ký thất bại: {}", exception.getMessage());
+            log.warn("[WearWise] Mã OTP đăng ký cho {}: {}", maskEmail(email), otp);
+        }
+    }
+
     /** Có bean JavaMailSender vẫn chưa đủ — host rỗng thì coi như chưa cấu hình. */
     private boolean isConfigured(JavaMailSender mailSender) {
         if (mailSender == null) {

@@ -50,28 +50,6 @@ class AuthControllerTest {
     }
 
     @Test
-    void registerReturnsCreatedTokens() throws Exception {
-        when(authService.register("demo", "demo@example.com", "password123"))
-                .thenReturn(authResponse());
-
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "username": "demo",
-                                  "email": "demo@example.com",
-                                  "password": "password123"
-                                }
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.accessToken").value("token-value"))
-                .andExpect(jsonPath("$.refreshToken").value("refresh-value"))
-                .andExpect(jsonPath("$.username").value("demo"))
-                .andExpect(jsonPath("$.role").value("USER"));
-    }
-
-    @Test
     void loginReturnsTokens() throws Exception {
         when(authService.login("demo", "password123")).thenReturn(authResponse());
 
@@ -110,6 +88,7 @@ class AuthControllerTest {
                 "demo",
                 "demo@example.com",
                 "USER",
+                null,
                 LocalDateTime.of(2026, 6, 16, 10, 0),
                 LocalDateTime.of(2026, 6, 16, 10, 0)
         ));
@@ -285,23 +264,6 @@ class AuthControllerTest {
                 .andExpect(status().isLocked())
                 .andExpect(jsonPath("$.message").value(
                         "Tài khoản đang bị khóa tạm do nhập sai mật khẩu quá nhiều lần. Hãy thử lại sau 15 phút, hoặc dùng \"Quên mật khẩu\" để đặt lại."));
-    }
-
-    @Test
-    void registerRejectsWeakPasswordAndMissingEmail() throws Exception {
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "username": "ab",
-                                  "password": "123"
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors.username").value("Tên đăng nhập phải từ 3 đến 100 ký tự."))
-                .andExpect(jsonPath("$.errors.email").value("Hãy nhập email."))
-                .andExpect(jsonPath("$.errors.password").value(
-                        "Mật khẩu phải từ 8 đến 100 ký tự, có cả chữ và số, không chứa khoảng trắng."));
     }
 
     private static AuthResponse authResponse() {
