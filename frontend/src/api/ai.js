@@ -1,8 +1,18 @@
-import { apiFetch } from './client';
+import { apiFetch, apiUpload } from './client';
 
 /** Trạng thái cấu hình Gemini (để ẩn/hiện phần gợi ý AI). */
 export function getAiStatus() {
   return apiFetch('/api/ai/status');
+}
+
+/**
+ * Nhờ AI nhận diện món đồ trong ảnh để điền sẵn form.
+ * Ảnh phải được thu nhỏ trước bằng shrinkImageForAi() — xem utils/image.js.
+ */
+export function analyzeClothingImage(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiUpload('/api/ai/clothing-items/analyze', formData);
 }
 
 /**

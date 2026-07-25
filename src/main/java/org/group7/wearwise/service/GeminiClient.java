@@ -2,6 +2,7 @@ package org.group7.wearwise.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.group7.wearwise.exception.AiUnavailableException;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 
 /**
  * Client cho Google Gemini (generateContent REST API) — không cần SDK.
@@ -56,15 +58,14 @@ public class GeminiClient {
         return !apiKey.isBlank();
     }
 
+    /** Ảnh gửi kèm prompt, nhúng thẳng vào request dưới dạng base64. */
+    public record InlineImage(String mimeType, byte[] data) {
+    }
+
     /**
      * Gửi prompt và trả về nội dung text của câu trả lời (đã yêu cầu ở dạng JSON).
      */
     public String generateJson(String prompt) {
-        if (!isConfigured()) {
-            throw new AiUnavailableException(
-                    "Gợi ý AI chưa được cấu hình. Hãy điền wearwise.gemini.api-key vào application.properties.");
-        }
-
         ObjectNode payload = objectMapper.createObjectNode();
         payload.putArray("contents")
                 .addObject()
@@ -74,6 +75,49 @@ public class GeminiClient {
         ObjectNode generationConfig = payload.putObject("generationConfig");
         generationConfig.put("responseMimeType", "application/json");
         generationConfig.put("temperature", 0.7);
+
+        return send(payload);
+    }
+
+    /**
+     * Gửi prompt kèm một ảnh và ép câu trả lời theo {@code responseSchema}.
+     *
+     * <p>Cấu hình ở đây tối ưu cho tác vụ phân loại ngắn, tiết kiệm token:</p>
+     * <ul>
+     *   <li>{@code thinkingBudget = 0} — Gemini 2.5 mặc định bật "thinking", với việc nhận diện
+     *       một món quần áo thì phần suy luận đó chỉ đốt token vô ích.</li>
+     *   <li>{@code responseSchema} — model buộc phải trả đúng enum hợp lệ, không cần prompt dài
+     *       để liệt kê luật, cũng không tốn lượt gọi lại khi output sai định dạng.</li>
+     *   <li>{@code temperature = 0} — kết quả ổn định, cùng một ảnh cho cùng một đáp án.</li>
+     * </ul>
+     */
+    public String generateJson(String prompt, InlineImage image, JsonNode responseSchema, int maxOutputTokens) {
+        ObjectNode payload = objectMapper.createObjectNode();
+        ArrayNode parts = payload.putArray("contents").addObject().putArray("parts");
+        parts.addObject().put("text", prompt);
+        ObjectNode inlineData = parts.addObject().putObject("inlineData");
+        inlineData.put("mimeType", image.mimeType());
+        inlineData.put("data", Base64.getEncoder().encodeToString(image.data()));
+
+        ObjectNode generationConfig = payload.putObject("generationConfig");
+        generationConfig.put("responseMimeType", "application/json");
+        generationConfig.set("responseSchema", responseSchema);
+        generationConfig.put("temperature", 0);
+        generationConfig.put("maxOutputTokens", maxOutputTokens);
+
+        // thinkingConfig chỉ tồn tại ở dòng 2.5; gửi cho model cũ hơn sẽ bị trả về HTTP 400.
+        if (model.startsWith("gemini-2.5")) {
+            generationConfig.putObject("thinkingConfig").put("thinkingBudget", 0);
+        }
+
+        return send(payload);
+    }
+
+    private String send(ObjectNode payload) {
+        if (!isConfigured()) {
+            throw new AiUnavailableException(
+                    "Gợi ý AI chưa được cấu hình. Hãy điền wearwise.gemini.api-key vào application.properties.");
+        }
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + "/v1beta/models/" + model + ":generateContent"))

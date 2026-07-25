@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, ErrorBanner, Field, Modal } from './ui';
+import { analyzeClothingImage, getAiStatus } from '../api/ai';
 import { uploadClothingImage } from '../api/images';
+import { shrinkImageForAi } from '../utils/image';
 import {
   CATEGORY_LABELS,
   CONDITION_LABELS,
@@ -52,19 +54,72 @@ export default function ItemFormModal({ item, onSave, onClose }) {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [aiReady, setAiReady] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiFilled, setAiFilled] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const fileInputRef = useRef(null);
+  // Giữ lại file vừa chọn để bấm "Điền lại" không phải chọn ảnh lần nữa.
+  const lastFileRef = useRef(null);
+
+  useEffect(() => {
+    getAiStatus()
+      .then((status) => setAiReady(Boolean(status.geminiConfigured)))
+      .catch(() => setAiReady(false));
+  }, []);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const handlePickFile = () => fileInputRef.current?.click();
 
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // cho phép chọn lại cùng một file
+  /** Đổ kết quả AI vào form, bỏ qua trường AI không đoán được. */
+  const applySuggestion = (suggestion) => {
+    const filled = [];
+    setForm((f) => {
+      const next = { ...f };
+      const put = (key, value, label) => {
+        if (value) {
+          next[key] = value;
+          filled.push(label);
+        }
+      };
+      put('name', suggestion.name, 'tên');
+      put('color', suggestion.color, 'màu');
+      put('colorTone', suggestion.colorTone, 'tone màu');
+      put('category', suggestion.category, 'danh mục');
+      put('season', suggestion.season, 'mùa');
+      put('style', suggestion.style, 'phong cách');
+      return next;
+    });
+    setAiFilled(filled);
+  };
+
+  const runAnalysis = async (file) => {
+    setAnalyzing(true);
+    setAiFilled(null);
+    try {
+      applySuggestion(await analyzeClothingImage(await shrinkImageForAi(file)));
+    } catch (err) {
+      // Nhận diện hỏng không được chặn việc thêm đồ — người dùng vẫn nhập tay được.
+      setError(`Không nhận diện được ảnh: ${err.message}`);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleFile = async (file) => {
     if (!file) return;
 
     setError(null);
     setUploading(true);
+    lastFileRef.current = file;
+
+    // Tải ảnh lên và nhờ AI nhận diện chạy song song — người dùng chỉ chờ một lần.
+    // Chỉ tự nhận diện khi thêm đồ mới; lúc sửa thì thông tin đã có sẵn, đợi người dùng
+    // bấm nút thì mới gọi để không tốn token vô ích.
+    const analysis = aiReady && !item ? runAnalysis(file) : null;
+
     try {
       const { url } = await uploadClothingImage(file);
       setForm((f) => ({ ...f, imageUrl: url }));
@@ -73,7 +128,28 @@ export default function ItemFormModal({ item, onSave, onClose }) {
     } finally {
       setUploading(false);
     }
+
+    await analysis;
   };
+
+  const handleUpload = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // cho phép chọn lại cùng một file
+    handleFile(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = Array.from(e.dataTransfer.files || []).find((f) => f.type.startsWith('image/'));
+    if (file) {
+      handleFile(file);
+    } else {
+      setError('Hãy thả một tệp ảnh JPG hoặc PNG.');
+    }
+  };
+
+  const busyWithImage = uploading || analyzing;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -115,6 +191,114 @@ export default function ItemFormModal({ item, onSave, onClose }) {
     <Modal title={item ? '✏️ Sửa món đồ' : '➕ Thêm món đồ'} onClose={onClose}>
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
       <form onSubmit={handleSubmit}>
+        {/* Ảnh đứng đầu form: luồng chính giờ là chụp ảnh rồi để AI điền phần còn lại. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png"
+          onChange={handleUpload}
+          style={{ display: 'none' }}
+        />
+
+        <div
+          className={`photo-drop ${dragging ? 'is-dragging' : ''} ${busyWithImage ? 'is-busy' : ''}`}
+          onClick={() => !busyWithImage && handlePickFile()}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handlePickFile();
+            }
+          }}
+        >
+          {form.imageUrl.trim() ? (
+            <img className="photo-drop-preview" src={form.imageUrl.trim()} alt="Ảnh món đồ" />
+          ) : (
+            <span className="photo-drop-icon" aria-hidden="true">
+              {aiReady ? '✨' : '📷'}
+            </span>
+          )}
+
+          <div className="photo-drop-text">
+            <strong>
+              {busyWithImage
+                ? analyzing
+                  ? '🔍 AI đang xem ảnh...'
+                  : '⏳ Đang tải ảnh lên...'
+                : form.imageUrl.trim()
+                  ? 'Đổi ảnh khác'
+                  : aiReady
+                    ? 'Chọn ảnh — AI tự điền thông tin'
+                    : 'Chọn ảnh minh họa'}
+            </strong>
+            <span>
+              {aiReady
+                ? 'Bấm hoặc kéo thả ảnh vào đây. AI sẽ đoán tên, màu, danh mục, mùa và phong cách.'
+                : 'Bấm hoặc kéo thả ảnh JPG/PNG vào đây.'}
+            </span>
+          </div>
+        </div>
+
+        {aiFilled && (
+          <div className={`ai-result ${aiFilled.length > 0 ? '' : 'is-empty'}`}>
+            {aiFilled.length > 0
+              ? `✨ AI đã điền ${aiFilled.join(', ')} — kiểm tra lại bên dưới rồi lưu.`
+              : '🤔 AI không nhận ra món đồ nào trong ảnh, bạn nhập tay giúp nhé.'}
+          </div>
+        )}
+
+        <div className="photo-drop-extra">
+          {aiReady && lastFileRef.current && (
+            <Button
+              type="button"
+              variant="purple"
+              size="sm"
+              onClick={() => runAnalysis(lastFileRef.current)}
+              disabled={busyWithImage}
+            >
+              🔁 Cho AI đọc lại ảnh
+            </Button>
+          )}
+          <Button type="button" size="sm" onClick={() => setShowUrlInput((v) => !v)}>
+            🔗 {showUrlInput ? 'Ẩn ô URL' : 'Dán URL ảnh'}
+          </Button>
+          <span className="photo-drop-samples-label">hoặc chọn ảnh mẫu:</span>
+          <div className="sample-pick-row">
+            {SAMPLE_IMAGES.map((sample) => (
+              <button
+                key={sample.url}
+                type="button"
+                className={`sample-pick ${form.imageUrl === sample.url ? 'is-active' : ''}`}
+                title={sample.label}
+                onClick={() =>
+                  setForm((f) => ({ ...f, imageUrl: f.imageUrl === sample.url ? '' : sample.url }))
+                }
+              >
+                <img src={sample.url} alt={sample.label} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {showUrlInput && (
+          <Field label="URL ảnh">
+            <input
+              className="nb-input"
+              value={form.imageUrl}
+              onChange={set('imageUrl')}
+              placeholder="https://..."
+              maxLength={255}
+            />
+          </Field>
+        )}
+
         <Field label="Tên món đồ *">
           <input
             className="nb-input"
@@ -162,49 +346,6 @@ export default function ItemFormModal({ item, onSave, onClose }) {
             sau trong phần sửa hoặc trang chi tiết.
           </p>
         )}
-
-        <Field label="Ảnh minh họa">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png"
-            onChange={handleUpload}
-            style={{ display: 'none' }}
-          />
-          <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
-            <input
-              className="nb-input"
-              style={{ flex: 1 }}
-              value={form.imageUrl}
-              onChange={set('imageUrl')}
-              placeholder="Tải ảnh lên, dán URL, hoặc chọn ảnh mẫu bên dưới"
-              maxLength={255}
-            />
-            <Button type="button" onClick={handlePickFile} disabled={uploading}>
-              {uploading ? '⏳ Đang tải...' : '⬆️ Tải ảnh'}
-            </Button>
-          </div>
-          <div className="sample-pick-row">
-            {SAMPLE_IMAGES.map((sample) => (
-              <button
-                key={sample.url}
-                type="button"
-                className={`sample-pick ${form.imageUrl === sample.url ? 'is-active' : ''}`}
-                title={sample.label}
-                onClick={() =>
-                  setForm((f) => ({ ...f, imageUrl: f.imageUrl === sample.url ? '' : sample.url }))
-                }
-              >
-                <img src={sample.url} alt={sample.label} />
-              </button>
-            ))}
-          </div>
-          {form.imageUrl.trim() && (
-            <div className="img-preview">
-              <img src={form.imageUrl.trim()} alt="Xem trước" />
-            </div>
-          )}
-        </Field>
 
         <label className="nb-checkbox-row">
           <input

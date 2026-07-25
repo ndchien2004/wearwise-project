@@ -563,6 +563,7 @@ a {
 .nb-btn--green { background: var(--green); }
 .nb-btn--danger { background: var(--red); }
 .nb-btn--dark { background: var(--ink); color: #fff; }
+.nb-btn--purple { background: var(--purple); }
 
 .nb-btn--sm {
   padding: 5px 11px;
@@ -1171,6 +1172,239 @@ a {
   font-size: 11.5px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+/* ---------- Món đã ẩn / outfit không khả dụng ---------- */
+
+.archived-section {
+  margin-top: 28px;
+  border-top: 2px dashed var(--ink);
+  padding-top: 16px;
+}
+
+.archived-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  font-family: var(--font-display);
+  font-size: 16px;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.archived-toggle-hint {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.archived-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.archived-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: var(--border-w) dashed var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: 8px 12px;
+}
+
+.archived-row-main {
+  flex: 1;
+  min-width: 140px;
+}
+
+.archived-row-name {
+  display: block;
+  font-weight: 800;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.archived-row-name:hover {
+  text-decoration: underline;
+}
+
+.archived-row-meta {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Outfit thiếu món: vẫn thấy được nhưng nhìn là biết đang hỏng */
+.item-card.is-unavailable {
+  border-style: dashed;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--paper),
+    var(--paper) 10px,
+    #f3f0e8 10px,
+    #f3f0e8 20px
+  );
+}
+
+.item-card.is-unavailable .item-photo,
+.item-card.is-unavailable .outfit-collage,
+.item-card.is-unavailable .outfit-flip {
+  filter: grayscale(0.85) opacity(0.65);
+}
+
+.unavailable-section {
+  margin-top: 32px;
+  border-top: 3px dashed var(--ink);
+  padding-top: 18px;
+}
+
+.unavailable-title {
+  font-size: 19px;
+  margin-bottom: 6px;
+}
+
+.unavailable-note {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+/* ----- Vùng thả ảnh: hành động chính của form thêm đồ ----- */
+
+.photo-drop {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 3px dashed var(--ink);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+}
+
+.photo-drop:hover,
+.photo-drop:focus-visible {
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 0 var(--ink);
+  outline: none;
+}
+
+.photo-drop.is-dragging {
+  border-style: solid;
+  background: var(--green);
+  transform: scale(1.01);
+}
+
+.photo-drop.is-busy {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.photo-drop-icon {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.photo-drop-preview {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.photo-drop-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.photo-drop-text strong {
+  font-family: var(--font-display);
+  font-size: 17px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.photo-drop-text span {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Kết quả AI vừa điền */
+.ai-result {
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--green);
+  border: var(--border-w) solid var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.ai-result.is-empty {
+  background: var(--yellow);
+}
+
+/* Hàng lựa chọn phụ: đọc lại ảnh, dán URL, ảnh mẫu */
+.photo-drop-extra {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.photo-drop-samples-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.photo-drop-extra .sample-pick-row {
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .photo-drop {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .photo-drop-text {
+    align-items: center;
+  }
 }
 
 .sample-pick-row {

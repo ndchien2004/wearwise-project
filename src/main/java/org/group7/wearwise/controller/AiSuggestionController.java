@@ -6,13 +6,17 @@ import org.group7.wearwise.dto.request.AiWeeklyPlanRequest;
 import org.group7.wearwise.dto.response.AiOutfitRankingResponse;
 import org.group7.wearwise.dto.response.AiOutfitSuggestionResponse;
 import org.group7.wearwise.dto.response.AiWeeklyDayPlanResponse;
+import org.group7.wearwise.dto.response.ClothingItemSuggestionResponse;
 import org.group7.wearwise.service.AiSuggestionService;
+import org.group7.wearwise.service.ClothingItemVisionService;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -23,9 +27,20 @@ import java.util.Map;
 public class AiSuggestionController {
 
     private final AiSuggestionService aiSuggestionService;
+    private final ClothingItemVisionService clothingItemVisionService;
 
-    public AiSuggestionController(AiSuggestionService aiSuggestionService) {
+    public AiSuggestionController(
+            AiSuggestionService aiSuggestionService,
+            ClothingItemVisionService clothingItemVisionService
+    ) {
         this.aiSuggestionService = aiSuggestionService;
+        this.clothingItemVisionService = clothingItemVisionService;
+    }
+
+    /** Nhận diện món đồ trong ảnh để điền sẵn form thêm đồ. */
+    @PostMapping("/clothing-items/analyze")
+    public ClothingItemSuggestionResponse analyzeClothingImage(@RequestParam("file") MultipartFile file) {
+        return clothingItemVisionService.analyze(file);
     }
 
     @PostMapping("/outfit-suggestions")
