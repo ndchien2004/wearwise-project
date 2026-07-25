@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import { useAuth } from './context/AuthContext';
-import AnalyticsPage from './pages/AnalyticsPage';
 import AuthPage from './pages/AuthPage';
 import CalendarPage from './pages/CalendarPage';
 import DashboardPage from './pages/DashboardPage';
@@ -60,7 +59,8 @@ export default function App() {
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/suggestions" element={<SuggestionsPage />} />
         <Route path="/try-on" element={<TryOnPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
+        {/* Thống kê đã gộp vào trang tài khoản — giữ redirect cho link/bookmark cũ. */}
+        <Route path="/analytics" element={<Navigate to="/profile" replace />} />
         <Route path="/share" element={<SharePage />} />
         <Route path="/share/:code" element={<SharePage />} />
         <Route path="/profile" element={<ProfilePage />} />

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as outfitsApi from '../api/outfits';
 import * as tryOnApi from '../api/tryOn';
+import ClosetSwitch from '../components/ClosetSwitch';
 import OutfitCard from '../components/OutfitCard';
 import OutfitFormModal from '../components/OutfitFormModal';
 import { Button, EmptyState, ErrorBanner, Field, Loading } from '../components/ui';
@@ -89,49 +90,54 @@ export default function OutfitsPage() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title tilt-right">🧢 Outfit</h1>
-        <Button variant="pink" onClick={() => setModal({})}>
-          ➕ Tạo outfit
-        </Button>
+        <ClosetSwitch />
+        <div className="header-tools">
+          <Button variant="pink" onClick={() => setModal({})}>
+            ➕ Tạo outfit
+          </Button>
+        </div>
       </div>
 
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
       <div className="filter-bar">
-        <Field label="Tìm kiếm" className="nb-field--grow">
+        <Field label="Tìm kiếm" className="filter-search">
           <input
             className="nb-input"
             value={filters.keyword}
             onChange={setFilter('keyword')}
-            placeholder="Tìm theo tên hoặc mô tả..."
+            placeholder="🔍 Tìm theo tên hoặc mô tả..."
           />
         </Field>
-        <Field label="Mùa">
-          <select className="nb-select" value={filters.season} onChange={setFilter('season')}>
-            <option value="">Tất cả</option>
-            {Object.entries(SEASON_LABELS).map(([value, text]) => (
-              <option key={value} value={value}>{text}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Phong cách">
-          <select className="nb-select" value={filters.style} onChange={setFilter('style')}>
-            <option value="">Tất cả</option>
-            {Object.entries(STYLE_LABELS).map(([value, text]) => (
-              <option key={value} value={value}>{text}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Yêu thích">
-          <select className="nb-select" value={filters.favorite} onChange={setFilter('favorite')}>
-            <option value="">Tất cả</option>
-            <option value="true">⭐ Yêu thích</option>
-            <option value="false">Chưa yêu thích</option>
-          </select>
-        </Field>
-        <Button className="filter-reset" onClick={() => setFilters(EMPTY_FILTERS)}>
-          🔄 Xóa lọc
-        </Button>
+
+        <div className="filter-grid filter-grid--3">
+          <Field label="Mùa" className="filter-cell">
+            <select className="nb-select" value={filters.season} onChange={setFilter('season')} title="Mùa">
+              <option value="">Tất cả</option>
+              {Object.entries(SEASON_LABELS).map(([value, text]) => (
+                <option key={value} value={value}>{text}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Phong cách" className="filter-cell">
+            <select className="nb-select" value={filters.style} onChange={setFilter('style')} title="Phong cách">
+              <option value="">Tất cả</option>
+              {Object.entries(STYLE_LABELS).map(([value, text]) => (
+                <option key={value} value={value}>{text}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Yêu thích" className="filter-cell">
+            <select className="nb-select" value={filters.favorite} onChange={setFilter('favorite')} title="Yêu thích">
+              <option value="">Tất cả</option>
+              <option value="true">⭐ Yêu thích</option>
+              <option value="false">Chưa yêu thích</option>
+            </select>
+          </Field>
+          <Button className="filter-reset" onClick={() => setFilters(EMPTY_FILTERS)}>
+            🔄 Xóa lọc
+          </Button>
+        </div>
       </div>
 
       {outfits === null ? (

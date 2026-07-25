@@ -182,7 +182,7 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
-              <Link to="/analytics" className="nb-btn nb-btn--sm" style={{ alignSelf: 'flex-start', marginTop: 6 }}>
+              <Link to="/profile" className="nb-btn nb-btn--sm" style={{ alignSelf: 'flex-start', marginTop: 6 }}>
                 📊 Xem thống kê →
               </Link>
             </div>

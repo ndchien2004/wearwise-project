@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import * as outfitsApi from '../api/outfits';
 import * as plansApi from '../api/plans';
 import CalendarPlanChip from '../components/CalendarPlanChip';
@@ -182,7 +183,12 @@ export default function CalendarPage() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">📅 Lịch phối đồ</h1>
+        <div className="page-heading-group">
+          <Link to="/suggestions" className="nb-btn nb-btn--sm">
+            ← Gợi ý thời tiết
+          </Link>
+          <h1 className="page-title">📅 Lịch phối đồ</h1>
+        </div>
         <div className="calendar-nav">
           <Button size="sm" onClick={() => changeMonth(-1)}>← Trước</Button>
           <span className="calendar-month-label">

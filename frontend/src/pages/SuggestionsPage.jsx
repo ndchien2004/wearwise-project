@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import * as aiApi from '../api/ai';
 import * as outfitsApi from '../api/outfits';
 import * as plansApi from '../api/plans';
@@ -260,28 +261,33 @@ export default function SuggestionsPage() {
     <div>
       <div className="page-header">
         <h1 className="page-title tilt-right">🌦️ Gợi ý theo thời tiết</h1>
-        <div style={{ position: 'relative', minWidth: 260 }}>
-          <input
-            className="nb-input"
-            value={cityQuery}
-            onChange={(e) => setCityQuery(e.target.value)}
-            placeholder={`📍 ${city.name} — đổi thành phố?`}
-          />
-          {cityResults.length > 0 && (
-            <div
-              className="nb-card"
-              style={{ position: 'absolute', top: '110%', left: 0, right: 0, zIndex: 50, padding: 8 }}
-            >
-              {cityResults.map((c, i) => (
-                <div key={`${c.latitude}-${c.longitude}-${i}`} className="picker-row" onClick={() => pickCity(c)}>
-                  📍 {c.name}
-                  <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>
-                    {[c.admin1, c.country].filter(Boolean).join(', ')}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="header-tools header-tools--inline">
+          <div className="city-picker">
+            <input
+              className="nb-input"
+              value={cityQuery}
+              onChange={(e) => setCityQuery(e.target.value)}
+              placeholder={`📍 ${city.name} — đổi thành phố?`}
+              aria-label="Đổi thành phố"
+            />
+            {cityResults.length > 0 && (
+              <div className="nb-card city-picker-results">
+                {cityResults.map((c, i) => (
+                  <div key={`${c.latitude}-${c.longitude}-${i}`} className="picker-row" onClick={() => pickCity(c)}>
+                    📍 {c.name}
+                    <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>
+                      {[c.admin1, c.country].filter(Boolean).join(', ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Lịch phối đồ chỉ để xem lại nên không cần một mục riêng — mở ngay cạnh ô tìm
+              thành phố, quay về bằng nút back ở đầu trang lịch. */}
+          <Link to="/calendar" className="nb-btn nb-btn--primary">
+            📅 Lịch phối đồ →
+          </Link>
         </div>
       </div>
 

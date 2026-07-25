@@ -5,6 +5,7 @@ import * as itemsApi from '../api/clothingItems';
 import * as tryOnApi from '../api/tryOn';
 import ItemCard from '../components/ItemCard';
 import BulkScanModal from '../components/BulkScanModal';
+import ClosetSwitch from '../components/ClosetSwitch';
 import ItemFormModal from '../components/ItemFormModal';
 import { Button, EmptyState, ErrorBanner, Field, Loading, Pagination, Toast } from '../components/ui';
 import { useConfirm } from '../context/ConfirmContext';
@@ -222,8 +223,8 @@ export default function WardrobePage() {
   };
 
   const renderFilterSelect = (key, labels, placeholder) => (
-    <Field label={placeholder}>
-      <select className="nb-select" value={filters[key]} onChange={setFilter(key)}>
+    <Field label={placeholder} className="filter-cell">
+      <select className="nb-select" value={filters[key]} onChange={setFilter(key)} title={placeholder}>
         <option value="">Tất cả</option>
         {Object.entries(labels).map(([value, text]) => (
           <option key={value} value={value}>
@@ -237,8 +238,8 @@ export default function WardrobePage() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">👕 Tủ đồ</h1>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <ClosetSwitch />
+        <div className="header-tools">
           {aiReady && (
             <Button variant="purple" onClick={() => setBulkScan(true)}>
               📸 Quét nhiều món
@@ -257,31 +258,41 @@ export default function WardrobePage() {
       />
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
+      {/* Ô tìm kiếm chiếm trọn dòng trên; toàn bộ dropdown lọc + nút xóa lọc luôn nằm chung
+          một dòng lưới bên dưới. */}
       <div className="filter-bar">
-        <Field label="Tìm kiếm" className="nb-field--grow">
+        <Field label="Tìm kiếm" className="filter-search">
           <input
             className="nb-input"
             value={filters.keyword}
             onChange={setFilter('keyword')}
-            placeholder="Tìm theo tên hoặc màu..."
+            placeholder="🔍 Tìm theo tên hoặc màu..."
           />
         </Field>
-        {renderFilterSelect('category', CATEGORY_LABELS, 'Danh mục')}
-        {renderFilterSelect('colorTone', TONE_LABELS, 'Tone màu')}
-        {renderFilterSelect('season', SEASON_LABELS, 'Mùa')}
-        {renderFilterSelect('style', STYLE_LABELS, 'Phong cách')}
-        {renderFilterSelect('condition', CONDITION_LABELS, 'Tình trạng')}
-        {renderFilterSelect('status', STATUS_LABELS, 'Trạng thái')}
-        <Field label="Yêu thích">
-          <select className="nb-select" value={filters.favorite} onChange={setFilter('favorite')}>
-            <option value="">Tất cả</option>
-            <option value="true">⭐ Yêu thích</option>
-            <option value="false">Chưa yêu thích</option>
-          </select>
-        </Field>
-        <Button className="filter-reset" onClick={() => setFilters(EMPTY_FILTERS)}>
-          🔄 Xóa lọc
-        </Button>
+
+        <div className="filter-grid filter-grid--7">
+          {renderFilterSelect('category', CATEGORY_LABELS, 'Danh mục')}
+          {renderFilterSelect('colorTone', TONE_LABELS, 'Tone màu')}
+          {renderFilterSelect('season', SEASON_LABELS, 'Mùa')}
+          {renderFilterSelect('style', STYLE_LABELS, 'Phong cách')}
+          {renderFilterSelect('condition', CONDITION_LABELS, 'Tình trạng')}
+          {renderFilterSelect('status', STATUS_LABELS, 'Trạng thái')}
+          <Field label="Yêu thích" className="filter-cell">
+            <select
+              className="nb-select"
+              value={filters.favorite}
+              onChange={setFilter('favorite')}
+              title="Yêu thích"
+            >
+              <option value="">Tất cả</option>
+              <option value="true">⭐ Yêu thích</option>
+              <option value="false">Chưa yêu thích</option>
+            </select>
+          </Field>
+          <Button className="filter-reset" onClick={() => setFilters(EMPTY_FILTERS)}>
+            🔄 Xóa lọc
+          </Button>
+        </div>
       </div>
 
       {items === null ? (
