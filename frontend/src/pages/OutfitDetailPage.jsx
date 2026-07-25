@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import * as outfitsApi from '../api/outfits';
 import * as tryOnApi from '../api/tryOn';
 import OutfitFormModal from '../components/OutfitFormModal';
-import { Badge, Button, EmptyState, ErrorBanner, Loading } from '../components/ui';
+import ShareModal from '../components/ShareModal';
+import { Badge, Button, EmptyState, ErrorBanner, Loading, Toast } from '../components/ui';
 import { useConfirm } from '../context/ConfirmContext';
 import {
   CATEGORY_COLORS,
@@ -25,6 +26,8 @@ export default function OutfitDetailPage() {
   const [error, setError] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [toast, setToast] = useState(null);
   const [busy, setBusy] = useState(false);
   const [tryOnHistory, setTryOnHistory] = useState([]);
   const [tryOnError, setTryOnError] = useState(null);
@@ -157,6 +160,7 @@ export default function OutfitDetailPage() {
           <h1 className="page-title">🧢 {outfit.name}</h1>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <Button variant="blue" onClick={() => setSharing(true)}>🔗 Chia sẻ</Button>
           <Button onClick={() => setEditing(true)}>✏️ Sửa</Button>
           <Button variant="danger" onClick={handleDelete} disabled={busy}>🗑️ Xóa</Button>
         </div>
@@ -340,6 +344,16 @@ export default function OutfitDetailPage() {
       {editing && (
         <OutfitFormModal outfit={outfit} onSave={handleEditSave} onClose={() => setEditing(false)} />
       )}
+      {sharing && (
+        <ShareModal
+          targetType="OUTFIT"
+          targetId={outfit.id}
+          targetName={outfit.name}
+          onClose={() => setSharing(false)}
+          onToast={setToast}
+        />
+      )}
+      <Toast message={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

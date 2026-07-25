@@ -14,6 +14,7 @@ import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitRepository;
+import org.group7.wearwise.repository.ShareRepository;
 import org.group7.wearwise.repository.specification.ClothingItemSpecifications;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -32,15 +33,18 @@ public class ClothingItemService {
     private final ClothingItemRepository clothingItemRepository;
     private final OutfitRepository outfitRepository;
     private final AppUserRepository appUserRepository;
+    private final ShareRepository shareRepository;
 
     public ClothingItemService(
             ClothingItemRepository clothingItemRepository,
             OutfitRepository outfitRepository,
-            AppUserRepository appUserRepository
+            AppUserRepository appUserRepository,
+            ShareRepository shareRepository
     ) {
         this.clothingItemRepository = clothingItemRepository;
         this.outfitRepository = outfitRepository;
         this.appUserRepository = appUserRepository;
+        this.shareRepository = shareRepository;
     }
 
     @Transactional
@@ -173,6 +177,8 @@ public class ClothingItemService {
             throw new ClothingItemInUseException(id);
         }
 
+        // Mã chia sẻ trỏ tới món này cũng hết ý nghĩa — gỡ luôn để không vướng khóa ngoại.
+        shareRepository.deleteByClothingItem_Id(id);
         clothingItemRepository.delete(item);
     }
 

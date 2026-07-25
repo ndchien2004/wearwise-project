@@ -16,7 +16,7 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler({ClothingItemNotFoundException.class, OutfitNotFoundException.class, OutfitPlanNotFoundException.class, TryOnResultNotFoundException.class})
+    @ExceptionHandler({ClothingItemNotFoundException.class, OutfitNotFoundException.class, OutfitPlanNotFoundException.class, TryOnResultNotFoundException.class, ShareNotFoundException.class})
     public ResponseEntity<ApiErrorResponse> handleNotFound(RuntimeException exception) {
         return build(HttpStatus.NOT_FOUND, exception.getMessage(), Map.of());
     }
@@ -63,7 +63,7 @@ public class GlobalExceptionHandler {
             errors.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
 
-        return build(HttpStatus.BAD_REQUEST, "Request validation failed.", errors);
+        return build(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên chưa hợp lệ. Hãy kiểm tra lại các ô đã nhập.", errors);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -73,13 +73,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
-        String message = "Invalid value for parameter: " + exception.getName();
-        return build(HttpStatus.BAD_REQUEST, message, Map.of(exception.getName(), "Unsupported value."));
+        String message = "Giá trị không hợp lệ cho tham số: " + exception.getName();
+        return build(HttpStatus.BAD_REQUEST, message, Map.of(exception.getName(), "Giá trị không được hỗ trợ."));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleUnreadableBody(HttpMessageNotReadableException exception) {
-        return build(HttpStatus.BAD_REQUEST, "Request body is invalid.", Map.of());
+        return build(HttpStatus.BAD_REQUEST, "Nội dung yêu cầu không hợp lệ.", Map.of());
     }
 
     private ResponseEntity<ApiErrorResponse> build(

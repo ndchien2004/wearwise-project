@@ -26,6 +26,13 @@ public interface ClothingItemRepository extends JpaRepository<ClothingItem, Long
 
     List<ClothingItem> findByNameContainingIgnoreCaseAndOwner_Username(String keyword, String username);
 
+    /** Dùng khi chép trang phục được chia sẻ: tìm món đã có sẵn để khỏi nhân bản. */
+    List<ClothingItem> findByOwner_UsernameAndNameIgnoreCaseAndCategory(
+            String username,
+            String name,
+            ClothingCategory category
+    );
+
     List<ClothingItem> findByOwner_UsernameAndLastWornAtIsNotNullOrderByLastWornAtDescIdAsc(String username, Pageable pageable);
 
     List<ClothingItem> findByOwner_UsernameAndWearCountGreaterThanOrderByWearCountDescIdAsc(

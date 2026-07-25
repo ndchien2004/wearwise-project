@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import { useAuth } from './context/AuthContext';
 import AnalyticsPage from './pages/AnalyticsPage';
@@ -8,25 +8,41 @@ import DashboardPage from './pages/DashboardPage';
 import ItemDetailPage from './pages/ItemDetailPage';
 import OutfitDetailPage from './pages/OutfitDetailPage';
 import OutfitsPage from './pages/OutfitsPage';
+import ProfilePage from './pages/ProfilePage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import SharePage from './pages/SharePage';
 import SuggestionsPage from './pages/SuggestionsPage';
 import TryOnPage from './pages/TryOnPage';
 import WardrobePage from './pages/WardrobePage';
 
 function RequireAuth({ children }) {
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
+
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    // Nhớ đường dẫn đang mở để sau khi đăng nhập quay lại đúng chỗ — quan trọng với
+    // link chia sẻ: người nhận thường chưa đăng nhập khi bấm vào link.
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   }
+
   return children;
 }
 
-export default function App() {
+function LoginRoute() {
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
 
+  if (isAuthenticated) {
+    return <Navigate to={location.state?.from || '/'} replace />;
+  }
+
+  return <AuthPage />;
+}
+
+export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <AuthPage />} />
+      <Route path="/login" element={<LoginRoute />} />
       {/* Công khai: người dùng mở link trong email khi chưa đăng nhập được. */}
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
@@ -45,6 +61,9 @@ export default function App() {
         <Route path="/suggestions" element={<SuggestionsPage />} />
         <Route path="/try-on" element={<TryOnPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/share" element={<SharePage />} />
+        <Route path="/share/:code" element={<SharePage />} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

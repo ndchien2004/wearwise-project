@@ -12,6 +12,7 @@ import org.group7.wearwise.exception.ClothingItemNotFoundException;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitRepository;
+import org.group7.wearwise.repository.ShareRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,6 +49,9 @@ class ClothingItemServiceTest {
 
     @Mock
     private OutfitRepository outfitRepository;
+
+    @Mock
+    private ShareRepository shareRepository;
 
     @InjectMocks
     private ClothingItemService clothingItemService;

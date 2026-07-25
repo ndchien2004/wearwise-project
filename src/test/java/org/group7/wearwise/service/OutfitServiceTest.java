@@ -11,6 +11,7 @@ import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitPlanRepository;
 import org.group7.wearwise.repository.OutfitRepository;
+import org.group7.wearwise.repository.ShareRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +50,9 @@ class OutfitServiceTest {
 
     @Mock
     private OutfitPlanRepository outfitPlanRepository;
+
+    @Mock
+    private ShareRepository shareRepository;
 
     @InjectMocks
     private OutfitService outfitService;

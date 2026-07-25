@@ -14,6 +14,7 @@ import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitPlanRepository;
 import org.group7.wearwise.repository.OutfitRepository;
+import org.group7.wearwise.repository.ShareRepository;
 import org.group7.wearwise.repository.specification.OutfitSpecifications;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,17 +38,20 @@ public class OutfitService {
     private final ClothingItemRepository clothingItemRepository;
     private final AppUserRepository appUserRepository;
     private final OutfitPlanRepository outfitPlanRepository;
+    private final ShareRepository shareRepository;
 
     public OutfitService(
             OutfitRepository outfitRepository,
             ClothingItemRepository clothingItemRepository,
             AppUserRepository appUserRepository,
-            OutfitPlanRepository outfitPlanRepository
+            OutfitPlanRepository outfitPlanRepository,
+            ShareRepository shareRepository
     ) {
         this.outfitRepository = outfitRepository;
         this.clothingItemRepository = clothingItemRepository;
         this.appUserRepository = appUserRepository;
         this.outfitPlanRepository = outfitPlanRepository;
+        this.shareRepository = shareRepository;
     }
 
     @Transactional
@@ -289,6 +293,8 @@ public class OutfitService {
     public void deleteOutfit(String ownerUsername, Long id) {
         Outfit outfit = getOutfitById(ownerUsername, id);
         outfitPlanRepository.deleteAll(outfitPlanRepository.findAllByOutfit_Id(outfit.getId()));
+        // Mã chia sẻ trỏ tới bộ này cũng hết ý nghĩa — gỡ luôn để không vướng khóa ngoại.
+        shareRepository.deleteByOutfit_Id(outfit.getId());
         outfitRepository.delete(outfit);
     }
 
