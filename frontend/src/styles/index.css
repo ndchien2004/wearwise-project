@@ -231,6 +231,32 @@ a {
   white-space: nowrap;
 }
 
+/* Ảnh đại diện nhỏ trên thanh HUD: ảnh Cloudinary nếu có, không thì chữ cái đầu tên. */
+.hud-user-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--yellow);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 13px;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.hud-user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* Chấm cảnh báo khi tài khoản chưa có email */
 .hud-user-alert,
 .game-menu-alert {
@@ -253,15 +279,15 @@ a {
    Mở đè lên trang, làm mờ nền phía sau; các mục là một chồng thẻ 3D, mục đang chọn trượt
    ra phía phải và nhô lên trước. Cuộn chuột / ↑↓ để chạy qua từng mục. */
 
+/* Menu điều hướng: overlay mờ nền, xếp dọc kiểu bảng — tiêu đề trên cùng, danh sách dàn từ
+   trên xuống (tự cuộn nếu dài), gợi ý dưới đáy. Không còn kiểu cuộn 3D canh giữa màn hình. */
 .game-menu {
-  --menu-shift: 72px;
-  --menu-focus-scale: 1.16;
   --menu-pad: clamp(16px, 6vw, 96px);
-  --menu-room: 240px;
   position: fixed;
   inset: 0;
   z-index: 200;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: rgba(17, 17, 17, 0.45);
   backdrop-filter: blur(11px) saturate(115%);
   -webkit-backdrop-filter: blur(11px) saturate(115%);
@@ -273,47 +299,13 @@ a {
   to { opacity: 1; }
 }
 
-.game-menu-viewport {
-  position: absolute;
-  inset: 0;
-  /* Perspective càng ngắn thì translateZ càng phóng to mạnh — 1800px là mức vừa đủ để có
-     chiều sâu mà mục đang chọn không bị thổi rộng quá chỗ đã chừa. */
-  perspective: 1800px;
-  perspective-origin: 10% 50%;
-}
-
-/* Băng mục trượt dọc để mục đang chọn luôn nằm đúng tâm màn hình (JS đo rồi đặt translateY).
-   Bề ngang luôn chừa lại --menu-room ở bên phải: mục đang chọn còn phải trượt sang phải
-   (--menu-shift), phóng to --menu-focus-scale và đổ bóng — thiếu chỗ là bị cắt mất mép.
-   680 × 0.16 + 72 + bóng ≈ 195, làm tròn lên 210. */
-.game-menu-track {
-  position: absolute;
-  top: 0;
-  left: var(--menu-pad);
-  width: min(660px, calc(100% - var(--menu-pad) - var(--menu-room)));
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-
-/* Lần canh giữa đầu tiên nhảy thẳng vào vị trí, không trượt từ trên xuống */
-.game-menu-track.is-ready {
-  transition: transform 0.5s cubic-bezier(0.22, 1, 0.3, 1);
-}
-
 .game-menu-head {
-  position: absolute;
-  top: 22px;
-  left: var(--menu-pad);
-  right: var(--menu-pad);
-  z-index: 5;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 22px var(--menu-pad) 14px;
 }
 
 .game-menu-logo {
@@ -348,19 +340,25 @@ a {
   transform: translate(-2px, -2px);
 }
 
-/* <li> giữ phần dựng 3D (vị trí trong chồng thẻ); <button> bên trong lo hiệu ứng hover/nhấn
-   nên hai transform không tranh nhau. */
-.game-menu-slot {
-  transform-style: preserve-3d;
-  transform-origin: left center;
-  will-change: transform, filter;
-  transition: transform 0.44s cubic-bezier(0.22, 1, 0.3, 1), opacity 0.34s ease,
-    filter 0.34s ease;
+/* Vùng danh sách chiếm phần còn lại và tự cuộn khi nhiều mục hơn chiều cao màn hình. */
+.game-menu-list-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px var(--menu-pad) 24px;
 }
 
-/* Từ tầng thứ hai trở ra: chìm hẳn xuống nền, không bắt được con trỏ ở vùng nhòe */
-.game-menu-slot.is-far .game-menu-item {
-  box-shadow: 3px 3px 0 0 var(--ink);
+.game-menu-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 620px;
+  /* Cả dải trong suốt với chuột — chỉ các nút bắt click; nhờ vậy bấm vào khoảng trống giữa
+     các mục sẽ lọt xuống vùng nền bên dưới để đóng menu. */
+  pointer-events: none;
 }
 
 .game-menu-item {
@@ -368,59 +366,89 @@ a {
   align-items: center;
   gap: 18px;
   width: 100%;
-  padding: 20px 26px;
+  /* Padding + line-height rộng để dấu tiếng Việt viết hoa (TỦ, ĐỒ, GỢI…) — vốn nhô lên trên
+     chiều cao chữ hoa — không bị overflow của nhãn cắt mất phần dấu ở đỉnh. */
+  padding: 16px 24px;
   border: var(--border);
   border-radius: 16px;
   background: var(--paper);
   box-shadow: var(--shadow);
   font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 900;
+  font-size: 22px;
+  /* 800 thay vì 900: nét bớt dày nên dấu không dính vào thân chữ, đọc rõ dấu hơn. */
+  font-weight: 800;
+  line-height: 1.25;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   text-align: left;
   color: var(--ink);
   cursor: pointer;
-  transition: background 0.28s ease, box-shadow 0.34s cubic-bezier(0.22, 1, 0.3, 1),
-    transform 0.2s cubic-bezier(0.22, 1, 0.3, 1), color 0.28s ease;
+  pointer-events: auto;
+  transition: background 0.2s ease, box-shadow 0.24s cubic-bezier(0.22, 1, 0.3, 1),
+    transform 0.18s cubic-bezier(0.22, 1, 0.3, 1), color 0.2s ease, font-size 0.2s ease;
 }
 
+/* Di chuột vào / chọn bằng bàn phím: nhấc thẻ lên tại chỗ, không nhảy vị trí. */
+.game-menu-item:hover,
 .game-menu-item.is-focused {
-  background: var(--yellow);
-  box-shadow: 14px 14px 0 0 var(--ink);
+  transform: translate(-3px, -3px);
+  box-shadow: 11px 11px 0 0 var(--ink);
 }
 
+/* Mục của trang đang xem: nền vàng và to hơn hẳn các mục còn lại (mục "active"). */
+.game-menu-item.is-current {
+  background: var(--yellow);
+  font-size: 30px;
+  padding: 22px 26px;
+  box-shadow: 8px 8px 0 0 var(--ink);
+}
+
+.game-menu-item.is-current:hover,
+.game-menu-item.is-current.is-focused {
+  box-shadow: 12px 12px 0 0 var(--ink);
+}
+
+.game-menu-item.is-danger:hover,
 .game-menu-item.is-danger.is-focused {
   background: var(--red);
 }
 
-/* Nhấn xuống: lún nhẹ, không đụng tới transform 3D ở <li> */
+/* Nhấn xuống: lún nhẹ */
 .game-menu-item:active {
-  transform: translate(3px, 3px);
+  transform: translate(2px, 2px);
   box-shadow: 4px 4px 0 0 var(--ink);
 }
 
 .game-menu-emoji {
-  font-size: 34px;
+  font-size: 30px;
   line-height: 1;
   flex-shrink: 0;
-  transition: transform 0.34s cubic-bezier(0.22, 1, 0.3, 1);
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.3, 1), font-size 0.2s ease;
 }
 
-/* Emoji nảy nhẹ khi mục được chọn — dấu hiệu sống động kiểu game */
+.game-menu-item.is-current .game-menu-emoji {
+  font-size: 38px;
+}
+
+/* Emoji nảy nhẹ khi rê chuột / chọn — dấu hiệu sống động */
+.game-menu-item:hover .game-menu-emoji,
 .game-menu-item.is-focused .game-menu-emoji {
-  transform: scale(1.18) rotate(-7deg);
+  transform: scale(1.12) rotate(-7deg);
 }
 
 .game-menu-label {
   flex: 1;
   min-width: 0;
+  /* overflow:hidden lo phần "…" khi nhãn dài, nhưng cũng cắt luôn theo chiều dọc. line-height
+     rộng + chút đệm trên–dưới chừa chỗ cho dấu tiếng Việt viết hoa khỏi bị xén. */
+  line-height: 1.3;
+  padding: 3px 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Nhãn cho biết đây là trang đang mở (khác với mục đang được chọn bằng chuột/bàn phím) */
+/* Nhãn cho biết đây là trang đang mở */
 .game-menu-tag {
   flex-shrink: 0;
   font-family: var(--font-body);
@@ -436,23 +464,21 @@ a {
 
 .game-menu-arrow {
   flex-shrink: 0;
-  font-size: 24px;
+  font-size: 22px;
   opacity: 0;
   transform: translateX(-10px);
-  transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.22, 1, 0.3, 1);
+  transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.22, 1, 0.3, 1);
 }
 
+.game-menu-item:hover .game-menu-arrow,
 .game-menu-item.is-focused .game-menu-arrow {
   opacity: 1;
   transform: translateX(0);
 }
 
 .game-menu-hint {
-  position: absolute;
-  bottom: 20px;
-  left: var(--menu-pad);
-  right: var(--menu-pad);
-  z-index: 5;
+  flex-shrink: 0;
+  padding: 12px var(--menu-pad) 20px;
   font-size: 13px;
   font-weight: 700;
   color: #fff;
@@ -494,13 +520,41 @@ a {
   margin-bottom: 20px;
 }
 
-.profile-avatar {
+/* Cột ảnh đại diện: ảnh + link "Gỡ ảnh" ngay bên dưới cho gần avatar. */
+.profile-avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.profile-avatar-remove {
+  font-size: 12.5px;
+  padding: 0;
+}
+
+/* Nút đổi mật khẩu nằm ở góc trên cùng bên phải của thẻ đầu tiên. */
+.profile-hero-action {
+  margin-left: auto;
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+
+.profile-avatar-wrap {
+  position: relative;
   flex-shrink: 0;
   width: 76px;
   height: 76px;
+}
+
+.profile-avatar {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   font-family: var(--font-display);
   font-size: 38px;
   font-weight: 900;
@@ -508,6 +562,42 @@ a {
   border: var(--border);
   border-radius: 50%;
   box-shadow: var(--shadow);
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Nút máy ảnh nhỏ nằm góc dưới phải ảnh đại diện để đổi ảnh. */
+.profile-avatar-edit {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background: var(--yellow);
+  border: var(--border);
+  border-radius: 50%;
+  box-shadow: 2px 2px 0 0 var(--ink);
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.profile-avatar-edit:hover:not(:disabled) {
+  background: var(--pink);
+  transform: translate(-1px, -1px);
+}
+
+.profile-avatar-edit:disabled {
+  cursor: progress;
+  opacity: 0.7;
 }
 
 .profile-hero-info {
@@ -2346,6 +2436,98 @@ a {
   padding: 24px;
 }
 
+/* Màn đăng nhập/đăng ký chiếm trọn màn hình, chia đôi bằng một đường chéo đậm: nửa trái là
+   các trường nhập liệu, nửa phải chỉ có logo. Cao đúng 100dvh + căn giữa để không phải cuộn. */
+.auth-screen {
+  position: relative;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.auth-brand-side {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(52% 0, 100% 0, 100% 100%, 48% 100%);
+  background: linear-gradient(155deg, #ffe066, var(--yellow));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  /* Chừa nhiều lề trái để logo nằm giữa phần nêm bên phải (khoảng 74% màn hình), không bị
+     đường chéo cắt mất một nửa. */
+  padding: 40px 5% 40px 54%;
+  text-align: center;
+}
+
+.auth-brand-name {
+  font-family: var(--font-display);
+  font-size: clamp(42px, 6vw, 78px);
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-shadow: 5px 5px 0 rgba(17, 17, 17, 0.14);
+}
+
+.auth-brand-name span {
+  color: #e8590c;
+}
+
+.auth-brand-name--mobile {
+  display: none;
+  font-size: 30px;
+  text-shadow: 3px 3px 0 rgba(17, 17, 17, 0.14);
+  margin-bottom: 8px;
+}
+
+.auth-brand-tag {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* Đường chéo đậm kéo suốt màn hình. */
+.auth-diagonal {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(52% 0, 54% 0, 50% 100%, 48% 100%);
+  background: var(--ink);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Nửa trái: căn giữa theo chiều dọc, cao trọn màn hình để nội dung nằm gọn không cuộn. */
+.auth-form-side {
+  position: relative;
+  z-index: 1;
+  width: 50%;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px clamp(20px, 3vw, 44px);
+}
+
+.auth-form-inner {
+  width: 100%;
+  max-width: 380px;
+}
+
+/* Đăng ký cần rộng hơn để xếp trường thành 2 cột cho đỡ dài (tránh cuộn). */
+.auth-form-inner--wide {
+  max-width: 540px;
+}
+
+.auth-heading {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+/* Thẻ đơn (không chia đôi) — dùng ở trang đặt lại mật khẩu. */
 .auth-card {
   width: 100%;
   max-width: 420px;
@@ -2360,11 +2542,79 @@ a {
   margin-bottom: 6px;
 }
 
-.auth-tabs {
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Chế độ đăng ký: lưới 2 cột cho 4 trường; thanh đo mật khẩu và nút gửi trải hết chiều ngang. */
+.auth-form--grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin: 20px 0;
+  gap: 10px 16px;
+}
+
+.auth-form .nb-field {
+  margin: 0;
+}
+
+.auth-form--grid .auth-pw-slot,
+.auth-form--grid .auth-submit {
+  grid-column: 1 / -1;
+}
+
+/* Chiều cao cố định để thanh đo độ mạnh hiện/ẩn không xê dịch biểu mẫu đang canh giữa. */
+.auth-pw-slot {
+  min-height: 128px;
+}
+
+.auth-form .pw-strength {
+  margin: 0;
+}
+
+.auth-form .pw-strength-rules {
+  margin-top: 4px;
+}
+
+.auth-form .pw-strength-rules li {
+  line-height: 1.45;
+  font-size: 12.5px;
+}
+
+.auth-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* Liên kết phụ dưới biểu mẫu (đăng ký / quên mật khẩu) — nằm cùng một hàng. */
+.auth-alt {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.auth-alt-line {
+  color: var(--muted);
+}
+
+.auth-link--strong {
+  color: #e8590c;
+}
+
+/* Ô nhập mã OTP: to, giãn ký tự cho dễ đọc từng số. */
+.auth-otp-input {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 12px;
+  padding-left: 12px;
 }
 
 .auth-hint {
@@ -2406,6 +2656,57 @@ a {
   padding: 12px 16px;
   font-weight: 700;
   margin-bottom: 18px;
+}
+
+/* Ô mật khẩu + nút con mắt để xem/ẩn mật khẩu đã gõ. */
+.pw-input-wrap {
+  position: relative;
+}
+
+.pw-input.nb-input {
+  /* Chừa chỗ bên phải cho nút con mắt khỏi đè lên chữ. */
+  padding-right: 46px;
+}
+
+.pw-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pw-toggle:hover {
+  background: rgba(17, 17, 17, 0.08);
+}
+
+/* Màn hình hẹp: ẩn nửa logo + đường chéo, biểu mẫu chiếm toàn bộ, logo hiện nhỏ ở trên. */
+@media (max-width: 760px) {
+  .auth-brand-side,
+  .auth-diagonal {
+    display: none;
+  }
+  .auth-form-side {
+    width: 100%;
+    padding: 28px clamp(20px, 6vw, 32px);
+  }
+  .auth-brand-name--mobile {
+    display: block;
+  }
+  .auth-form-inner,
+  .auth-form-inner--wide {
+    max-width: 420px;
+  }
 }
 
 /* ---------- Thanh đo độ mạnh mật khẩu ---------- */
@@ -2450,6 +2751,192 @@ a {
 }
 
 .pw-strength-rules .is-missing {
+  color: var(--muted);
+}
+
+/* ---------- Modal căn chỉnh ảnh đại diện ---------- */
+
+.avatar-crop-modal {
+  max-width: 360px;
+  text-align: center;
+}
+
+.avatar-crop-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.avatar-crop-stage {
+  position: relative;
+  margin: 0 auto 16px;
+  overflow: hidden;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  cursor: grab;
+  touch-action: none;
+}
+
+.avatar-crop-stage:active {
+  cursor: grabbing;
+}
+
+.avatar-crop-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Cửa sổ tròn: phần trong rõ, phần ngoài phủ mờ để thấy khung avatar sẽ ra sao. */
+.avatar-crop-mask {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2000px rgba(17, 17, 17, 0.55);
+  border: 2px solid #fff;
+  pointer-events: none;
+}
+
+.avatar-crop-zoom {
+  width: 100%;
+  margin-bottom: 18px;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+
+/* ---------- Vòng hướng dẫn (onboarding) ---------- */
+
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(17, 17, 17, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: tour-fade 0.2s ease-out;
+}
+
+@keyframes tour-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.tour-card {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  padding: 44px 28px 22px;
+  text-align: center;
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: 8px 8px 0 0 var(--ink);
+  overflow: hidden;
+}
+
+.tour-skip {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.tour-skip:hover {
+  color: var(--ink);
+}
+
+.tour-body {
+  min-height: 210px;
+}
+
+.tour-body.is-from-right {
+  animation: tour-in-right 0.32s cubic-bezier(0.22, 1, 0.3, 1);
+}
+
+.tour-body.is-from-left {
+  animation: tour-in-left 0.32s cubic-bezier(0.22, 1, 0.3, 1);
+}
+
+@keyframes tour-in-right {
+  from { opacity: 0; transform: translateX(34px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes tour-in-left {
+  from { opacity: 0; transform: translateX(-34px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.tour-emoji {
+  font-size: 76px;
+  line-height: 1;
+  filter: drop-shadow(4px 4px 0 var(--ink));
+}
+
+.tour-title {
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin: 16px 0 10px;
+}
+
+.tour-text {
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.tour-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px 0 18px;
+}
+
+.tour-dot {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.tour-dot.is-done {
+  background: var(--ink);
+}
+
+.tour-dot.is-active {
+  background: var(--yellow);
+  transform: scale(1.3);
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tour-count {
+  font-family: var(--font-display);
+  font-weight: 900;
   color: var(--muted);
 }
 
@@ -2590,7 +3077,8 @@ a {
   .weather-temp { font-size: 44px; }
   .weather-emoji { font-size: 48px; }
   .profile-hero { gap: 14px; }
-  .profile-avatar { width: 60px; height: 60px; font-size: 30px; }
+  .profile-avatar-wrap { width: 60px; height: 60px; }
+  .profile-avatar { font-size: 30px; }
   .section-heading { font-size: 17px; }
   .nb-modal { padding: 18px; }
   .nb-modal-overlay { padding: 12px; }
@@ -2598,35 +3086,27 @@ a {
   .hud-menu-btn { padding: 8px 12px; font-size: 13px; }
   .hud-logo { font-size: 17px; }
 
-  /* Menu game trên điện thoại: nhìn thẳng hơn, trượt ít hơn, và panel hẹp bớt để mục đang
-     chọn (đã trượt phải + phóng to 1.05) vẫn nằm trọn trong màn hình. */
-  .game-menu {
-    --menu-shift: 16px;
-    --menu-focus-scale: 1.1;
-    --menu-pad: 12px;
-    /* Gồm cả phần perspective phóng thêm theo translateZ, không chỉ --menu-focus-scale.
-       Theo tỉ lệ bề rộng vì phần phóng thêm cũng tỉ lệ với bề rộng thẻ — để số cố định thì
-       vừa ở điện thoại lại tràn ở đúng mốc 640px. */
-    --menu-room: max(90px, 18vw);
-  }
-  .game-menu-viewport {
-    perspective: 1200px;
-    perspective-origin: 50% 50%;
-  }
-  .game-menu-track { gap: 10px; }
+  /* Menu trên điện thoại: lề hẹp, chữ nhỏ lại cho vừa màn hình. */
+  .game-menu { --menu-pad: 14px; }
+  .game-menu-head { padding: 16px 14px 10px; }
+  .game-menu-list-wrap { padding: 4px 14px 20px; }
+  .game-menu-list { gap: 12px; }
   .game-menu-logo { font-size: 22px; }
-  .game-menu-item { font-size: 17px; padding: 14px 16px; gap: 12px; }
-  .game-menu-item.is-focused { box-shadow: 8px 8px 0 0 var(--ink); }
-  .game-menu-emoji { font-size: 25px; }
+  .game-menu-item { font-size: 17px; padding: 13px 16px; gap: 12px; }
+  .game-menu-item.is-current { font-size: 22px; padding: 16px 18px; }
+  .game-menu-emoji { font-size: 24px; }
+  .game-menu-item.is-current .game-menu-emoji { font-size: 29px; }
   .game-menu-tag { font-size: 10px; padding: 2px 8px; }
 }
 
-/* Cửa sổ thấp (laptop 768–800px): thu nhỏ menu để nhìn thấy nhiều mục quanh tâm hơn */
+/* Cửa sổ thấp (laptop 768–800px): thu nhỏ mục để danh sách đỡ phải cuộn */
 @media (max-height: 860px) {
   .game-menu-logo { font-size: 25px; }
-  .game-menu-track { gap: 10px; }
-  .game-menu-item { padding: 15px 22px; font-size: 21px; }
-  .game-menu-emoji { font-size: 30px; }
+  .game-menu-list { gap: 10px; }
+  .game-menu-item { padding: 13px 22px; font-size: 20px; }
+  .game-menu-item.is-current { font-size: 25px; padding: 17px 24px; }
+  .game-menu-emoji { font-size: 27px; }
+  .game-menu-item.is-current .game-menu-emoji { font-size: 33px; }
 }
 
 /* Lịch: ô ngày co lại thay vì tràn ngang */
