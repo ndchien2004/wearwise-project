@@ -49,8 +49,25 @@ export function AuthProvider({ children }) {
     [applySession]
   );
 
-  const register = useCallback(
-    async (name, email, password) => applySession(await authApi.register(name, email, password)),
+  // Bước 1: gửi mã OTP (chưa tạo tài khoản). Bước 2: xác nhận OTP xong thì tạo tài khoản +
+  // đăng nhập luôn bằng cặp token trả về.
+  const registerRequestOtp = useCallback(
+    (name, email, password) => authApi.registerRequestOtp(name, email, password),
+    []
+  );
+
+  const registerVerify = useCallback(
+    async (email, otp) => {
+      const response = await authApi.registerVerify(email, otp);
+      applySession(response);
+      // Bật cờ để hiện vòng hướng dẫn lần đầu ngay sau khi tạo tài khoản thành công.
+      try {
+        localStorage.setItem('wearwise_onboarding_pending', '1');
+      } catch {
+        // localStorage bị chặn — bỏ qua, chỉ mất phần hướng dẫn.
+      }
+      return response;
+    },
     [applySession]
   );
 
@@ -60,6 +77,9 @@ export function AuthProvider({ children }) {
       applySession(await authApi.changePassword(currentPassword, newPassword)),
     [applySession]
   );
+
+  // Cập nhật hồ sơ đang giữ trong context (vd sau khi đổi ảnh đại diện) mà không phải gọi lại /me.
+  const updateUser = useCallback((profile) => setUser(profile), []);
 
   const logout = useCallback(async () => {
     try {
@@ -78,11 +98,13 @@ export function AuthProvider({ children }) {
       user,
       isAuthenticated: Boolean(username),
       login,
-      register,
+      registerRequestOtp,
+      registerVerify,
       logout,
       changePassword,
+      updateUser,
     }),
-    [username, user, login, register, logout, changePassword]
+    [username, user, login, registerRequestOtp, registerVerify, logout, changePassword, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
