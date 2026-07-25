@@ -24,6 +24,8 @@ export default function AuthPage() {
     setNotice(null);
   };
 
+  // Thông báo lỗi lấy thẳng từ server (đã là tiếng Việt) — không đoán lại theo mã HTTP,
+  // để chỉ có một nguồn sự thật duy nhất cho nội dung lỗi.
   const readError = (err) => {
     const fieldErrors = Object.values(err.fieldErrors || {});
     return fieldErrors.length > 0 ? fieldErrors.join(' ') : err.message;
@@ -107,15 +109,20 @@ export default function AuthPage() {
 
         <form onSubmit={handleSubmit}>
           {mode !== 'forgot' && (
-            <Field label="Tên đăng nhập">
+            <Field label={mode === 'login' ? 'Tên đăng nhập hoặc email' : 'Tên đăng nhập'}>
               <input
                 className="nb-input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="vd: chien.nguyen"
+                placeholder={mode === 'login' ? 'vd: chien.nguyen hoặc ban@gmail.com' : 'vd: chien.nguyen'}
                 autoComplete="username"
                 required
               />
+              {mode === 'register' && (
+                <p className="auth-hint">
+                  Chỉ gồm chữ không dấu, số và các ký tự . _ - — không khoảng trắng.
+                </p>
+              )}
             </Field>
           )}
 

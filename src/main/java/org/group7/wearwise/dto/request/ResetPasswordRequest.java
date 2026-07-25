@@ -4,10 +4,10 @@ import jakarta.validation.constraints.NotBlank;
 import org.group7.wearwise.validation.StrongPassword;
 
 public record ResetPasswordRequest(
-        @NotBlank(message = "Reset token is required.")
+        @NotBlank(message = "Thiếu mã đặt lại mật khẩu.")
         String token,
 
-        @NotBlank(message = "Password is required.")
+        @NotBlank(message = "Hãy nhập mật khẩu.")
         @StrongPassword
         String newPassword
 ) {

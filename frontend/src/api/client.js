@@ -1,3 +1,15 @@
+/**
+ * Gốc của API. Để trống khi chạy dev (Vite proxy /api sang localhost:8080) và khi frontend
+ * được phục vụ cùng origin với backend. Khi deploy tách rời — ví dụ frontend trên Cloudflare
+ * Pages, backend ở nơi khác — đặt VITE_API_BASE_URL lúc build, vd:
+ * VITE_API_BASE_URL=https://api.wearwise.example.com
+ */
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+
+function apiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
+
 const TOKEN_KEY = 'wearwise_token';
 const REFRESH_TOKEN_KEY = 'wearwise_refresh_token';
 const USERNAME_KEY = 'wearwise_username';
@@ -50,7 +62,7 @@ function refreshAccessToken() {
   }
 
   if (!pendingRefresh) {
-    pendingRefresh = fetch('/api/auth/refresh', {
+    pendingRefresh = fetch(apiUrl('/api/auth/refresh'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
@@ -72,8 +84,11 @@ function refreshAccessToken() {
   return pendingRefresh;
 }
 
-async function handleResponse(response) {
-  if (response.status === 401) {
+async function handleResponse(response, auth) {
+  // Chỉ request đang mang token mới coi 401 là "phiên hết hạn". Với /login, /register,
+  // /refresh... thì 401 nghĩa là sai thông tin đăng nhập — phải giữ nguyên thông báo của
+  // server, và tuyệt đối không xóa phiên hiện có chỉ vì gõ nhầm mật khẩu.
+  if (response.status === 401 && auth) {
     clearSession();
     window.dispatchEvent(new Event('wearwise:unauthorized'));
     throw new ApiError(401, 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
@@ -112,7 +127,7 @@ async function sendWithRetry(send, auth) {
     }
   }
 
-  return handleResponse(response);
+  return handleResponse(response, auth);
 }
 
 export async function apiFetch(path, { method = 'GET', body, auth = true } = {}) {
@@ -122,7 +137,7 @@ export async function apiFetch(path, { method = 'GET', body, auth = true } = {})
       headers.Authorization = `Bearer ${token}`;
     }
 
-    return fetch(path, {
+    return fetch(apiUrl(path), {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -140,7 +155,7 @@ export async function apiUpload(path, formData, { method = 'POST' } = {}) {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    return fetch(path, { method, headers, body: formData });
+    return fetch(apiUrl(path), { method, headers, body: formData });
   };
 
   return sendWithRetry(send, true);

@@ -16,7 +16,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface StrongPassword {
 
-    String message() default "Password must be 8-100 characters and include at least one letter and one digit.";
+    String message() default "Mật khẩu phải từ 8 đến 100 ký tự, có cả chữ và số, không chứa khoảng trắng.";
 
     Class<?>[] groups() default {};
 

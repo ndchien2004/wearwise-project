@@ -3,7 +3,7 @@ package org.group7.wearwise.dto.request;
 import jakarta.validation.constraints.NotBlank;
 
 public record RefreshTokenRequest(
-        @NotBlank(message = "Refresh token is required.")
+        @NotBlank(message = "Thiếu refresh token.")
         String refreshToken
 ) {
 }

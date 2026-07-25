@@ -4,6 +4,6 @@ package org.group7.wearwise.exception;
 public class InvalidPasswordResetTokenException extends RuntimeException {
 
     public InvalidPasswordResetTokenException() {
-        super("Password reset link is invalid or has expired. Please request a new one.");
+        super("Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Hãy yêu cầu link mới.");
     }
 }

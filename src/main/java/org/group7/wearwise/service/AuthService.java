@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Optional;
 
 @Service
 public class AuthService {
@@ -23,7 +24,6 @@ public class AuthService {
     private final AuthTokenService authTokenService;
     private final AuthTokenRevocationService authTokenRevocationService;
     private final RefreshTokenService refreshTokenService;
-    private final PasswordResetService passwordResetService;
     private final int maxFailedLoginAttempts;
     private final long lockDurationSeconds;
 
@@ -33,7 +33,6 @@ public class AuthService {
             AuthTokenService authTokenService,
             AuthTokenRevocationService authTokenRevocationService,
             RefreshTokenService refreshTokenService,
-            PasswordResetService passwordResetService,
             @Value("${wearwise.auth.max-failed-login-attempts:5}") int maxFailedLoginAttempts,
             @Value("${wearwise.auth.lock-duration-seconds:900}") long lockDurationSeconds
     ) {
@@ -42,22 +41,26 @@ public class AuthService {
         this.authTokenService = authTokenService;
         this.authTokenRevocationService = authTokenRevocationService;
         this.refreshTokenService = refreshTokenService;
-        this.passwordResetService = passwordResetService;
         this.maxFailedLoginAttempts = maxFailedLoginAttempts;
         this.lockDurationSeconds = lockDurationSeconds;
     }
 
+    /**
+     * Email được chốt ngay khi tạo tài khoản và không thể đổi về sau — hệ thống không có
+     * API cập nhật email. Đây là địa chỉ duy nhất nhận link đặt lại mật khẩu, nên khóa lại
+     * để kẻ chiếm được phiên đăng nhập không thể tự trỏ email khôi phục sang hộp thư của mình.
+     */
     @Transactional
     public AuthResponse register(String username, String email, String password) {
         String normalizedUsername = normalizeUsername(username);
         String normalizedEmail = normalizeEmail(email);
 
         if (appUserRepository.existsByUsername(normalizedUsername)) {
-            throw new IllegalArgumentException("Username is already taken.");
+            throw new IllegalArgumentException("Tên đăng nhập này đã có người sử dụng.");
         }
 
         if (appUserRepository.existsByEmail(normalizedEmail)) {
-            throw new IllegalArgumentException("Email is already registered.");
+            throw new IllegalArgumentException("Email này đã được dùng cho một tài khoản khác.");
         }
 
         AppUser user = AppUser.builder()
@@ -72,16 +75,19 @@ public class AuthService {
     }
 
     /**
-     * Đăng nhập kèm chống dò mật khẩu: sai quá {@code max-failed-login-attempts} lần
+     * Đăng nhập bằng tên đăng nhập <em>hoặc</em> email — người dùng hay nhớ email hơn.
+     * Không cần đoán người dùng nhập gì: username không chứa được ký tự {@code @}
+     * (xem {@code RegisterRequest}) nên hai không gian tên không thể đụng nhau.
+     *
+     * <p>Kèm chống dò mật khẩu: sai quá {@code max-failed-login-attempts} lần
      * thì tài khoản bị khóa tạm trong {@code lock-duration-seconds}.
      *
      * <p>{@code noRollbackFor} là bắt buộc: nếu không, việc ném lỗi đăng nhập sẽ cuốn theo
      * cả bản ghi số lần sai vừa lưu, và bộ đếm sẽ mãi mãi bằng 0.</p>
      */
     @Transactional(noRollbackFor = {AuthenticationFailedException.class, AccountLockedException.class})
-    public AuthResponse login(String username, String password) {
-        String normalizedUsername = normalizeUsername(username);
-        AppUser user = appUserRepository.findByUsername(normalizedUsername)
+    public AuthResponse login(String usernameOrEmail, String password) {
+        AppUser user = findByUsernameOrEmail(usernameOrEmail)
                 .orElseThrow(AuthenticationFailedException::new);
 
         LocalDateTime now = LocalDateTime.now();
@@ -111,7 +117,7 @@ public class AuthService {
     public AuthResponse refresh(String refreshToken) {
         String username = refreshTokenService.consume(refreshToken);
         AppUser user = appUserRepository.findByUsername(username)
-                .orElseThrow(() -> new AuthenticationFailedException("Refresh token is invalid or expired."));
+                .orElseThrow(() -> new AuthenticationFailedException("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại."));
 
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
             throw new AccountLockedException(
@@ -125,37 +131,6 @@ public class AuthService {
     public CurrentUserResponse getCurrentUser(String username) {
         AppUser user = appUserRepository.findByUsername(normalizeUsername(username))
                 .orElseThrow(AuthenticationFailedException::new);
-
-        return CurrentUserResponse.from(user);
-    }
-
-    /**
-     * Thêm hoặc đổi email của tài khoản đang đăng nhập. Cần thiết cho các tài khoản tạo
-     * trước khi có tính năng quên mật khẩu — chưa có email thì không nhận được link đặt lại.
-     */
-    @Transactional
-    public CurrentUserResponse updateEmail(String username, String currentPassword, String email) {
-        AppUser user = appUserRepository.findByUsername(normalizeUsername(username))
-                .orElseThrow(AuthenticationFailedException::new);
-
-        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
-            throw new AuthenticationFailedException("Current password is incorrect.");
-        }
-
-        String normalizedEmail = normalizeEmail(email);
-        if (normalizedEmail.equals(user.getEmail())) {
-            return CurrentUserResponse.from(user);
-        }
-
-        if (appUserRepository.existsByEmail(normalizedEmail)) {
-            throw new IllegalArgumentException("Email is already registered.");
-        }
-
-        user.setEmail(normalizedEmail);
-        appUserRepository.save(user);
-
-        // Mã đặt lại đã gửi tới hộp thư cũ không được phép còn hiệu lực.
-        passwordResetService.invalidatePendingResets(user.getUsername());
 
         return CurrentUserResponse.from(user);
     }
@@ -181,11 +156,11 @@ public class AuthService {
                 .orElseThrow(AuthenticationFailedException::new);
 
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
-            throw new AuthenticationFailedException("Current password is incorrect.");
+            throw new AuthenticationFailedException("Mật khẩu hiện tại không đúng.");
         }
 
         if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
-            throw new IllegalArgumentException("New password must be different from the current password.");
+            throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu hiện tại.");
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
@@ -225,9 +200,21 @@ public class AuthService {
         );
     }
 
+    /** Cả username lẫn email đều được lưu ở dạng chữ thường nên chỉ cần chuẩn hóa một kiểu. */
+    private Optional<AppUser> findByUsernameOrEmail(String usernameOrEmail) {
+        if (usernameOrEmail == null || usernameOrEmail.trim().isBlank()) {
+            return Optional.empty();
+        }
+
+        String identifier = usernameOrEmail.trim().toLowerCase(Locale.ROOT);
+
+        return appUserRepository.findByUsername(identifier)
+                .or(() -> appUserRepository.findByEmail(identifier));
+    }
+
     private String normalizeUsername(String username) {
         if (username == null || username.trim().isBlank()) {
-            throw new IllegalArgumentException("Username is required.");
+            throw new IllegalArgumentException("Hãy nhập tên đăng nhập.");
         }
 
         return username.trim().toLowerCase(Locale.ROOT);
@@ -236,7 +223,7 @@ public class AuthService {
     private String normalizeEmail(String email) {
         String normalizedEmail = PasswordResetService.normalizeEmail(email);
         if (normalizedEmail == null) {
-            throw new IllegalArgumentException("Email is required.");
+            throw new IllegalArgumentException("Hãy nhập email.");
         }
 
         return normalizedEmail;

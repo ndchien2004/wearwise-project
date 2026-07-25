@@ -118,7 +118,38 @@ class AuthSecurityIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Email is already registered."));
+                .andExpect(jsonPath("$.message").value("Email này đã được dùng cho một tài khoản khác."));
+    }
+
+    /** Ô đăng nhập nhận cả hai: người dùng thường nhớ email hơn tên đăng nhập. */
+    @Test
+    void loginAcceptsEitherTheUsernameOrTheEmail() throws Exception {
+        saveUser("demo", "demo@example.com", "password123");
+
+        assertThat(login("demo", "password123").get("accessToken").asText()).isNotBlank();
+
+        JsonNode byEmail = postJson("/api/auth/login", """
+                {"username": "DEMO@Example.com", "password": "password123"}
+                """, status().isOk());
+        assertThat(byEmail.get("accessToken").asText()).isNotBlank();
+        assertThat(byEmail.get("username").asText()).isEqualTo("demo");
+    }
+
+    @Test
+    void loginWithAnUnknownIdentifierIsRejectedWithoutRevealingWhichPartIsWrong() throws Exception {
+        saveUser("demo", "demo@example.com", "password123");
+
+        postJson("/api/auth/login", """
+                {"username": "khong-ton-tai", "password": "password123"}
+                """, status().isUnauthorized());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username": "demo", "password": "sai-mat-khau"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Tên đăng nhập/email hoặc mật khẩu không đúng."));
     }
 
     @Test
@@ -259,29 +290,24 @@ class AuthSecurityIntegrationTest {
                 """.formatted(oldRefreshToken), status().isUnauthorized());
     }
 
+    /**
+     * Đăng ký mới bắt buộc có email, và email đó dùng được ngay cho luồng quên mật khẩu.
+     * Đây là đường duy nhất để một tài khoản có email — không thể bổ sung sau.
+     */
     @Test
-    void legacyAccountWithoutEmailCanAddOneAndThenResetItsPassword() throws Exception {
-        // Tài khoản tạo trước khi có tính năng quên mật khẩu: cột email còn trống.
-        saveUser("legacy", null, "password123");
-        String accessToken = login("legacy", "password123").get("accessToken").asText();
+    void emailFromRegistrationDrivesThePasswordResetFlow() throws Exception {
+        postJson("/api/auth/register", """
+                {"username": "newbie", "email": "Newbie@Example.COM", "password": "password123"}
+                """, status().isCreated());
 
+        String accessToken = login("newbie", "password123").get("accessToken").asText();
         mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").doesNotExist());
-
-        mockMvc.perform(put("/api/auth/me/email")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"currentPassword": "password123", "email": "Legacy@Example.COM"}
-                                """))
-                .andExpect(status().isOk())
                 // Email được chuẩn hóa về chữ thường trước khi lưu.
-                .andExpect(jsonPath("$.email").value("legacy@example.com"));
+                .andExpect(jsonPath("$.email").value("newbie@example.com"));
 
-        // Có email rồi thì luồng quên mật khẩu dùng được.
         postJson("/api/auth/forgot-password", """
-                {"email": "legacy@example.com"}
+                {"email": "newbie@example.com"}
                 """, status().isOk());
         String resetToken = captureResetToken();
 
@@ -290,51 +316,15 @@ class AuthSecurityIntegrationTest {
                 """.formatted(resetToken), status().isOk());
 
         postJson("/api/auth/login", """
-                {"username": "legacy", "password": "brandNew456"}
+                {"username": "newbie", "password": "brandNew456"}
                 """, status().isOk());
     }
 
+    /** Email chốt một lần khi đăng ký: API đổi email đã bị gỡ hẳn, không chỉ ẩn trên giao diện. */
     @Test
-    void updateEmailRequiresTheCurrentPassword() throws Exception {
-        saveUser("legacy", null, "password123");
-        String accessToken = login("legacy", "password123").get("accessToken").asText();
-
-        mockMvc.perform(put("/api/auth/me/email")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"currentPassword": "wrong-password", "email": "legacy@example.com"}
-                                """))
-                .andExpect(status().isUnauthorized());
-
-        assertThat(appUserRepository.findByUsername("legacy").orElseThrow().getEmail()).isNull();
-    }
-
-    @Test
-    void updateEmailRejectsAnAddressAlreadyTaken() throws Exception {
-        saveUser("demo", "taken@example.com", "password123");
-        saveUser("legacy", null, "password123");
-        String accessToken = login("legacy", "password123").get("accessToken").asText();
-
-        mockMvc.perform(put("/api/auth/me/email")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"currentPassword": "password123", "email": "taken@example.com"}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Email is already registered."));
-    }
-
-    @Test
-    void changingEmailInvalidatesResetLinksSentToTheOldAddress() throws Exception {
-        saveUser("demo", "old@example.com", "password123");
+    void emailCannotBeChangedAfterRegistration() throws Exception {
+        saveUser("demo", "demo@example.com", "password123");
         String accessToken = login("demo", "password123").get("accessToken").asText();
-
-        postJson("/api/auth/forgot-password", """
-                {"email": "old@example.com"}
-                """, status().isOk());
-        String resetToken = captureResetToken();
 
         mockMvc.perform(put("/api/auth/me/email")
                         .header("Authorization", "Bearer " + accessToken)
@@ -342,12 +332,10 @@ class AuthSecurityIntegrationTest {
                         .content("""
                                 {"currentPassword": "password123", "email": "new@example.com"}
                                 """))
-                .andExpect(status().isOk());
+                .andExpect(status().is4xxClientError());
 
-        // Link đã gửi tới hộp thư cũ không còn dùng được.
-        postJson("/api/auth/reset-password", """
-                {"token": "%s", "newPassword": "brandNew456"}
-                """.formatted(resetToken), status().isBadRequest());
+        assertThat(appUserRepository.findByUsername("demo").orElseThrow().getEmail())
+                .isEqualTo("demo@example.com");
     }
 
     @Test

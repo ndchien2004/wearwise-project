@@ -4,10 +4,10 @@ import jakarta.validation.constraints.NotBlank;
 import org.group7.wearwise.validation.StrongPassword;
 
 public record ChangePasswordRequest(
-        @NotBlank(message = "Current password is required.")
+        @NotBlank(message = "Hãy nhập mật khẩu hiện tại.")
         String currentPassword,
 
-        @NotBlank(message = "Password is required.")
+        @NotBlank(message = "Hãy nhập mật khẩu.")
         @StrongPassword
         String newPassword
 ) {

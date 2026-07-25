@@ -44,9 +44,6 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenService refreshTokenService;
 
-    @Mock
-    private PasswordResetService passwordResetService;
-
     private PasswordEncoder passwordEncoder;
     private AuthService authService;
 
@@ -59,7 +56,6 @@ class AuthServiceTest {
                 new AuthTokenService(TEST_TOKEN_SECRET, 3600),
                 authTokenRevocationService,
                 refreshTokenService,
-                passwordResetService,
                 MAX_FAILED_ATTEMPTS,
                 LOCK_DURATION_SECONDS
         );
@@ -95,7 +91,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.register("demo", "demo@example.com", "password123"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Username is already taken.");
+                .hasMessage("Tên đăng nhập này đã có người sử dụng.");
     }
 
     @Test
@@ -105,7 +101,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.register("demo", "demo@example.com", "password123"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Email is already registered.");
+                .hasMessage("Email này đã được dùng cho một tài khoản khác.");
     }
 
     @Test
@@ -114,7 +110,39 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login("demo", "wrong-password"))
                 .isInstanceOf(AuthenticationFailedException.class)
-                .hasMessage("Invalid username or password.");
+                .hasMessage("Tên đăng nhập/email hoặc mật khẩu không đúng.");
+    }
+
+    @Test
+    void loginAcceptsTheEmailInsteadOfTheUsername() {
+        AppUser user = user("password123");
+        when(appUserRepository.findByUsername("demo@example.com")).thenReturn(Optional.empty());
+        when(appUserRepository.findByEmail("demo@example.com")).thenReturn(Optional.of(user));
+
+        AuthResponse response = authService.login("  Demo@Example.COM ", "password123");
+
+        // Token vẫn phát theo username, dù người dùng đăng nhập bằng email.
+        assertThat(response.username()).isEqualTo("demo");
+        assertThat(response.accessToken()).isNotBlank();
+    }
+
+    @Test
+    void loginLooksUpTheUsernameBeforeFallingBackToEmail() {
+        when(appUserRepository.findByUsername("demo")).thenReturn(Optional.of(user("password123")));
+
+        authService.login("Demo", "password123");
+
+        verify(appUserRepository, never()).findByEmail(any());
+    }
+
+    @Test
+    void loginRejectsAnIdentifierThatMatchesNeitherUsernameNorEmail() {
+        when(appUserRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+        when(appUserRepository.findByEmail("ghost")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login("ghost", "password123"))
+                .isInstanceOf(AuthenticationFailedException.class)
+                .hasMessage("Tên đăng nhập/email hoặc mật khẩu không đúng.");
     }
 
     @Test
@@ -137,7 +165,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login("demo", "wrong-password"))
                 .isInstanceOf(AccountLockedException.class)
-                .hasMessageContaining("temporarily locked");
+                .hasMessageContaining("bị khóa tạm");
 
         assertThat(user.getLockedUntil()).isAfter(LocalDateTime.now());
         assertThat(user.getFailedLoginAttempts()).isZero();
@@ -188,7 +216,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.refresh("refresh-token"))
                 .isInstanceOf(AuthenticationFailedException.class)
-                .hasMessage("Refresh token is invalid or expired.");
+                .hasMessage("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
     }
 
     @Test
@@ -204,53 +232,6 @@ class AuthServiceTest {
         assertThat(response.username()).isEqualTo("demo");
         assertThat(response.email()).isEqualTo("demo@example.com");
         assertThat(response.role()).isEqualTo("USER");
-    }
-
-    @Test
-    void updateEmailAddsEmailToAnAccountThatHadNone() {
-        AppUser user = user("password123");
-        user.setEmail(null);
-        when(appUserRepository.findByUsername("demo")).thenReturn(Optional.of(user));
-        when(appUserRepository.existsByEmail("new@example.com")).thenReturn(false);
-
-        CurrentUserResponse response = authService.updateEmail("demo", "password123", " New@Example.com ");
-
-        assertThat(user.getEmail()).isEqualTo("new@example.com");
-        assertThat(response.email()).isEqualTo("new@example.com");
-        verify(passwordResetService).invalidatePendingResets("demo");
-    }
-
-    @Test
-    void updateEmailRejectsWrongPassword() {
-        when(appUserRepository.findByUsername("demo")).thenReturn(Optional.of(user("password123")));
-
-        assertThatThrownBy(() -> authService.updateEmail("demo", "wrong-password", "new@example.com"))
-                .isInstanceOf(AuthenticationFailedException.class)
-                .hasMessage("Current password is incorrect.");
-
-        verify(appUserRepository, never()).save(any());
-    }
-
-    @Test
-    void updateEmailRejectsEmailUsedByAnotherAccount() {
-        when(appUserRepository.findByUsername("demo")).thenReturn(Optional.of(user("password123")));
-        when(appUserRepository.existsByEmail("taken@example.com")).thenReturn(true);
-
-        assertThatThrownBy(() -> authService.updateEmail("demo", "password123", "taken@example.com"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Email is already registered.");
-    }
-
-    @Test
-    void updateEmailToTheSameAddressIsANoOp() {
-        AppUser user = user("password123");
-        when(appUserRepository.findByUsername("demo")).thenReturn(Optional.of(user));
-
-        CurrentUserResponse response = authService.updateEmail("demo", "password123", "DEMO@example.com");
-
-        assertThat(response.email()).isEqualTo("demo@example.com");
-        verify(appUserRepository, never()).save(any());
-        verify(passwordResetService, never()).invalidatePendingResets(any());
     }
 
     @Test
@@ -288,7 +269,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.changePassword("demo", "wrong-password", "newPassword456"))
                 .isInstanceOf(AuthenticationFailedException.class)
-                .hasMessage("Current password is incorrect.");
+                .hasMessage("Mật khẩu hiện tại không đúng.");
 
         verify(refreshTokenService, never()).revokeAllForUser(any());
     }
@@ -299,7 +280,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.changePassword("demo", "password123", "password123"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("New password must be different from the current password.");
+                .hasMessage("Mật khẩu mới phải khác mật khẩu hiện tại.");
     }
 
     private AppUser user(String rawPassword) {

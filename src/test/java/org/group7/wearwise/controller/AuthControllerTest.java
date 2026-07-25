@@ -124,39 +124,6 @@ class AuthControllerTest {
     }
 
     @Test
-    void updateEmailReturnsRefreshedProfile() throws Exception {
-        when(authService.updateEmail("demo", "password123", "new@example.com"))
-                .thenReturn(new CurrentUserResponse(1L, "demo", "new@example.com", "USER", null, null));
-
-        mockMvc.perform(put("/api/auth/me/email")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "currentPassword": "password123",
-                                  "email": "new@example.com"
-                                }
-                                """)
-                        .principal(new UsernamePasswordAuthenticationToken("demo", null)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("new@example.com"));
-    }
-
-    @Test
-    void updateEmailRejectsMalformedAddress() throws Exception {
-        mockMvc.perform(put("/api/auth/me/email")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "currentPassword": "password123",
-                                  "email": "not-an-email"
-                                }
-                                """)
-                        .principal(new UsernamePasswordAuthenticationToken("demo", null)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors.email").value("Email is not valid."));
-    }
-
-    @Test
     void logoutRevokesAccessAndRefreshTokens() throws Exception {
         mockMvc.perform(post("/api/auth/logout")
                         .header("Authorization", "Bearer token-value")
@@ -207,7 +174,7 @@ class AuthControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors.email").value("Email is not valid."));
+                .andExpect(jsonPath("$.errors.email").value("Email không hợp lệ. Ví dụ đúng: ban@gmail.com"));
 
         verify(passwordResetService, never()).requestReset(anyString());
     }
@@ -252,7 +219,7 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(
-                        "Password reset link is invalid or has expired. Please request a new one."));
+                        "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Hãy yêu cầu link mới."));
     }
 
     @Test
@@ -267,7 +234,7 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.newPassword").value(
-                        "Password must be 8-100 characters and include at least one letter and one digit."));
+                        "Mật khẩu phải từ 8 đến 100 ký tự, có cả chữ và số, không chứa khoảng trắng."));
     }
 
     @Test
@@ -300,7 +267,7 @@ class AuthControllerTest {
                                 }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("Invalid username or password."));
+                .andExpect(jsonPath("$.message").value("Tên đăng nhập/email hoặc mật khẩu không đúng."));
     }
 
     @Test
@@ -317,7 +284,7 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isLocked())
                 .andExpect(jsonPath("$.message").value(
-                        "Account is temporarily locked after too many failed sign-in attempts. Try again in 15 minute(s)."));
+                        "Tài khoản đang bị khóa tạm do nhập sai mật khẩu quá nhiều lần. Hãy thử lại sau 15 phút, hoặc dùng \"Quên mật khẩu\" để đặt lại."));
     }
 
     @Test
@@ -331,10 +298,10 @@ class AuthControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors.username").value("Username must be between 3 and 100 characters."))
-                .andExpect(jsonPath("$.errors.email").value("Email is required."))
+                .andExpect(jsonPath("$.errors.username").value("Tên đăng nhập phải từ 3 đến 100 ký tự."))
+                .andExpect(jsonPath("$.errors.email").value("Hãy nhập email."))
                 .andExpect(jsonPath("$.errors.password").value(
-                        "Password must be 8-100 characters and include at least one letter and one digit."));
+                        "Mật khẩu phải từ 8 đến 100 ký tự, có cả chữ và số, không chứa khoảng trắng."));
     }
 
     private static AuthResponse authResponse() {

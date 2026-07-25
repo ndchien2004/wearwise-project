@@ -123,7 +123,7 @@ public class PasswordResetService {
                 .orElseThrow(InvalidPasswordResetTokenException::new);
 
         if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
-            throw new IllegalArgumentException("New password must be different from the current password.");
+            throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu hiện tại.");
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));

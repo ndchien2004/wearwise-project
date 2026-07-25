@@ -8,7 +8,6 @@ import org.group7.wearwise.dto.request.LogoutRequest;
 import org.group7.wearwise.dto.request.RefreshTokenRequest;
 import org.group7.wearwise.dto.request.RegisterRequest;
 import org.group7.wearwise.dto.request.ResetPasswordRequest;
-import org.group7.wearwise.dto.request.UpdateEmailRequest;
 import org.group7.wearwise.dto.response.AuthResponse;
 import org.group7.wearwise.dto.response.CurrentUserResponse;
 import org.group7.wearwise.dto.response.MessageResponse;
@@ -20,7 +19,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -63,18 +61,6 @@ public class AuthController {
     @GetMapping("/me")
     public CurrentUserResponse me(Authentication authentication) {
         return authService.getCurrentUser(authentication.getName());
-    }
-
-    @PutMapping("/me/email")
-    public CurrentUserResponse updateEmail(
-            Authentication authentication,
-            @Valid @RequestBody UpdateEmailRequest request
-    ) {
-        return authService.updateEmail(
-                authentication.getName(),
-                request.currentPassword(),
-                request.email()
-        );
     }
 
     @PostMapping("/logout")

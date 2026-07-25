@@ -16,7 +16,7 @@ public class AccountLockedException extends RuntimeException {
 
     private static String buildMessage(long retryAfterSeconds) {
         long minutes = Math.max(1, (retryAfterSeconds + 59) / 60);
-        return "Account is temporarily locked after too many failed sign-in attempts. Try again in "
-                + minutes + " minute(s).";
+        return "Tài khoản đang bị khóa tạm do nhập sai mật khẩu quá nhiều lần. "
+                + "Hãy thử lại sau " + minutes + " phút, hoặc dùng \"Quên mật khẩu\" để đặt lại.";
     }
 }

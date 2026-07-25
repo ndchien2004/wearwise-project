@@ -58,22 +58,22 @@ public class RefreshTokenService {
     @Transactional(noRollbackFor = AuthenticationFailedException.class)
     public String consume(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
-            throw new AuthenticationFailedException("Refresh token is invalid or expired.");
+            throw new AuthenticationFailedException("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
         }
 
         RefreshToken storedToken = refreshTokenRepository.findByTokenHash(secureTokenGenerator.hash(rawToken))
-                .orElseThrow(() -> new AuthenticationFailedException("Refresh token is invalid or expired."));
+                .orElseThrow(() -> new AuthenticationFailedException("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại."));
 
         LocalDateTime now = LocalDateTime.now();
 
         if (storedToken.getRevokedAt() != null) {
             // Token đã thu hồi mà vẫn được dùng lại: coi như bị lộ, hủy toàn bộ phiên.
             refreshTokenRepository.revokeAllForUser(storedToken.getUsername(), now);
-            throw new AuthenticationFailedException("Refresh token is invalid or expired.");
+            throw new AuthenticationFailedException("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
         }
 
         if (!storedToken.isUsable(now)) {
-            throw new AuthenticationFailedException("Refresh token is invalid or expired.");
+            throw new AuthenticationFailedException("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
         }
 
         storedToken.setRevokedAt(now);

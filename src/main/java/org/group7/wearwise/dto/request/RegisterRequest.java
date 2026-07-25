@@ -7,20 +7,22 @@ import jakarta.validation.constraints.Size;
 import org.group7.wearwise.validation.StrongPassword;
 
 public record RegisterRequest(
-        @NotBlank(message = "Username is required.")
-        @Size(min = 3, max = 100, message = "Username must be between 3 and 100 characters.")
+        @NotBlank(message = "Hãy nhập tên đăng nhập.")
+        @Size(min = 3, max = 100, message = "Tên đăng nhập phải từ 3 đến 100 ký tự.")
+        // Cấm ký tự @ nên tên đăng nhập không bao giờ trùng dạng email — nhờ vậy ô đăng nhập
+        // nhận được cả hai mà không cần đoán người dùng đang nhập kiểu nào.
         @Pattern(
                 regexp = "^[A-Za-z0-9._-]+$",
-                message = "Username may only contain letters, digits, dot, underscore and hyphen."
+                message = "Tên đăng nhập chỉ gồm chữ không dấu, số và các ký tự . _ - (không khoảng trắng)."
         )
         String username,
 
-        @NotBlank(message = "Email is required.")
-        @Email(message = "Email is not valid.")
-        @Size(max = 190, message = "Email must be at most 190 characters.")
+        @NotBlank(message = "Hãy nhập email.")
+        @Email(message = "Email không hợp lệ. Ví dụ đúng: ban@gmail.com")
+        @Size(max = 190, message = "Email tối đa 190 ký tự.")
         String email,
 
-        @NotBlank(message = "Password is required.")
+        @NotBlank(message = "Hãy nhập mật khẩu.")
         @StrongPassword
         String password
 ) {

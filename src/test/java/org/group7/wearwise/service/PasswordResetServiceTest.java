@@ -198,7 +198,7 @@ class PasswordResetServiceTest {
 
         assertThatThrownBy(() -> passwordResetService.resetPassword("raw-token", "password123"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("New password must be different from the current password.");
+                .hasMessage("Mật khẩu mới phải khác mật khẩu hiện tại.");
     }
 
     @Test

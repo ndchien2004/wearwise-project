@@ -75,7 +75,7 @@ class RefreshTokenServiceTest {
 
         assertThatThrownBy(() -> refreshTokenService.consume("raw-token"))
                 .isInstanceOf(AuthenticationFailedException.class)
-                .hasMessage("Refresh token is invalid or expired.");
+                .hasMessage("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
     }
 
     @Test
