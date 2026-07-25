@@ -52,6 +52,9 @@ public enum ErrorCode {
     /** Không chia sẻ được vì trang phục đang bị ẩn / thiếu món. */
     SHARE_TARGET_UNAVAILABLE(HttpStatus.CONFLICT),
 
+    /** Gọi quá nhanh/quá nhiều — kèm header Retry-After cho biết chờ bao lâu. */
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS),
+
     // ----- Ảnh & dịch vụ ngoài -----
     IMAGE_INVALID(HttpStatus.BAD_REQUEST),
     AI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),

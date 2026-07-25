@@ -24,14 +24,17 @@ import java.util.List;
 public class SecurityConfig {
 
     private final BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter;
+    private final RateLimitFilter rateLimitFilter;
     private final List<String> allowedOrigins;
 
     public SecurityConfig(
             BearerTokenAuthenticationFilter bearerTokenAuthenticationFilter,
+            RateLimitFilter rateLimitFilter,
             @Value("${wearwise.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}")
             List<String> allowedOrigins
     ) {
         this.bearerTokenAuthenticationFilter = bearerTokenAuthenticationFilter;
+        this.rateLimitFilter = rateLimitFilter;
         this.allowedOrigins = allowedOrigins;
     }
 
@@ -67,6 +70,9 @@ public class SecurityConfig {
                                 response.sendError(401, "Unauthorized"))
                 )
                 .addFilterBefore(bearerTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // Đặt sau filter xác thực để hạn mức tính theo tài khoản khi đã đăng nhập,
+                // chỉ rơi về IP với request ẩn danh.
+                .addFilterAfter(rateLimitFilter, BearerTokenAuthenticationFilter.class)
                 .build();
     }
 
