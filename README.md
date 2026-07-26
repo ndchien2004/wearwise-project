@@ -48,6 +48,7 @@ Mở http://localhost:5173 — dev server proxy sẵn `/api` sang backend nên k
 | Lịch phối đồ theo ngày (lên kế hoạch, đánh dấu đã mặc) | `/api/outfit-plans` | Lịch phối đồ |
 | Gợi ý outfit theo thời tiết (Open-Meteo, không cần API key) | `/api/outfits/suggestions` | Gợi ý thời tiết |
 | Thống kê tủ đồ (phân bố, mặc nhiều nhất, lâu chưa mặc) | `/api/statistics` | Thống kê |
+| Lịch sử mặc theo ngày (mặc gì nhiều nhất trong tháng, số ngày có mặc) | `/api/statistics/history` | Trang chủ |
 | Chia sẻ outfit/món đồ sang tài khoản khác bằng mã 8 ký tự | `/api/shares` | Chia sẻ |
 
 ### Xác thực (JWT)
@@ -102,6 +103,19 @@ Chưa cấu hình SMTP thì ứng dụng **không** gửi mail mà ghi thẳng l
 demo ngay khi dev. Muốn gửi mail thật, điền `spring.mail.*` trong `src/main/resources/application-secrets.properties`
 (file đã gitignore, sẵn khung để điền; với Gmail phải dùng App password 16 ký tự chứ không phải mật khẩu thường).
 
+### Nhật ký mặc
+
+Mỗi lượt mặc được ghi thành một dòng trong bảng `wear_logs` — một dòng cho outfit và một dòng cho
+mỗi món trong bộ. Đây là nguồn sự thật của lịch sử; `wearCount` và `lastWornAt` trên món đồ/outfit
+chỉ là bản tóm tắt được cập nhật kèm theo.
+
+- **Mỗi ngày tối đa một lượt** cho mỗi món và mỗi outfit — bảo đảm bằng ràng buộc UNIQUE
+  `(owner, clothing_item, worn_on)` và `(owner, outfit, worn_on)`, không phải bằng cách so `lastWornAt`.
+- **Bỏ đánh dấu "đã mặc"** ở lịch sẽ xoá đúng những dòng do kế hoạch đó sinh ra, trừ lại `wearCount`
+  và đọc lại `lastWornAt` từ dòng gần nhất còn lại.
+- Tài khoản có sẵn dữ liệu từ trước được dựng lại một dòng `LEGACY` tại `lastWornAt` ngay lần khởi
+  động đầu tiên, nên hoàn tác và màn hình lịch sử vẫn có dữ liệu để đọc.
+
 ### Logic gợi ý theo thời tiết
 
 Frontend lấy thời tiết hiện tại từ Open-Meteo (theo thành phố người dùng chọn), rồi gọi
@@ -125,7 +139,7 @@ cho khỏi đọc nhầm). Người nhận vào trang **Chia sẻ**, nhập mã,
 ## Test
 
 ```bash
-./mvnw test        # backend (167 tests)
+./mvnw test        # backend (229 tests)
 cd frontend && npm run build   # kiểm tra build frontend
 ```
 

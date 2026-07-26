@@ -3,6 +3,7 @@ package org.group7.wearwise.service;
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.entity.OutfitPlan;
+import org.group7.wearwise.enums.WearSource;
 import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.exception.BusinessRuleException;
 import org.group7.wearwise.exception.ErrorCode;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
@@ -25,15 +27,18 @@ public class OutfitPlanService {
     private final OutfitPlanRepository outfitPlanRepository;
     private final OutfitService outfitService;
     private final AppUserRepository appUserRepository;
+    private final WearLogService wearLogService;
 
     public OutfitPlanService(
             OutfitPlanRepository outfitPlanRepository,
             OutfitService outfitService,
-            AppUserRepository appUserRepository
+            AppUserRepository appUserRepository,
+            WearLogService wearLogService
     ) {
         this.outfitPlanRepository = outfitPlanRepository;
         this.outfitService = outfitService;
         this.appUserRepository = appUserRepository;
+        this.wearLogService = wearLogService;
     }
 
     @Transactional(readOnly = true)
@@ -68,11 +73,11 @@ public class OutfitPlanService {
         LocalDate normalizedPlanDate = requirePlanDate(planDate);
         if (outfitPlanRepository.existsByOwner_UsernameAndPlanDateAndOutfit_Id(
                 normalizedOwnerUsername, normalizedPlanDate, outfit.getId())) {
-            throw new IllegalArgumentException("Outfit này đã được lên lịch cho ngày đó rồi.");
+            throw duplicatePlan(outfit, normalizedPlanDate);
         }
 
         OutfitPlan plan = OutfitPlan.builder()
-                .planDate(requirePlanDate(planDate))
+                .planDate(normalizedPlanDate)
                 .note(normalizeNote(note))
                 .outfit(outfit)
                 .owner(owner)
@@ -88,11 +93,24 @@ public class OutfitPlanService {
         Outfit outfit = outfitService.getOutfitById(normalizedOwnerUsername, outfitId);
         assertOutfitUsable(outfit);
 
-        plan.setPlanDate(requirePlanDate(planDate));
+        LocalDate normalizedPlanDate = requirePlanDate(planDate);
+        if (outfitPlanRepository.existsByOwner_UsernameAndPlanDateAndOutfit_IdAndIdNot(
+                normalizedOwnerUsername, normalizedPlanDate, outfit.getId(), plan.getId())) {
+            throw duplicatePlan(outfit, normalizedPlanDate);
+        }
+
+        plan.setPlanDate(normalizedPlanDate);
         plan.setNote(normalizeNote(note));
         plan.setOutfit(outfit);
 
         return outfitPlanRepository.save(plan);
+    }
+
+    private BusinessRuleException duplicatePlan(Outfit outfit, LocalDate planDate) {
+        return new BusinessRuleException(
+                ErrorCode.PLAN_DUPLICATE,
+                "Outfit \"" + outfit.getName() + "\" đã được lên lịch cho ngày " + planDate + " rồi."
+        );
     }
 
     /** Không cho lên lịch một bộ đang thiếu món — tới ngày đó cũng không mặc được. */
@@ -115,8 +133,40 @@ public class OutfitPlanService {
             return plan;
         }
 
-        outfitService.markAsWorn(normalizedOwnerUsername, plan.getOutfit().getId());
+        // Completing a future plan would stamp today onto lastWornAt and skew every wear statistic.
+        if (plan.getPlanDate().isAfter(LocalDate.now())) {
+            throw new BusinessRuleException(
+                    ErrorCode.PLAN_NOT_DUE,
+                    "Kế hoạch ngày " + plan.getPlanDate() + " chưa tới nên chưa đánh dấu đã mặc được."
+            );
+        }
+
+        outfitService.applyWear(normalizedOwnerUsername, plan.getOutfit().getId(), WearSource.PLAN, plan.getId());
+
         plan.setCompleted(true);
+        plan.setCompletedAt(LocalDateTime.now());
+
+        return outfitPlanRepository.save(plan);
+    }
+
+    /**
+     * Undo a completion by removing exactly the wear log entries it created. Plans completed
+     * before the log existed have no entries, so the flag is cleared without touching any count
+     * rather than guessing what to subtract.
+     */
+    @Transactional
+    public OutfitPlan uncompletePlan(String ownerUsername, Long id) {
+        String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
+        OutfitPlan plan = getPlanById(normalizedOwnerUsername, id);
+
+        if (!Boolean.TRUE.equals(plan.getCompleted())) {
+            return plan;
+        }
+
+        wearLogService.revertPlanWears(normalizedOwnerUsername, plan.getId());
+
+        plan.setCompleted(false);
+        plan.setCompletedAt(null);
 
         return outfitPlanRepository.save(plan);
     }

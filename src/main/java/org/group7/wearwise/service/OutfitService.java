@@ -7,6 +7,7 @@ import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.enums.WearSource;
 import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.exception.BusinessRuleException;
 import org.group7.wearwise.exception.ClothingItemNotFoundException;
@@ -21,7 +22,6 @@ import org.group7.wearwise.repository.specification.OutfitSpecifications;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -41,19 +41,22 @@ public class OutfitService {
     private final AppUserRepository appUserRepository;
     private final OutfitPlanRepository outfitPlanRepository;
     private final ShareRepository shareRepository;
+    private final WearLogService wearLogService;
 
     public OutfitService(
             OutfitRepository outfitRepository,
             ClothingItemRepository clothingItemRepository,
             AppUserRepository appUserRepository,
             OutfitPlanRepository outfitPlanRepository,
-            ShareRepository shareRepository
+            ShareRepository shareRepository,
+            WearLogService wearLogService
     ) {
         this.outfitRepository = outfitRepository;
         this.clothingItemRepository = clothingItemRepository;
         this.appUserRepository = appUserRepository;
         this.outfitPlanRepository = outfitPlanRepository;
         this.shareRepository = shareRepository;
+        this.wearLogService = wearLogService;
     }
 
     @Transactional
@@ -137,9 +140,19 @@ public class OutfitService {
 
     @Transactional
     public Outfit markAsWorn(String ownerUsername, Long id) {
+        return applyWear(ownerUsername, id, WearSource.OUTFIT, null);
+    }
+
+    /**
+     * Ghi nhận mặc nguyên bộ: một lượt cho bộ và một lượt cho mỗi món chưa được tính hôm nay
+     * (món có thể đã được mặc lẻ hoặc nằm trong một bộ khác cùng ngày).
+     *
+     * @param outfitPlanId kế hoạch đứng sau lượt mặc này, để hoàn tác gỡ đúng những dòng đó
+     */
+    @Transactional
+    public Outfit applyWear(String ownerUsername, Long id, WearSource source, Long outfitPlanId) {
         Outfit outfit = getOutfitById(ownerUsername, id);
         LocalDateTime wornAt = LocalDateTime.now();
-        LocalDate today = wornAt.toLocalDate();
 
         // Bộ thiếu món (do món bị ẩn) thì chặn sớm bằng thông báo nói rõ phải thay món nào,
         // thay vì để assertWearable báo lỗi về một món lẻ.
@@ -148,24 +161,15 @@ public class OutfitService {
         // Không mặc được nguyên bộ nếu có món đang giặt / hỏng / chưa dùng được.
         outfit.getClothingItems().forEach(ClothingItemService::assertWearable);
 
-        // Mỗi outfit chỉ tính tối đa 1 lượt mặc mỗi ngày (bấm lại trong ngày không cộng thêm).
-        if (ClothingItemService.isWornOn(outfit.getLastWornAt(), today)) {
+        AppUser owner = outfit.getOwner();
+        if (!wearLogService.recordOutfitWear(owner, outfit, wornAt, source, outfitPlanId)) {
             return outfit;
         }
 
-        outfit.setWearCount(normalizeWearCount(outfit.getWearCount()) + 1);
-        outfit.setLastWornAt(wornAt);
+        outfit.getClothingItems()
+                .forEach(item -> wearLogService.recordItemWear(owner, item, wornAt, source, outfitPlanId));
 
-        // Món đồ đã tính lượt hôm nay (mặc lẻ hoặc thuộc outfit khác) thì không cộng lại.
-        outfit.getClothingItems().forEach(item -> {
-            if (!ClothingItemService.isWornOn(item.getLastWornAt(), today)) {
-                item.setWearCount(normalizeWearCount(item.getWearCount()) + 1);
-                item.setLastWornAt(wornAt);
-            }
-        });
-
-        clothingItemRepository.saveAll(outfit.getClothingItems());
-        return outfitRepository.save(outfit);
+        return outfit;
     }
 
     @Transactional
@@ -301,8 +305,9 @@ public class OutfitService {
     public void deleteOutfit(String ownerUsername, Long id) {
         Outfit outfit = getOutfitById(ownerUsername, id);
         outfitPlanRepository.deleteAll(outfitPlanRepository.findAllByOutfit_Id(outfit.getId()));
-        // Mã chia sẻ trỏ tới bộ này cũng hết ý nghĩa — gỡ luôn để không vướng khóa ngoại.
+        // Mã chia sẻ và nhật ký mặc trỏ tới bộ này cũng hết ý nghĩa — gỡ luôn để không vướng khóa ngoại.
         shareRepository.deleteByOutfit_Id(outfit.getId());
+        wearLogService.deleteForOutfit(outfit.getId());
         outfitRepository.delete(outfit);
     }
 

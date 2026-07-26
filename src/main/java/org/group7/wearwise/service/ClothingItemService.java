@@ -9,6 +9,7 @@ import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.ColorTone;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.enums.WearSource;
 import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.exception.BusinessRuleException;
 import org.group7.wearwise.exception.ClothingItemInUseException;
@@ -39,17 +40,20 @@ public class ClothingItemService {
     private final OutfitRepository outfitRepository;
     private final AppUserRepository appUserRepository;
     private final ShareRepository shareRepository;
+    private final WearLogService wearLogService;
 
     public ClothingItemService(
             ClothingItemRepository clothingItemRepository,
             OutfitRepository outfitRepository,
             AppUserRepository appUserRepository,
-            ShareRepository shareRepository
+            ShareRepository shareRepository,
+            WearLogService wearLogService
     ) {
         this.clothingItemRepository = clothingItemRepository;
         this.outfitRepository = outfitRepository;
         this.appUserRepository = appUserRepository;
         this.shareRepository = shareRepository;
+        this.wearLogService = wearLogService;
     }
 
     @Transactional
@@ -264,8 +268,9 @@ public class ClothingItemService {
             throw new ClothingItemInUseException(item.getName(), outfitNames, wearCount);
         }
 
-        // Mã chia sẻ trỏ tới món này cũng hết ý nghĩa — gỡ luôn để không vướng khóa ngoại.
+        // Mã chia sẻ và nhật ký mặc trỏ tới món này cũng hết ý nghĩa — gỡ luôn để không vướng khóa ngoại.
         shareRepository.deleteByClothingItem_Id(id);
+        wearLogService.deleteForClothingItem(id);
         clothingItemRepository.delete(item);
     }
 
@@ -319,17 +324,10 @@ public class ClothingItemService {
         // Đồ đang giặt / chưa dùng được / hư hỏng thì không mặc được.
         assertWearable(item);
 
-        // Mỗi món đồ chỉ tính tối đa 1 lượt mặc mỗi ngày.
-        if (isWornOn(item.getLastWornAt(), LocalDate.now())) {
-            return item;
-        }
+        // Nhật ký giữ luật "mỗi món tối đa 1 lượt mỗi ngày"; bấm lại trong ngày không cộng thêm.
+        wearLogService.recordItemWear(item.getOwner(), item, LocalDateTime.now(), WearSource.ITEM, null);
 
-        int currentWearCount = item.getWearCount() == null ? 0 : item.getWearCount();
-
-        item.setWearCount(currentWearCount + 1);
-        item.setLastWornAt(LocalDateTime.now());
-
-        return clothingItemRepository.save(item);
+        return item;
     }
 
     public static boolean isWornOn(LocalDateTime lastWornAt, LocalDate date) {

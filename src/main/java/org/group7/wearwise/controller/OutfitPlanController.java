@@ -85,6 +85,11 @@ public class OutfitPlanController {
         return OutfitPlanResponse.from(outfitPlanService.completePlan(authentication.getName(), id));
     }
 
+    @PatchMapping("/{id}/uncomplete")
+    public OutfitPlanResponse uncompletePlan(Authentication authentication, @PathVariable Long id) {
+        return OutfitPlanResponse.from(outfitPlanService.uncompletePlan(authentication.getName(), id));
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletePlan(Authentication authentication, @PathVariable Long id) {
