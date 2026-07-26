@@ -15,6 +15,9 @@ function DayModal({ iso, plans, outfits, onChanged, onClose }) {
   const [busy, setBusy] = useState(false);
 
   const dayPlans = plans.filter((p) => p.date === iso);
+  // An outfit missing an archived item cannot be planned — the server rejects it on submit.
+  const selectableOutfits = outfits.filter((o) => o.available);
+  const isFuture = iso > todayIso();
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -41,6 +44,19 @@ function DayModal({ iso, plans, outfits, onChanged, onClose }) {
     setError(null);
     try {
       await plansApi.completePlan(plan.id);
+      await onChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleUncomplete = async (plan) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await plansApi.uncompletePlan(plan.id);
       await onChanged();
     } catch (err) {
       setError(err.message);
@@ -89,8 +105,18 @@ function DayModal({ iso, plans, outfits, onChanged, onClose }) {
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {!plan.completed && (
-                    <Button size="sm" variant="green" disabled={busy} onClick={() => handleComplete(plan)}>
+                  {plan.completed ? (
+                    <Button size="sm" disabled={busy} onClick={() => handleUncomplete(plan)}>
+                      ↩️ Bỏ đánh dấu
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="green"
+                      disabled={busy || isFuture}
+                      title={isFuture ? 'Chưa tới ngày này nên chưa đánh dấu được.' : undefined}
+                      onClick={() => handleComplete(plan)}
+                    >
                       ✅ Đã mặc
                     </Button>
                   )}
@@ -109,11 +135,16 @@ function DayModal({ iso, plans, outfits, onChanged, onClose }) {
         <Field label="Outfit">
           <select className="nb-select" value={outfitId} onChange={(e) => setOutfitId(e.target.value)}>
             <option value="">— Chọn outfit —</option>
-            {outfits.map((o) => (
+            {selectableOutfits.map((o) => (
               <option key={o.id} value={o.id}>{o.name}</option>
             ))}
           </select>
         </Field>
+        {selectableOutfits.length < outfits.length && (
+          <p style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600, marginTop: -6, marginBottom: 12 }}>
+            {outfits.length - selectableOutfits.length} outfit đang thiếu món nên không lên lịch được.
+          </p>
+        )}
         <Field label="Ghi chú">
           <input
             className="nb-input"

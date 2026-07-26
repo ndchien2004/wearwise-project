@@ -136,7 +136,7 @@ export default function SuggestionsPage() {
       await plansApi.createPlan({ date: todayIso(), outfitId: outfit.id, note: 'Theo gợi ý thời tiết' });
       toastOk(`Đã thêm "${outfit.name}" vào lịch hôm nay! 📅`);
     } catch (err) {
-      if (err.message?.includes('already planned')) {
+      if (err.code === 'PLAN_DUPLICATE') {
         toastOk(`"${outfit.name}" đã có trong lịch hôm nay rồi 📅`);
       } else {
         toastErr(err.message);
@@ -213,7 +213,7 @@ export default function SuggestionsPage() {
       await plansApi.createPlan({ date: day.date, outfitId: day.outfit.id, note: 'Theo kế hoạch AI' });
       toastOk(`Đã thêm "${day.outfit.name}" vào lịch ngày ${day.date}! 📅`);
     } catch (err) {
-      if (err.message?.includes('already planned')) {
+      if (err.code === 'PLAN_DUPLICATE') {
         toastOk(`Ngày ${day.date} đã có kế hoạch rồi 📅`);
       } else {
         toastErr(err.message);
