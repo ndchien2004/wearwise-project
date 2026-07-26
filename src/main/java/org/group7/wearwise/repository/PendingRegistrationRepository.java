@@ -17,6 +17,13 @@ public interface PendingRegistrationRepository extends JpaRepository<PendingRegi
     /** Số lần yêu cầu OTP gần đây cho một email — dùng để chặn spam. */
     long countByEmailAndCreatedAtAfter(String email, LocalDateTime createdAt);
 
+    /** Một email khác đang giữ tên đăng nhập này bằng một yêu cầu OTP còn hiệu lực. */
+    boolean existsByUsernameAndEmailNotAndUsedAtIsNullAndExpiresAtAfter(
+            String username,
+            String email,
+            LocalDateTime now
+    );
+
     @Modifying
     @Query("update PendingRegistration p set p.usedAt = :now where p.email = :email and p.usedAt is null")
     int markAllUsedForEmail(@Param("email") String email, @Param("now") LocalDateTime now);

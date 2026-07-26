@@ -5,6 +5,8 @@ import org.group7.wearwise.dto.response.CurrentUserResponse;
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.exception.AccountLockedException;
 import org.group7.wearwise.exception.AuthenticationFailedException;
+import org.group7.wearwise.exception.BusinessRuleException;
+import org.group7.wearwise.exception.ErrorCode;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,8 +92,10 @@ class AuthServiceTest {
         when(appUserRepository.existsByUsername("demo")).thenReturn(true);
 
         assertThatThrownBy(() -> authService.register("demo", "demo@example.com", "password123"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Tên đăng nhập này đã có người sử dụng.");
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("Tên đăng nhập này đã có người sử dụng.")
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.USERNAME_TAKEN);
     }
 
     @Test
@@ -100,8 +104,10 @@ class AuthServiceTest {
         when(appUserRepository.existsByEmail("demo@example.com")).thenReturn(true);
 
         assertThatThrownBy(() -> authService.register("demo", "demo@example.com", "password123"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Email này đã được dùng cho một tài khoản khác.");
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("Email này đã được dùng cho một tài khoản khác.")
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.EMAIL_TAKEN);
     }
 
     @Test
