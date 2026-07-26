@@ -29,11 +29,16 @@ import java.util.Map;
  *
  * <ul>
  *   <li><b>AI</b> — mỗi lượt gọi tốn tiền thật và quota có hạn, nên siết chặt nhất.</li>
+ *   <li><b>Thử đồ</b> — mỗi lượt ghép ảnh là một lần gọi dịch vụ trả phí, đắt nhất trong hệ thống.</li>
+ *   <li><b>Tải ảnh</b> — mỗi lượt chiếm dung lượng lưu trữ vĩnh viễn trên Cloudinary.</li>
  *   <li><b>Xác thực</b> — tính theo IP để chặn dò mật khẩu và đăng ký hàng loạt. Khóa tài khoản
  *       sau 5 lần sai đã có sẵn, nhưng nó không ngăn được việc dò <i>nhiều tài khoản khác nhau</i>
  *       từ cùng một nguồn.</li>
  *   <li><b>Còn lại</b> — hạn mức rộng, chỉ để chặn cào dữ liệu và vòng lặp lỗi của client.</li>
  * </ul>
+ *
+ * <p>Chỉ những thao tác thực sự tốn kém mới vào nhóm đắt: đọc trạng thái cấu hình hay xem lại
+ * ảnh đã ghép là request thường, tính vào hạn mức AI/thử đồ sẽ làm người dùng hết lượt oan.</p>
  *
  * <p>Chạy <b>sau</b> {@link BearerTokenAuthenticationFilter} để biết được username; request chưa
  * đăng nhập thì tính theo IP.</p>
@@ -47,6 +52,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     /** Tự tạo thay vì inject: filter chạy ngoài MVC nên không phụ thuộc ObjectMapper của web layer. */
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final int aiPerHour;
+    private final int tryOnPerHour;
+    private final int uploadPerHour;
     private final int authPerMinute;
     private final int generalPerMinute;
     private final boolean trustForwardedHeader;
@@ -54,12 +61,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
     public RateLimitFilter(
             RateLimiter rateLimiter,
             @Value("${wearwise.ratelimit.ai-per-hour:40}") int aiPerHour,
+            @Value("${wearwise.ratelimit.try-on-per-hour:15}") int tryOnPerHour,
+            @Value("${wearwise.ratelimit.upload-per-hour:80}") int uploadPerHour,
             @Value("${wearwise.ratelimit.auth-per-minute:20}") int authPerMinute,
             @Value("${wearwise.ratelimit.general-per-minute:240}") int generalPerMinute,
             @Value("${wearwise.ratelimit.trust-forwarded-header:false}") boolean trustForwardedHeader
     ) {
         this.rateLimiter = rateLimiter;
         this.aiPerHour = aiPerHour;
+        this.tryOnPerHour = tryOnPerHour;
+        this.uploadPerHour = uploadPerHour;
         this.authPerMinute = authPerMinute;
         this.generalPerMinute = generalPerMinute;
         this.trustForwardedHeader = trustForwardedHeader;
@@ -79,7 +90,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        Group group = groupOf(path);
+        Group group = groupOf(path, request.getMethod());
         String key = group.name() + ':' + callerKey(request);
         long retryAfterSeconds = rateLimiter.checkAndConsume(key, group.capacity(this), group.window());
 
@@ -92,9 +103,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private Group groupOf(String path) {
-        if (path.startsWith("/api/ai/")) {
+    private Group groupOf(String path, String method) {
+        boolean post = "POST".equalsIgnoreCase(method);
+
+        // /api/ai/status chỉ đọc cấu hình, giao diện gọi mỗi lần mở form — không phải một lượt AI.
+        if (path.startsWith("/api/ai/") && !path.startsWith("/api/ai/status")) {
             return Group.AI;
+        }
+        if (post && (path.startsWith("/api/try-on/items/") || path.startsWith("/api/try-on/outfits/"))) {
+            return Group.TRY_ON;
+        }
+        if (post && (path.startsWith("/api/images/")
+                || path.startsWith("/api/try-on/body-photo")
+                || path.startsWith("/api/auth/avatar"))) {
+            return Group.UPLOAD;
         }
         // /api/auth/me, /logout, /avatar là thao tác thường của người đã đăng nhập, không phải cửa dò mật khẩu.
         if (path.startsWith("/api/auth/")
@@ -156,24 +178,32 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private enum Group {
-        AI, AUTH, GENERAL;
+        AI, TRY_ON, UPLOAD, AUTH, GENERAL;
 
         private int capacity(RateLimitFilter filter) {
             return switch (this) {
                 case AI -> filter.aiPerHour;
+                case TRY_ON -> filter.tryOnPerHour;
+                case UPLOAD -> filter.uploadPerHour;
                 case AUTH -> filter.authPerMinute;
                 case GENERAL -> filter.generalPerMinute;
             };
         }
 
         private Duration window() {
-            return this == AI ? Duration.ofHours(1) : Duration.ofMinutes(1);
+            return switch (this) {
+                case AI, TRY_ON, UPLOAD -> Duration.ofHours(1);
+                case AUTH, GENERAL -> Duration.ofMinutes(1);
+            };
         }
 
         private String message(long retryAfterSeconds) {
+            long minutes = Math.max(1, retryAfterSeconds / 60);
             return switch (this) {
                 case AI -> "Bạn đã dùng hết lượt AI cho giờ này. Hãy thử lại sau "
-                        + Math.max(1, retryAfterSeconds / 60) + " phút, hoặc nhập thông tin thủ công.";
+                        + minutes + " phút, hoặc nhập thông tin thủ công.";
+                case TRY_ON -> "Bạn đã dùng hết lượt thử đồ cho giờ này. Hãy thử lại sau " + minutes + " phút.";
+                case UPLOAD -> "Bạn đã tải lên khá nhiều ảnh. Hãy thử lại sau " + minutes + " phút.";
                 case AUTH -> "Quá nhiều lần thử. Hãy đợi " + retryAfterSeconds + " giây rồi thử lại.";
                 case GENERAL -> "Bạn thao tác hơi nhanh. Hãy đợi " + retryAfterSeconds + " giây rồi thử lại.";
             };

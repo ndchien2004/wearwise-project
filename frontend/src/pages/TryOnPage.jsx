@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import * as itemsApi from '../api/clothingItems';
 import * as tryOnApi from '../api/tryOn';
@@ -20,6 +20,7 @@ export default function TryOnPage() {
   const fileInputRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [items, setItems] = useState([]);
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);
@@ -30,11 +31,21 @@ export default function TryOnPage() {
 
   const ITEMS_PER_PAGE = 9; // 3 cột x 3 dòng
 
+  const loadProfile = useCallback(() => {
+    setLoadingProfile(true);
+    setError(null);
+    tryOnApi
+      .getTryOnProfile()
+      .then(setProfile)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoadingProfile(false));
+  }, []);
+
   useEffect(() => {
-    tryOnApi.getTryOnProfile().then(setProfile).catch((err) => setError(err.message));
+    loadProfile();
     itemsApi.findItems().then(setItems).catch(() => setItems([]));
     tryOnApi.listTryOns().then(setResults).catch(() => setResults([]));
-  }, []);
+  }, [loadProfile]);
 
   const wearableItems = items.filter((item) => item.imageUrl);
   const itemPageCount = Math.ceil(wearableItems.length / ITEMS_PER_PAGE);
@@ -116,7 +127,16 @@ export default function TryOnPage() {
     return (
       <div>
         <ErrorBanner error={error} onDismiss={() => setError(null)} />
-        <Loading>Đang mở phòng thử đồ...</Loading>
+        {loadingProfile ? (
+          <Loading>Đang mở phòng thử đồ...</Loading>
+        ) : (
+          <EmptyState emoji="🚪">
+            Không mở được phòng thử đồ.{' '}
+            <Button size="sm" onClick={loadProfile}>
+              🔄 Thử lại
+            </Button>
+          </EmptyState>
+        )}
       </div>
     );
   }
