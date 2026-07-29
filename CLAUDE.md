@@ -278,6 +278,12 @@ Người dùng gõ một câu ("7 ngày đi làm, thứ Sáu gặp khách"), AI 
   đủ 7 ngày" thì model bỏ qua lúc nào không hay. Trần `WearPlan.MAX_DAYS` = 14.
 - Model trả về id bịa hoặc ngày ngoài khoảng thì **bỏ dòng đó**, không ném lỗi cả lượt: mất một
   ngày còn hơn mất cả kế hoạch lẫn một lượt gọi trả tiền.
+- `AiPlanModal` là **cửa duy nhất** vào tính năng này; trang Lịch và trang Gợi ý thời tiết cùng mở
+  nó, khác nhau ở chỗ trang Gợi ý truyền thêm `forecast`. Trước đây trang Gợi ý có luồng riêng
+  ("Để AI lên kế hoạch" → `/api/ai/weekly-plan`) chạy ngay không hỏi gì rồi thêm từng ngày vào lịch.
+  Hai nút tên gần giống nhau ở hai trang khiến người dùng bấm nhầm và tưởng tính năng mới bị hỏng —
+  đừng dựng lại lối vào thứ hai. **`/api/ai/weekly-plan` và `AiSuggestionService.planWeek` hiện
+  không còn client nào gọi**, giữ lại chỉ vì chưa ai quyết định xóa.
 
 ### 4.11 Phân trang
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import * as wearPlansApi from '../api/wearPlans';
 import { Button, ErrorBanner, Field, Loading, Modal } from '../components/ui';
-import { DOW_NAMES, formatDate, todayIso } from '../utils/date';
+import { DOW_NAMES, formatDate, toIsoDate, todayIso } from '../utils/date';
 
 const DAY_OPTIONS = [3, 5, 7, 10, 14];
 
@@ -17,13 +17,19 @@ function weekdayOf(iso) {
   return DOW_NAMES[index];
 }
 
+function isoPlusDays(iso, offset) {
+  const date = new Date(`${iso}T00:00:00`);
+  date.setDate(date.getDate() + offset);
+  return toIsoDate(date);
+}
+
 /**
  * Nhập yêu cầu → AI sinh lịch → xem trước → lưu.
  *
  * Ba bước tách bạch trong cùng một modal: người dùng thấy được kế hoạch trước khi nó chạm vào
  * lịch thật, và những ngày họ đã tự đặt chỉ bị thay khi chính họ tick ghi đè.
  */
-export default function AiPlanModal({ onSaved, onClose }) {
+export default function AiPlanModal({ forecast, tone, onSaved, onClose }) {
   const [step, setStep] = useState('form');
   const [request, setRequest] = useState('');
   const [days, setDays] = useState(7);
@@ -34,6 +40,11 @@ export default function AiPlanModal({ onSaved, onClose }) {
   const [overwrite, setOverwrite] = useState({});
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  // Dự báo chỉ có cho vài ngày tới, còn kế hoạch có thể dài tới 14 ngày — cắt theo đúng khoảng
+  // người dùng chọn để phần dư không lọt vào prompt.
+  const endDate = isoPlusDays(startDate, Number(days) - 1);
+  const usableForecast = (forecast ?? []).filter((d) => d.date >= startDate && d.date <= endDate);
 
   const handleGenerate = async (e) => {
     e.preventDefault();
@@ -49,6 +60,10 @@ export default function AiPlanModal({ onSaved, onClose }) {
         request: request.trim(),
         days: Number(days),
         startDate,
+        tone: tone || null,
+        // Chỉ gửi những ngày nằm trong đợt. Gửi cả dự báo 7 ngày cho một kế hoạch 3 ngày là
+        // nhét vào prompt bốn ngày AI không dùng tới.
+        forecast: usableForecast.length > 0 ? usableForecast : null,
       });
       setPreview(result);
       setTitle(result.title || 'Kế hoạch mặc');
@@ -142,6 +157,14 @@ export default function AiPlanModal({ onSaved, onClose }) {
               />
             </Field>
           </div>
+
+          <p className="ai-plan-hint">
+            {usableForecast.length === 0
+              ? '🌦️ Đợt này chưa có dự báo thời tiết nên AI sẽ bỏ qua tiêu chí đó thay vì đoán bừa.'
+              : usableForecast.length < Number(days)
+                ? `🌦️ Có dự báo cho ${usableForecast.length}/${days} ngày đầu; những ngày sau AI xếp theo mục đích của bạn.`
+                : `🌦️ AI sẽ dựa vào dự báo thời tiết của cả ${days} ngày.`}
+          </p>
 
           <div className="nb-modal-actions">
             <Button type="submit" variant="primary" disabled={busy}>

@@ -78,9 +78,14 @@ vì đó là hỏng thật, phải sửa bộ mới dùng lại.
 
 ### Kế hoạch mặc do AI sinh
 
-Ở trang Lịch phối đồ, bấm **✨ AI lên kế hoạch** rồi gõ mong muốn bằng lời — *"7 ngày đi làm, thứ
-Sáu gặp khách nên cần lịch sự hơn"*. AI xếp lịch từ chính các bộ đang có trong tủ, mỗi ngày kèm một
-câu giải thích.
+Bấm **✨ AI lên kế hoạch** — nút này có ở **cả hai** trang *Lịch phối đồ* và *Gợi ý thời tiết*, mở
+cùng một hộp thoại. Gõ mong muốn bằng lời (*"7 ngày đi làm, thứ Sáu gặp khách nên cần lịch sự
+hơn"*), chọn số ngày và ngày bắt đầu. AI xếp lịch từ chính các bộ đang có trong tủ, mỗi ngày kèm
+một câu giải thích.
+
+Mở từ trang *Gợi ý thời tiết* thì dự báo của thành phố đang chọn được gửi kèm, nên AI cân nhắc cả
+nhiệt độ và khả năng mưa từng ngày. Mở từ trang *Lịch* thì không có dự báo và AI được dặn bỏ qua
+tiêu chí đó thay vì đoán bừa — hộp thoại nói rõ nó đang dùng dự báo cho mấy ngày.
 
 Kế hoạch hiện ra ở dạng **xem trước, chưa lưu gì**. Ngày nào bạn đã tự đặt lịch sẵn sẽ được đánh
 dấu và **giữ nguyên** trừ khi bạn tự tick ghi đè. Bấm lưu thì các ngày đổ vào lịch tháng như kế

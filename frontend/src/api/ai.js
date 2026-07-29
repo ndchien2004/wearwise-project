@@ -44,13 +44,8 @@ export function rankAiOutfits(payload) {
   return apiFetch('/api/ai/outfit-ranking', { method: 'POST', body: payload });
 }
 
-/**
- * Nhờ AI lên kế hoạch mặc cho nhiều ngày dựa vào dự báo thời tiết.
- * payload: { days: [{ date, tempMin, tempMax, rainChance, description }], tone? }
- */
-export function planAiWeek(payload) {
-  return apiFetch('/api/ai/weekly-plan', { method: 'POST', body: payload });
-}
+// Kế hoạch mặc nhiều ngày đã chuyển sang api/wearPlans.js: luồng mới nhận thêm yêu cầu bằng lời
+// của người dùng, có bước xem trước và lưu cả đợt trong một lần thay vì thêm từng ngày vào lịch.
 
 /** Quét nhiều món trong một ảnh, trả về mảng gợi ý để người dùng soát lại. */
 export function analyzeClothingImageBatch(file) {

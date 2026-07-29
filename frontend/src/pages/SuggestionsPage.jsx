@@ -4,6 +4,7 @@ import * as aiApi from '../api/ai';
 import * as outfitsApi from '../api/outfits';
 import * as plansApi from '../api/plans';
 import { DEFAULT_CITY, getWeather, searchCity } from '../api/weather';
+import AiPlanModal from '../components/AiPlanModal';
 import OutfitVisual from '../components/OutfitVisual';
 import { Badge, Button, EmptyState, ErrorBanner, Loading, Toast } from '../components/ui';
 import {
@@ -64,13 +65,10 @@ export default function SuggestionsPage() {
   const [rankingLoading, setRankingLoading] = useState(false);
   const [rankingError, setRankingError] = useState(null);
 
-  const [weekPlan, setWeekPlan] = useState(() => ssGet('ww_ai_weekplan'));
-  const [planLoading, setPlanLoading] = useState(false);
-  const [planError, setPlanError] = useState(null);
-  const [planningDate, setPlanningDate] = useState(null);
+  const [aiPlanning, setAiPlanning] = useState(false);
 
-  // Lưu kết quả AI để chuyển tab rồi quay lại vẫn còn.
-  useEffect(() => ssSet('ww_ai_weekplan', weekPlan), [weekPlan]);
+  // Lưu kết quả AI để chuyển tab rồi quay lại vẫn còn. Kế hoạch nhiều ngày không cần lưu như vậy:
+  // nó được lưu thẳng vào lịch, xem lại ở trang Lịch hoặc thẻ kế hoạch ở Trang chủ.
   useEffect(() => ssSet('ww_ai_ranking', aiRanking), [aiRanking]);
   useEffect(() => ssSet('ww_ai_compose', aiSuggestions), [aiSuggestions]);
   useEffect(() => {
@@ -89,7 +87,6 @@ export default function SuggestionsPage() {
     setSuggestions(null);
     setError(null);
     setRankingError(null);
-    setPlanError(null);
     try {
       const w = await getWeather(activeCity.latitude, activeCity.longitude);
       setWeather(w);
@@ -126,7 +123,6 @@ export default function SuggestionsPage() {
     setCityQuery('');
     setCityResults([]);
     // Đổi thành phố thì kết quả AI cũ không còn phù hợp — xóa đi.
-    setWeekPlan(null);
     setAiRanking(null);
   };
 
@@ -182,46 +178,14 @@ export default function SuggestionsPage() {
     }
   };
 
-  // Nhờ AI lên kế hoạch mặc cho các ngày trong dự báo.
-  const planWeekWithAi = async () => {
-    setPlanError(null);
-    setPlanLoading(true);
-    try {
-      const result = await aiApi.planAiWeek({
-        days: weather.daily.map((d) => ({
-          date: d.date,
-          tempMin: d.tempMin,
-          tempMax: d.tempMax,
-          rainChance: d.rainChance,
-          description: d.desc,
-        })),
-        tone: aiTone || null,
-      });
-      setWeekPlan(result);
-    } catch (err) {
-      setPlanError(err.message);
-    } finally {
-      setPlanLoading(false);
-    }
-  };
-
-  // Thêm 1 ngày trong kế hoạch AI vào lịch phối đồ.
-  const addPlanDay = async (day) => {
-    setPlanError(null);
-    setPlanningDate(day.date);
-    try {
-      await plansApi.createPlan({ date: day.date, outfitId: day.outfit.id, note: 'Theo kế hoạch AI' });
-      toastOk(`Đã thêm "${day.outfit.name}" vào lịch ngày ${day.date}! 📅`);
-    } catch (err) {
-      if (err.code === 'PLAN_DUPLICATE') {
-        toastOk(`Ngày ${day.date} đã có kế hoạch rồi 📅`);
-      } else {
-        toastErr(err.message);
-      }
-    } finally {
-      setPlanningDate(null);
-    }
-  };
+  // Dự báo theo đúng dạng AiPlanModal cần, để nó không phải biết cấu trúc của API thời tiết.
+  const forecastForPlan = (weather?.daily ?? []).map((d) => ({
+    date: d.date,
+    tempMin: d.tempMin,
+    tempMax: d.tempMax,
+    rainChance: d.rainChance,
+    description: d.desc,
+  }));
 
   // Biến một gợi ý AI thành outfit thật trong tủ.
   const createOutfitFromAi = async (suggestion) => {
@@ -334,42 +298,16 @@ export default function SuggestionsPage() {
           </div>
 
           <div className="section-heading-row">
-            <h2 className="section-heading" style={{ margin: 0 }}>🗓️ Kế hoạch mặc cả tuần</h2>
-            <Button variant="primary" onClick={planWeekWithAi} disabled={planLoading}>
-              {planLoading ? '🤖 AI đang lên lịch...' : '✨ Để AI lên kế hoạch'}
+            <h2 className="section-heading" style={{ margin: 0 }}>🗓️ Kế hoạch mặc nhiều ngày</h2>
+            <Button variant="primary" onClick={() => setAiPlanning(true)}>
+              ✨ AI lên kế hoạch
             </Button>
           </div>
 
-          {planError && (
-            <div style={{ marginBottom: 14 }}>
-              <ErrorBanner error={planError} onDismiss={() => setPlanError(null)} />
-            </div>
-          )}
-
-          {weekPlan && (
-            <div className="card-grid" style={{ marginBottom: 22 }}>
-              {weekPlan.map((day) => (
-                <div key={day.date} className="nb-card item-card">
-                  <Badge color="blue">
-                    📅 {new Date(`${day.date}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })}
-                  </Badge>
-                  <OutfitVisual outfit={day.outfit} />
-                  <div className="item-name" title={day.outfit.name}>🧢 {day.outfit.name}</div>
-                  <p style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--muted)', margin: 0 }}>💡 {day.reason}</p>
-                  <div className="card-actions">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => addPlanDay(day)}
-                      disabled={planningDate !== null}
-                    >
-                      {planningDate === day.date ? '⏳ Đang thêm...' : '📅 Thêm vào lịch'}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <p style={{ fontWeight: 600, color: 'var(--muted)', fontSize: 13.5, marginTop: 0, marginBottom: 22 }}>
+            Nói cho AI biết bạn cần lịch cho dịp gì và bao nhiêu ngày — dự báo ở trên được dùng luôn.
+            Xem trước rồi lưu cả đợt vào lịch trong một lần.
+          </p>
 
           <h2 className="section-heading">🤖 Nhờ AI phối đồ từ tủ của bạn</h2>
           <div className="nb-card" style={{ marginBottom: 20 }}>
@@ -550,6 +488,15 @@ export default function SuggestionsPage() {
             </div>
           )}
         </>
+      )}
+
+      {aiPlanning && (
+        <AiPlanModal
+          forecast={forecastForPlan}
+          tone={aiTone || null}
+          onSaved={(saved) => toastOk(`Đã lưu "${saved.title}" — ${saved.dayCount} ngày vào lịch! 📅`)}
+          onClose={() => setAiPlanning(false)}
+        />
       )}
     </div>
   );
