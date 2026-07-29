@@ -1,6 +1,7 @@
 package org.group7.wearwise.service;
 
 import org.group7.wearwise.entity.RefreshToken;
+import org.group7.wearwise.enums.AuditAction;
 import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.repository.RefreshTokenRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,11 +22,13 @@ public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final SecureTokenGenerator secureTokenGenerator;
+    private final AuditLogService auditLogService;
     private final long expiresInSeconds;
 
     public RefreshTokenService(
             RefreshTokenRepository refreshTokenRepository,
             SecureTokenGenerator secureTokenGenerator,
+            AuditLogService auditLogService,
             @Value("${wearwise.auth.refresh-token-expires-in-seconds:604800}") long expiresInSeconds
     ) {
         if (expiresInSeconds < 1) {
@@ -34,6 +37,7 @@ public class RefreshTokenService {
 
         this.refreshTokenRepository = refreshTokenRepository;
         this.secureTokenGenerator = secureTokenGenerator;
+        this.auditLogService = auditLogService;
         this.expiresInSeconds = expiresInSeconds;
     }
 
@@ -69,6 +73,10 @@ public class RefreshTokenService {
         if (storedToken.getRevokedAt() != null) {
             // Token đã thu hồi mà vẫn được dùng lại: coi như bị lộ, hủy toàn bộ phiên.
             refreshTokenRepository.revokeAllForUser(storedToken.getUsername(), now);
+            // Sự kiện đáng chú ý nhất trong toàn bộ nhật ký: hoặc token đã bị đánh cắp thật, hoặc
+            // có một client đang gọi /refresh song song sai cách. Cả hai đều cần người xem xét.
+            auditLogService.record(AuditAction.REFRESH_TOKEN_REUSE_DETECTED, storedToken.getUsername(),
+                    "Refresh token đã thu hồi lại được dùng; toàn bộ phiên của tài khoản bị hủy");
             throw new AuthenticationFailedException("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
         }
 

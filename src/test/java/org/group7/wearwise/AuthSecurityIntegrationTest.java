@@ -2,6 +2,8 @@ package org.group7.wearwise;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
+import org.group7.wearwise.config.RefreshTokenCookie;
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.PasswordResetTokenRepository;
@@ -16,10 +18,13 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultMatcher;
 
 import java.time.LocalDateTime;
 
@@ -101,14 +106,19 @@ class AuthSecurityIntegrationTest {
                 """, status().isOk());
         assertThat(appUserRepository.findByUsername("public-user")).isEmpty();
 
-        // Nhập đúng OTP thì tạo tài khoản và trả về cả hai token.
+        // Nhập đúng OTP thì tạo tài khoản, trả access token trong body và refresh token qua cookie.
         String otp = captureRegistrationOtp();
-        JsonNode tokens = postJson("/api/auth/register/verify", """
-                {"email": "public-user@example.com", "otp": "%s"}
-                """.formatted(otp), status().isOk());
+        MockHttpServletResponse verified = mockMvc.perform(post("/api/auth/register/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "public-user@example.com", "otp": "%s"}
+                                """.formatted(otp)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse();
 
-        assertThat(tokens.get("accessToken").asText()).isNotBlank();
-        assertThat(tokens.get("refreshToken").asText()).isNotBlank();
+        assertThat(asJson(verified).get("accessToken").asText()).isNotBlank();
+        assertThat(refreshCookieOf(verified)).isNotBlank();
         assertThat(appUserRepository.findByUsername("public-user")).isPresent();
     }
 
@@ -212,39 +222,62 @@ class AuthSecurityIntegrationTest {
     @Test
     void refreshTokenRotatesAndOldTokenStopsWorking() throws Exception {
         saveUser("demo", "demo@example.com", "password123");
-        String firstRefreshToken = login("demo", "password123").get("refreshToken").asText();
+        String firstRefreshToken = loginRefreshToken("demo", "password123");
 
-        JsonNode refreshed = postJson("/api/auth/refresh", """
-                {"refreshToken": "%s"}
-                """.formatted(firstRefreshToken), status().isOk());
+        MockHttpServletResponse refreshed = refresh(firstRefreshToken, status().isOk());
 
-        assertThat(refreshed.get("accessToken").asText()).isNotBlank();
-        assertThat(refreshed.get("refreshToken").asText()).isNotEqualTo(firstRefreshToken);
+        assertThat(asJson(refreshed).get("accessToken").asText()).isNotBlank();
+        assertThat(refreshCookieOf(refreshed)).isNotEqualTo(firstRefreshToken);
 
         // Dùng lại refresh token cũ phải bị từ chối.
-        postJson("/api/auth/refresh", """
-                {"refreshToken": "%s"}
-                """.formatted(firstRefreshToken), status().isUnauthorized());
+        refresh(firstRefreshToken, status().isUnauthorized());
+    }
+
+    /**
+     * Refresh token là bí mật duy nhất còn sống 7 ngày, nên nó phải nằm ngoài tầm với của
+     * JavaScript: chỉ đi bằng cookie HttpOnly, không bao giờ xuất hiện trong JSON.
+     */
+    @Test
+    void refreshTokenNeverAppearsInAnyResponseBody() throws Exception {
+        saveUser("demo", "demo@example.com", "password123");
+
+        MockHttpServletResponse loginResponse = loginResponse("demo", "password123");
+        assertThat(loginResponse.getContentAsString()).doesNotContain(refreshCookieOf(loginResponse));
+        assertThat(asJson(loginResponse).has("refreshToken")).isFalse();
+
+        assertThat(loginResponse.getHeaders(HttpHeaders.SET_COOKIE))
+                .anyMatch(cookie -> cookie.startsWith(RefreshTokenCookie.NAME + "=")
+                        && cookie.contains("HttpOnly")
+                        && cookie.contains("Path=/api/auth"));
+    }
+
+    /**
+     * Cookie được trình duyệt gửi tự động, kể cả với request do một trang web độc hại kích hoạt.
+     * Header tự chế thì trang đó không đặt được — nên thiếu header là từ chối.
+     */
+    @Test
+    void refreshCookieIsIgnoredWithoutTheClientHeader() throws Exception {
+        saveUser("demo", "demo@example.com", "password123");
+        String refreshToken = loginRefreshToken("demo", "password123");
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie(RefreshTokenCookie.NAME, refreshToken)))
+                .andExpect(status().isForbidden());
+
+        // Bị chặn chứ không phải bị tiêu thụ — token vẫn còn nguyên giá trị.
+        refresh(refreshToken, status().isOk());
     }
 
     @Test
     void reusingRevokedRefreshTokenKillsTheWholeSession() throws Exception {
         saveUser("demo", "demo@example.com", "password123");
-        String firstRefreshToken = login("demo", "password123").get("refreshToken").asText();
+        String firstRefreshToken = loginRefreshToken("demo", "password123");
 
-        String secondRefreshToken = postJson("/api/auth/refresh", """
-                {"refreshToken": "%s"}
-                """.formatted(firstRefreshToken), status().isOk())
-                .get("refreshToken").asText();
+        String secondRefreshToken = refreshCookieOf(refresh(firstRefreshToken, status().isOk()));
 
         // Token cũ bị dùng lại: coi như bị đánh cắp, thu hồi toàn bộ phiên.
-        postJson("/api/auth/refresh", """
-                {"refreshToken": "%s"}
-                """.formatted(firstRefreshToken), status().isUnauthorized());
-
-        postJson("/api/auth/refresh", """
-                {"refreshToken": "%s"}
-                """.formatted(secondRefreshToken), status().isUnauthorized());
+        refresh(firstRefreshToken, status().isUnauthorized());
+        refresh(secondRefreshToken, status().isUnauthorized());
     }
 
     @Test
@@ -280,7 +313,7 @@ class AuthSecurityIntegrationTest {
     @Test
     void forgotPasswordThenResetAllowsLoginWithNewPassword() throws Exception {
         saveUser("demo", "demo@example.com", "password123");
-        String oldRefreshToken = login("demo", "password123").get("refreshToken").asText();
+        String oldRefreshToken = loginRefreshToken("demo", "password123");
 
         postJson("/api/auth/forgot-password", """
                 {"email": "DEMO@example.com"}
@@ -305,9 +338,7 @@ class AuthSecurityIntegrationTest {
                 """, status().isUnauthorized());
 
         // Phiên cũ bị đăng xuất khỏi mọi thiết bị.
-        postJson("/api/auth/refresh", """
-                {"refreshToken": "%s"}
-                """.formatted(oldRefreshToken), status().isUnauthorized());
+        refresh(oldRefreshToken, status().isUnauthorized());
     }
 
     /**
@@ -454,25 +485,65 @@ class AuthSecurityIntegrationTest {
     }
 
     private JsonNode login(String username, String password) throws Exception {
-        return postJson("/api/auth/login", """
-                {"username": "%s", "password": "%s"}
-                """.formatted(username, password), status().isOk());
+        return asJson(loginResponse(username, password));
+    }
+
+    /** Refresh token không còn nằm trong JSON — lấy nó ra từ cookie, đúng như trình duyệt làm. */
+    private String loginRefreshToken(String username, String password) throws Exception {
+        return refreshCookieOf(loginResponse(username, password));
+    }
+
+    private MockHttpServletResponse loginResponse(String username, String password) throws Exception {
+        return mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username": "%s", "password": "%s"}
+                                """.formatted(username, password)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse();
+    }
+
+    /** Gọi /refresh như trình duyệt: token trong cookie, kèm header nhận dạng client chống CSRF. */
+    private MockHttpServletResponse refresh(String refreshToken, ResultMatcher expectedStatus) throws Exception {
+        return mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie(RefreshTokenCookie.NAME, refreshToken))
+                        .header(RefreshTokenCookie.CLIENT_HEADER, "web"))
+                .andExpect(expectedStatus)
+                .andReturn()
+                .getResponse();
+    }
+
+    private static String refreshCookieOf(MockHttpServletResponse response) throws Exception {
+        String prefix = RefreshTokenCookie.NAME + "=";
+        for (String setCookie : response.getHeaders(HttpHeaders.SET_COOKIE)) {
+            if (!setCookie.startsWith(prefix)) {
+                continue;
+            }
+            String value = setCookie.substring(prefix.length());
+            int semicolon = value.indexOf(';');
+            return semicolon < 0 ? value : value.substring(0, semicolon);
+        }
+
+        throw new AssertionError("Phản hồi không đặt cookie " + RefreshTokenCookie.NAME);
+    }
+
+    private static JsonNode asJson(MockHttpServletResponse response) throws Exception {
+        String body = response.getContentAsString();
+        return body.isBlank() ? OBJECT_MAPPER.createObjectNode() : OBJECT_MAPPER.readTree(body);
     }
 
     private JsonNode postJson(
             String path,
             String body,
-            org.springframework.test.web.servlet.ResultMatcher expectedStatus
+            ResultMatcher expectedStatus
     ) throws Exception {
-        String response = mockMvc.perform(post(path)
+        return asJson(mockMvc.perform(post(path)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(expectedStatus)
                 .andReturn()
-                .getResponse()
-                .getContentAsString();
-
-        return response.isBlank() ? OBJECT_MAPPER.createObjectNode() : OBJECT_MAPPER.readTree(response);
+                .getResponse());
     }
 
     private void saveUser(String username, String email, String rawPassword) {

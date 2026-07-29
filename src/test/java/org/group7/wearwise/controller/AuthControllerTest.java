@@ -1,5 +1,7 @@
 package org.group7.wearwise.controller;
 
+import jakarta.servlet.http.Cookie;
+import org.group7.wearwise.config.RefreshTokenCookie;
 import org.group7.wearwise.dto.response.AuthResponse;
 import org.group7.wearwise.dto.response.CurrentUserResponse;
 import org.group7.wearwise.exception.AccountLockedException;
@@ -19,6 +21,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.time.LocalDateTime;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -28,6 +31,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,14 +47,19 @@ class AuthControllerTest {
         passwordResetService = mock(PasswordResetService.class);
 
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AuthController(authService, passwordResetService))
+                .standaloneSetup(new AuthController(
+                        authService, passwordResetService, new RefreshTokenCookie(false, "Lax", 604800)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator())
                 .build();
     }
 
+    /**
+     * Refresh token phải rời khỏi payload JSON hoàn toàn — còn nằm trong body là frontend còn
+     * có thể cất vào localStorage, và mọi lợi ích của cookie HttpOnly mất sạch.
+     */
     @Test
-    void loginReturnsTokens() throws Exception {
+    void loginReturnsAccessTokenInBodyAndRefreshTokenOnlyInAnHttpOnlyCookie() throws Exception {
         when(authService.login("demo", "password123")).thenReturn(authResponse());
 
         mockMvc.perform(post("/api/auth/login")
@@ -63,11 +72,42 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("token-value"))
-                .andExpect(jsonPath("$.refreshToken").value("refresh-value"));
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().string("Set-Cookie", containsString("wearwise_refresh=refresh-value")))
+                .andExpect(header().string("Set-Cookie", containsString("HttpOnly")))
+                .andExpect(header().string("Set-Cookie", containsString("Path=/api/auth")))
+                .andExpect(header().string("Set-Cookie", containsString("SameSite=Lax")));
     }
 
     @Test
-    void refreshReturnsRotatedTokens() throws Exception {
+    void refreshReadsTheTokenFromTheCookie() throws Exception {
+        when(authService.refresh("refresh-value")).thenReturn(authResponse());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie(RefreshTokenCookie.NAME, "refresh-value"))
+                        .header(RefreshTokenCookie.CLIENT_HEADER, "web"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("token-value"))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist());
+    }
+
+    /**
+     * Cốt lõi của lớp chống CSRF: trình duyệt tự gửi cookie kèm mọi request, kể cả request do
+     * trang web độc hại kích hoạt — nhưng trang đó không đặt được header tự chế.
+     */
+    @Test
+    void refreshRejectsTheCookieWhenTheClientHeaderIsMissing() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie(RefreshTokenCookie.NAME, "refresh-value")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MISSING_CLIENT_HEADER"));
+
+        verify(authService, never()).refresh(anyString());
+    }
+
+    /** Client không phải trình duyệt (curl, script kiểm thử) vẫn gửi được token qua body. */
+    @Test
+    void refreshStillAcceptsTheTokenInTheBody() throws Exception {
         when(authService.refresh("refresh-value")).thenReturn(authResponse());
 
         mockMvc.perform(post("/api/auth/refresh")
@@ -79,6 +119,14 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("token-value"));
+    }
+
+    @Test
+    void refreshWithoutAnyTokenIsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh"))
+                .andExpect(status().isUnauthorized());
+
+        verify(authService, never()).refresh(anyString());
     }
 
     @Test
@@ -126,6 +174,20 @@ class AuthControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(authService).logout("Bearer token-value", null);
+    }
+
+    @Test
+    void logoutRevokesTheCookieTokenAndTellsTheBrowserToDropIt() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer token-value")
+                        .header(RefreshTokenCookie.CLIENT_HEADER, "web")
+                        .cookie(new Cookie(RefreshTokenCookie.NAME, "refresh-value"))
+                        .principal(new UsernamePasswordAuthenticationToken("demo", null)))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Set-Cookie", containsString("wearwise_refresh=")))
+                .andExpect(header().string("Set-Cookie", containsString("Max-Age=0")));
+
+        verify(authService).logout("Bearer token-value", "refresh-value");
     }
 
     @Test

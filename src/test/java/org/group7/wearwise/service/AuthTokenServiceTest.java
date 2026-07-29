@@ -1,6 +1,7 @@
 package org.group7.wearwise.service;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -109,6 +110,33 @@ class AuthTokenServiceTest {
         assertThatThrownBy(() -> new AuthTokenService("short-secret", 3600))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Auth token secret must be at least 32 characters.");
+    }
+
+    @Test
+    void missingSecretIsRejected() {
+        assertThatThrownBy(() -> new AuthTokenService("   ", 3600))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Chưa cấu hình wearwise.auth.token-secret");
+    }
+
+    /** Khóa mặc định nằm công khai trong git — chạy production bằng nó là không có xác thực thật. */
+    @Test
+    void developmentSecretIsRejectedOutsideDevelopmentProfiles() {
+        assertThatThrownBy(() -> new AuthTokenService(AuthTokenService.DEV_ONLY_SECRET, 3600))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("khóa mặc định của môi trường phát triển");
+    }
+
+    @Test
+    void developmentSecretIsAllowedUnderDevProfile() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("dev");
+
+        AuthTokenService authTokenService =
+                new AuthTokenService(environment, AuthTokenService.DEV_ONLY_SECRET, 3600);
+
+        assertThat(authTokenService.validateAndGetUsername(authTokenService.createToken("demo")))
+                .contains("demo");
     }
 
     @Test

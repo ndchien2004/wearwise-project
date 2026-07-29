@@ -51,8 +51,10 @@ export default function OutfitFormModal({ outfit, onSave, onClose }) {
   };
 
   useEffect(() => {
+    // Ô chọn món phải thấy được cả tủ: người dùng cần chọn bất kỳ món nào để ghép thành outfit,
+    // cắt trang ở đây sẽ khiến món ở trang sau không bao giờ chọn tới.
     itemsApi
-      .findItems()
+      .findAllItems()
       .then(setAllItems)
       .catch((err) => setError(err.message));
   }, []);

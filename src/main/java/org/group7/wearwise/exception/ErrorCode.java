@@ -23,6 +23,14 @@ public enum ErrorCode {
     USERNAME_TAKEN(HttpStatus.BAD_REQUEST),
     EMAIL_TAKEN(HttpStatus.BAD_REQUEST),
     INVALID_RESET_TOKEN(HttpStatus.BAD_REQUEST),
+    /** Request dùng refresh token trong cookie nhưng thiếu header nhận dạng client (chống CSRF). */
+    MISSING_CLIENT_HEADER(HttpStatus.FORBIDDEN),
+
+    // ----- Quản trị -----
+    /** Không có tài khoản nào mang tên đăng nhập được yêu cầu. */
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** Thao tác quản trị bị từ chối vì vi phạm ràng buộc an toàn (vd tự khóa chính mình). */
+    ADMIN_ACTION_REJECTED(HttpStatus.CONFLICT),
 
     // ----- Không tìm thấy -----
     CLOTHING_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND),

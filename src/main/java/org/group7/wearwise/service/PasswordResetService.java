@@ -2,6 +2,7 @@ package org.group7.wearwise.service;
 
 import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.PasswordResetToken;
+import org.group7.wearwise.enums.AuditAction;
 import org.group7.wearwise.exception.InvalidPasswordResetTokenException;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.PasswordResetTokenRepository;
@@ -33,6 +34,7 @@ public class PasswordResetService {
     private final AuthMailService authMailService;
     private final RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
     private final long expiresInSeconds;
     private final int maxRequestsPerHour;
 
@@ -43,6 +45,7 @@ public class PasswordResetService {
             AuthMailService authMailService,
             RefreshTokenService refreshTokenService,
             PasswordEncoder passwordEncoder,
+            AuditLogService auditLogService,
             @Value("${wearwise.auth.password-reset-expires-in-seconds:1800}") long expiresInSeconds,
             @Value("${wearwise.auth.password-reset-max-requests-per-hour:5}") int maxRequestsPerHour
     ) {
@@ -52,6 +55,7 @@ public class PasswordResetService {
         this.authMailService = authMailService;
         this.refreshTokenService = refreshTokenService;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogService = auditLogService;
         this.expiresInSeconds = expiresInSeconds;
         this.maxRequestsPerHour = maxRequestsPerHour;
     }
@@ -101,6 +105,8 @@ public class PasswordResetService {
                 rawToken,
                 Math.max(1, expiresInSeconds / 60)
         );
+
+        auditLogService.record(AuditAction.PASSWORD_RESET_REQUESTED, user.getUsername(), null);
     }
 
     /** Đặt mật khẩu mới bằng mã dùng một lần; mọi phiên đang mở đều bị đăng xuất. */
@@ -137,6 +143,8 @@ public class PasswordResetService {
 
         // Mật khẩu đổi thì mọi phiên cũ phải chấm dứt, kể cả trên thiết bị khác.
         refreshTokenService.revokeAllForUser(user.getUsername());
+        auditLogService.record(AuditAction.PASSWORD_RESET_COMPLETED, user.getUsername(),
+                "Đặt lại bằng link gửi qua email; mọi phiên cũ bị thu hồi");
         log.info("Đã đặt lại mật khẩu cho tài khoản {}", user.getUsername());
     }
 

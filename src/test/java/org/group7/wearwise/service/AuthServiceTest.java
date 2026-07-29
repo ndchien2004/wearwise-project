@@ -44,6 +44,9 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenService refreshTokenService;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     private PasswordEncoder passwordEncoder;
     private AuthService authService;
 
@@ -56,6 +59,7 @@ class AuthServiceTest {
                 new AuthTokenService(TEST_TOKEN_SECRET, 3600),
                 authTokenRevocationService,
                 refreshTokenService,
+                auditLogService,
                 MAX_FAILED_ATTEMPTS,
                 LOCK_DURATION_SECONDS
         );

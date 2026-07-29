@@ -66,6 +66,18 @@ public class AppUser {
     @Column(name = "password_changed_at")
     private LocalDateTime passwordChangedAt;
 
+    /**
+     * Hạn mức AI riêng cho tài khoản này (lượt/giờ). NULL nghĩa là dùng mức mặc định toàn hệ thống.
+     * Quản trị viên chỉnh được để nới cho người dùng thật hoặc siết một tài khoản đang lạm dụng,
+     * mà không phải đổi cấu hình và khởi động lại server.
+     */
+    @Column(name = "ai_quota_per_hour")
+    private Integer aiQuotaPerHour;
+
+    /** Tương tự cho nhóm gọi dịch vụ ngoài (thử đồ ảo, tải ảnh). NULL = dùng mặc định. */
+    @Column(name = "external_quota_per_hour")
+    private Integer externalQuotaPerHour;
+
     private LocalDateTime createdAt;
 
     @PrePersist

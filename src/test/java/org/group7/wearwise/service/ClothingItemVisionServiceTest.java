@@ -46,7 +46,7 @@ class ClothingItemVisionServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(geminiClient.isConfigured()).thenReturn(true);
-        service = new ClothingItemVisionService(geminiClient);
+        service = new ClothingItemVisionService(geminiClient, new ImageValidator());
     }
 
     @Test

@@ -6,39 +6,65 @@
  */
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
-function apiUrl(path) {
+export function apiUrl(path) {
   return `${API_BASE_URL}${path}`;
 }
 
-const TOKEN_KEY = 'wearwise_token';
-const REFRESH_TOKEN_KEY = 'wearwise_refresh_token';
-const USERNAME_KEY = 'wearwise_username';
+/**
+ * Header tự đặt, gửi kèm MỌI request. Backend chỉ chấp nhận cookie refresh token khi thấy
+ * header này — đó là lớp chống CSRF: trang web lạ không đặt được header tự chế (form HTML
+ * không có cơ chế đó, còn fetch từ origin lạ thì vấp CORS preflight).
+ */
+export const CLIENT_HEADER = 'X-Wearwise-Client';
+
+/**
+ * Gợi ý "máy này từng đăng nhập" để lúc mở lại trang biết có nên thử khôi phục phiên hay không.
+ * KHÔNG phải thông tin bí mật — refresh token thật nằm trong cookie HttpOnly do server đặt.
+ */
+const SESSION_HINT_KEY = 'wearwise_username';
+
+/**
+ * Access token chỉ sống trong bộ nhớ của tab, cố tình KHÔNG đưa vào localStorage: token nằm
+ * trong localStorage thì mọi đoạn script chạy được trên trang đều đọc được, và nó còn sống
+ * sót qua cả lúc đóng trình duyệt. Ở đây, đóng tab là mất — phiên dài do cookie HttpOnly giữ,
+ * và cookie đó JavaScript không chạm tới được.
+ */
+let accessToken = null;
 
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function getRefreshToken() {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return accessToken;
 }
 
 export function getStoredUsername() {
-  return localStorage.getItem(USERNAME_KEY);
+  try {
+    return localStorage.getItem(SESSION_HINT_KEY);
+  } catch {
+    return null;
+  }
 }
 
-export function storeSession(token, refreshToken, username) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USERNAME_KEY, username);
+/** Có dấu vết phiên cũ không? Dùng để quyết định có gọi /refresh lúc khởi động hay không. */
+export function hasSessionHint() {
+  return Boolean(getStoredUsername());
+}
 
-  if (refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+export function storeSession(token, username) {
+  accessToken = token;
+  try {
+    localStorage.setItem(SESSION_HINT_KEY, username);
+  } catch {
+    // localStorage bị chặn — phiên vẫn chạy bình thường, chỉ mất khả năng tự đăng nhập lại
+    // sau khi tải lại trang.
   }
 }
 
 export function clearSession() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem(USERNAME_KEY);
+  accessToken = null;
+  try {
+    localStorage.removeItem(SESSION_HINT_KEY);
+  } catch {
+    /* không có gì để dọn */
+  }
 }
 
 export class ApiError extends Error {
@@ -57,30 +83,29 @@ export class ApiError extends Error {
 }
 
 /**
- * Gia hạn access token. Nhiều request cùng gặp 401 sẽ dùng chung một lần gọi /refresh
- * thay vì mỗi request tự gọi (nếu không, refresh token xoay vòng sẽ tự vô hiệu lẫn nhau).
+ * Gia hạn access token bằng cookie refresh token. Nhiều request cùng gặp 401 sẽ dùng chung một
+ * lần gọi /refresh thay vì mỗi request tự gọi (nếu không, refresh token xoay vòng sẽ tự vô hiệu
+ * lẫn nhau).
+ *
+ * <p>Không kiểm tra trước xem có refresh token hay không được nữa — cookie HttpOnly vô hình với
+ * JavaScript. Cứ gọi và để server trả lời; thất bại thì coi như chưa đăng nhập.
  */
 let pendingRefresh = null;
 
-function refreshAccessToken() {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    return Promise.resolve(null);
-  }
-
+export function refreshAccessToken() {
   if (!pendingRefresh) {
     pendingRefresh = fetch(apiUrl('/api/auth/refresh'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
+      headers: { 'Content-Type': 'application/json', [CLIENT_HEADER]: 'web' },
+      credentials: 'include',
     })
       .then(async (response) => {
         if (!response.ok) {
           return null;
         }
         const data = await response.json();
-        storeSession(data.accessToken, data.refreshToken, data.username);
-        return data.accessToken;
+        storeSession(data.accessToken, data.username);
+        return data;
       })
       .catch(() => null)
       .finally(() => {
@@ -123,14 +148,18 @@ async function handleResponse(response, auth) {
   return data;
 }
 
-/** Gửi lại request một lần sau khi gia hạn token, để access token hết hạn không làm gián đoạn thao tác. */
+/**
+ * Gửi lại request một lần sau khi gia hạn token, để access token hết hạn không làm gián đoạn
+ * thao tác. Chỉ thử gia hạn khi máy này từng đăng nhập — tránh bắn một lượt /refresh vô ích
+ * mỗi lần khách vãng lai chạm vào endpoint cần quyền.
+ */
 async function sendWithRetry(send, auth) {
   let response = await send(getToken());
 
-  if (response.status === 401 && auth && getRefreshToken()) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      response = await send(newToken);
+  if (response.status === 401 && auth && hasSessionHint()) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      response = await send(refreshed.accessToken);
     }
   }
 
@@ -139,7 +168,7 @@ async function sendWithRetry(send, auth) {
 
 export async function apiFetch(path, { method = 'GET', body, auth = true } = {}) {
   const send = (token) => {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = { 'Content-Type': 'application/json', [CLIENT_HEADER]: 'web' };
     if (auth && token) {
       headers.Authorization = `Bearer ${token}`;
     }
@@ -147,6 +176,8 @@ export async function apiFetch(path, { method = 'GET', body, auth = true } = {})
     return fetch(apiUrl(path), {
       method,
       headers,
+      // Cần cho cookie refresh token khi frontend và backend nằm ở hai domain khác nhau.
+      credentials: 'include',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   };
@@ -157,12 +188,12 @@ export async function apiFetch(path, { method = 'GET', body, auth = true } = {})
 // Tải file (multipart) — trình duyệt tự đặt Content-Type kèm boundary, không set thủ công.
 export async function apiUpload(path, formData, { method = 'POST' } = {}) {
   const send = (token) => {
-    const headers = {};
+    const headers = { [CLIENT_HEADER]: 'web' };
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    return fetch(apiUrl(path), { method, headers, body: formData });
+    return fetch(apiUrl(path), { method, headers, credentials: 'include', body: formData });
   };
 
   return sendWithRetry(send, true);

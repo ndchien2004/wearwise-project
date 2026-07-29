@@ -22,7 +22,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
@@ -264,9 +268,11 @@ class ClothingItemServiceTest {
                 .favorite(true)
                 .build();
 
-        when(clothingItemRepository.findAll(any(Specification.class))).thenReturn(List.of(sneaker));
+        Pageable pageable = PageRequest.of(0, 12, Sort.by(Sort.Direction.ASC, "id"));
+        when(clothingItemRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(sneaker), pageable, 1));
 
-        List<ClothingItem> items = clothingItemService.findItems(
+        Page<ClothingItem> items = clothingItemService.findItems(
                 OWNER,
                 "run",
                 ClothingCategory.SHOES,
@@ -275,11 +281,18 @@ class ClothingItemServiceTest {
                 ClothingCondition.GOOD,
                 ClothingStatus.AVAILABLE,
                 true,
-                null
+                null,
+                null,
+                pageable
         );
 
-        assertThat(items).containsExactly(sneaker);
-        verify(clothingItemRepository).findAll(any(Specification.class));
+        assertThat(items.getContent()).containsExactly(sneaker);
+
+        // Phân trang phải xuống tới repository chứ không được cắt trong bộ nhớ sau khi lấy hết.
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(clothingItemRepository).findAll(any(Specification.class), captor.capture());
+        assertThat(captor.getValue().getPageSize()).isEqualTo(12);
+        assertThat(captor.getValue().getSort().isSorted()).isTrue();
     }
 
     @Test

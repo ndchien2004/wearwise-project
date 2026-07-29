@@ -1,0 +1,25 @@
+# Header bảo mật cho Cloudflare Pages. Cloudflare đọc file này lúc deploy và gắn header vào
+# mọi phản hồi; chạy `npm run dev` thì Vite KHÔNG đọc file này (chỉ ảnh hưởng bản deploy).
+#
+# Đây mới là lớp chống XSS chính của hệ thống: token nằm trong bộ nhớ tab trình duyệt, nên
+# một đoạn script lạ chèn được vào trang là đọc được phiên đăng nhập. `script-src 'self'`
+# chặn đúng cửa đó — mã chỉ chạy được nếu đến từ chính domain này.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://res.cloudinary.com; connect-src 'self' https:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+# Ghi chú về hai directive "lỏng" phía trên và cách siết lại:
+#
+#   connect-src 'self' https:
+#     Domain backend được nhúng lúc build (VITE_API_BASE_URL) nên không viết cứng được vào
+#     file tĩnh này. Sau khi chốt domain, hãy thay `https:` bằng địa chỉ thật để chặn luôn
+#     đường rò dữ liệu, ví dụ:
+#       connect-src 'self' https://api.wearwise.example.com https://api.open-meteo.com https://geocoding-api.open-meteo.com
+#
+#   style-src ... 'unsafe-inline'
+#     Google Fonts chèn style inline. Bỏ được nếu tự host font trong thư mục public/.

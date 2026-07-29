@@ -22,6 +22,24 @@ const MENU_ITEMS = [
   { key: 'logout', action: 'logout', emoji: '🚪', label: 'Đăng xuất', danger: true },
 ];
 
+/**
+ * Quản trị viên nhìn thấy một menu <b>hoàn toàn khác</b>, không phải menu thường cộng thêm một mục.
+ *
+ * <p>Đây là tài khoản vận hành, không phải tài khoản dùng ứng dụng: nó không có tủ đồ để quản lý,
+ * không phối outfit, không thử đồ. Bày những mục đó ra chỉ tạo cảm giác admin cũng là một người
+ * dùng bình thường — trong khi cả thiết kế phía server đi theo hướng ngược lại (admin quản lý tài
+ * khoản, không chạm vào nội dung).
+ *
+ * <p>Vẫn giữ "Đăng xuất" vì không có nó thì không thoát ra được. Đổi mật khẩu vào qua ô tài khoản
+ * ở góc phải thanh trên cùng.
+ */
+const ADMIN_MENU_ITEMS = [
+  { key: 'admin-overview', to: '/admin', emoji: '📊', label: 'Tổng quan', exact: true },
+  { key: 'admin-users', to: '/admin/users', emoji: '👥', label: 'Tài khoản' },
+  { key: 'admin-audit', to: '/admin/audit', emoji: '📜', label: 'Nhật ký' },
+  { key: 'logout', action: 'logout', emoji: '🚪', label: 'Đăng xuất', danger: true },
+];
+
 function isPathInside(pathname, base) {
   return pathname === base || pathname.startsWith(`${base}/`);
 }
@@ -33,7 +51,7 @@ function matchesItem(pathname, item) {
 }
 
 export default function Layout() {
-  const { username, user, logout } = useAuth();
+  const { username, user, isAdmin, logout } = useAuth();
   const confirm = useConfirm();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -59,7 +77,7 @@ export default function Layout() {
   // Tài khoản tạo trước khi có tính năng quên mật khẩu thì chưa có email — nhắc người dùng bổ sung.
   const needsEmail = Boolean(user) && !user.email;
 
-  const items = MENU_ITEMS.map((item) => ({
+  const items = (isAdmin ? ADMIN_MENU_ITEMS : MENU_ITEMS).map((item) => ({
     ...item,
     current: matchesItem(pathname, item),
     alert: item.key === 'profile' && needsEmail,
@@ -104,7 +122,8 @@ export default function Layout() {
           Menu
         </button>
 
-        <Link to="/" className="hud-logo">
+        {/* Trang chủ của quản trị viên là khu vực vận hành, không phải bảng điều khiển tủ đồ. */}
+        <Link to={isAdmin ? '/admin' : '/'} className="hud-logo">
           Wear<span>Wise</span>
         </Link>
 

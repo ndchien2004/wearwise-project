@@ -58,6 +58,23 @@ public class TryOnResult {
     @Column(nullable = false, length = 512)
     private String resultImageUrl;
 
+    /**
+     * Ảnh người đã dùng làm nền cho lần ghép này. Thường là ảnh cơ thể của người dùng, nhưng khi
+     * mặc chồng lớp thì lại là ảnh kết quả của lần ghép trước.
+     *
+     * <p>Lưu lại thay vì suy ra từ hồ sơ người dùng: người dùng có thể đổi ảnh cơ thể bất cứ lúc
+     * nào, và khi đó mọi kết quả cũ sẽ bị so sánh với một ảnh gốc không liên quan.</p>
+     */
+    @Column(name = "base_image_url", length = 512)
+    private String baseImageUrl;
+
+    /**
+     * Kết quả trước đó trong chuỗi mặc chồng (tham chiếu mềm). NULL nghĩa là ghép từ ảnh cơ thể
+     * gốc — tức là lớp đầu tiên.
+     */
+    @Column(name = "base_result_id")
+    private Long baseResultId;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "owner_id", nullable = false)
     private AppUser owner;

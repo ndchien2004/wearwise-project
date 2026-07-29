@@ -29,6 +29,22 @@ import java.util.TreeMap;
 @Service
 public class CloudinaryService {
 
+    /**
+     * Incoming transformation áp lên ảnh <b>trước khi lưu</b>, gồm hai phần:
+     *
+     * <ul>
+     *   <li>{@code a_exif} — xoay ảnh theo thẻ EXIF Orientation. Phải làm trước khi xóa metadata,
+     *       nếu không ảnh chụp dọc bằng điện thoại sẽ nằm ngang vĩnh viễn.</li>
+     *   <li>{@code fl_force_strip} — xóa toàn bộ EXIF, IPTC, XMP. Ảnh từ điện thoại mang theo
+     *       tọa độ GPS nơi chụp và model máy; URL Cloudinary lại công khai, nên giữ metadata
+     *       đồng nghĩa công bố chỗ ở của người dùng — đặc biệt với ảnh cơ thể dùng để thử đồ.</li>
+     * </ul>
+     *
+     * <p>Cloudinary chỉ tự bỏ metadata ở ảnh <i>phái sinh</i>; bản gốc thì giữ nguyên, nên bắt
+     * buộc phải yêu cầu tường minh ngay lúc tải lên.</p>
+     */
+    private static final String INCOMING_TRANSFORMATION = "a_exif,fl_force_strip";
+
     private final String cloudName;
     private final String apiKey;
     private final String apiSecret;
@@ -75,6 +91,7 @@ public class CloudinaryService {
         TreeMap<String, String> signedParams = new TreeMap<>();
         signedParams.put("folder", folder);
         signedParams.put("timestamp", Long.toString(timestamp));
+        signedParams.put("transformation", INCOMING_TRANSFORMATION);
         String signature = sign(signedParams);
 
         String dataUri = "data:" + normalizeContentType(contentType) + ";base64,"
@@ -85,6 +102,7 @@ public class CloudinaryService {
         formParams.put("api_key", apiKey);
         formParams.put("timestamp", Long.toString(timestamp));
         formParams.put("folder", folder);
+        formParams.put("transformation", INCOMING_TRANSFORMATION);
         formParams.put("signature", signature);
 
         HttpRequest request = HttpRequest.newBuilder()

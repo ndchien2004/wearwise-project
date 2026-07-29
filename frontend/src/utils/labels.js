@@ -100,6 +100,60 @@ export const SUGGESTION_REASON_LABELS = {
   ITEMS_UNAVAILABLE: '🚫 Có món đồ chưa sẵn sàng',
 };
 
+/**
+ * Loại sự kiện trong nhật ký kiểm toán. Thứ tự khai báo cũng là thứ tự hiển thị trong dropdown
+ * lọc và biểu đồ: nhóm truy cập trước, rồi mật khẩu, rồi cảnh báo, cuối cùng là hành động
+ * của quản trị viên.
+ */
+export const AUDIT_ACTION_LABELS = {
+  LOGIN_SUCCEEDED: 'Đăng nhập thành công',
+  LOGIN_FAILED: 'Đăng nhập thất bại',
+  ACCOUNT_AUTO_LOCKED: 'Tự động khóa tài khoản',
+  LOGGED_OUT: 'Đăng xuất',
+  ACCOUNT_REGISTERED: 'Tạo tài khoản',
+  PASSWORD_CHANGED: 'Đổi mật khẩu',
+  PASSWORD_RESET_REQUESTED: 'Yêu cầu đặt lại mật khẩu',
+  PASSWORD_RESET_COMPLETED: 'Đã đặt lại mật khẩu',
+  REFRESH_TOKEN_REUSE_DETECTED: 'Phát hiện token bị dùng lại',
+  ADMIN_LOCKED_ACCOUNT: 'Quản trị viên khóa tài khoản',
+  ADMIN_UNLOCKED_ACCOUNT: 'Quản trị viên mở khóa',
+  ADMIN_CHANGED_RATE_LIMIT: 'Quản trị viên đổi hạn mức',
+};
+
+export const AUDIT_ACTION_EMOJIS = {
+  LOGIN_SUCCEEDED: '✅',
+  LOGIN_FAILED: '🚫',
+  ACCOUNT_AUTO_LOCKED: '🔒',
+  LOGGED_OUT: '👋',
+  ACCOUNT_REGISTERED: '🎉',
+  PASSWORD_CHANGED: '🔑',
+  PASSWORD_RESET_REQUESTED: '📧',
+  PASSWORD_RESET_COMPLETED: '🔓',
+  REFRESH_TOKEN_REUSE_DETECTED: '🚨',
+  ADMIN_LOCKED_ACCOUNT: '🛡️',
+  ADMIN_UNLOCKED_ACCOUNT: '🛡️',
+  ADMIN_CHANGED_RATE_LIMIT: '🎚️',
+};
+
+/**
+ * Màu badge theo mức độ đáng chú ý, không phải theo loại: sự kiện cần người xem xét thì đỏ,
+ * hành động quản trị thì tím (để phân biệt với hoạt động của người dùng thường), còn lại trung tính.
+ */
+export const AUDIT_ACTION_BADGES = {
+  LOGIN_SUCCEEDED: 'nb-badge--green',
+  LOGIN_FAILED: 'nb-badge--orange',
+  ACCOUNT_AUTO_LOCKED: 'nb-badge--red',
+  LOGGED_OUT: 'nb-badge--muted',
+  ACCOUNT_REGISTERED: 'nb-badge--cyan',
+  PASSWORD_CHANGED: 'nb-badge--yellow',
+  PASSWORD_RESET_REQUESTED: 'nb-badge--yellow',
+  PASSWORD_RESET_COMPLETED: 'nb-badge--yellow',
+  REFRESH_TOKEN_REUSE_DETECTED: 'nb-badge--red',
+  ADMIN_LOCKED_ACCOUNT: 'nb-badge--purple',
+  ADMIN_UNLOCKED_ACCOUNT: 'nb-badge--purple',
+  ADMIN_CHANGED_RATE_LIMIT: 'nb-badge--purple',
+};
+
 export function label(map, key) {
   return map[key] ?? key ?? '—';
 }

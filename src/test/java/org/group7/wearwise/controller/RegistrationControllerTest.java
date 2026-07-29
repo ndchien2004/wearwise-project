@@ -1,5 +1,6 @@
 package org.group7.wearwise.controller;
 
+import org.group7.wearwise.config.RefreshTokenCookie;
 import org.group7.wearwise.dto.response.AuthResponse;
 import org.group7.wearwise.dto.response.RegistrationOtpResponse;
 import org.group7.wearwise.exception.GlobalExceptionHandler;
@@ -12,9 +13,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.Validator;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,7 +30,8 @@ class RegistrationControllerTest {
     void setUp() {
         registrationService = mock(RegistrationService.class);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new RegistrationController(registrationService))
+                .standaloneSetup(new RegistrationController(
+                        registrationService, new RefreshTokenCookie(false, "Lax", 604800)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator())
                 .build();
@@ -85,8 +89,11 @@ class RegistrationControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("token-value"))
-                .andExpect(jsonPath("$.refreshToken").value("refresh-value"))
-                .andExpect(jsonPath("$.username").value("demo"));
+                .andExpect(jsonPath("$.username").value("demo"))
+                // Như mọi endpoint phát hành token khác: refresh token chỉ đi bằng cookie HttpOnly.
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().string("Set-Cookie", containsString("wearwise_refresh=refresh-value")))
+                .andExpect(header().string("Set-Cookie", containsString("HttpOnly")));
     }
 
     @Test

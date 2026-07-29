@@ -19,7 +19,9 @@ import org.group7.wearwise.repository.ClothingItemRepository;
 import org.group7.wearwise.repository.OutfitRepository;
 import org.group7.wearwise.repository.ShareRepository;
 import org.group7.wearwise.repository.specification.ClothingItemSpecifications;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -152,6 +154,7 @@ public class ClothingItemService {
                         null,
                         null,
                         null,
+                        null,
                         false
                 )
         );
@@ -170,12 +173,25 @@ public class ClothingItemService {
                         null,
                         null,
                         null,
+                        null,
                         true
                 )
         );
     }
 
-    public List<ClothingItem> findItems(
+    /**
+     * Tìm món đồ theo bộ lọc, <b>cắt trang ngay ở database</b>.
+     *
+     * <p>Trước đây phương thức này trả về toàn bộ kết quả và frontend tự cắt bằng
+     * {@code items.slice()}. Với tủ 500 món thì mỗi lần mở trang là 500 bản ghi rời khỏi database,
+     * đi qua mạng và nằm trong bộ nhớ trình duyệt, chỉ để hiển thị 12 món. Nay Spring Data sinh
+     * thẳng {@code limit ?, ?} kèm một câu {@code count(*)} riêng.
+     *
+     * <p>Thứ tự sắp xếp <b>bắt buộc phải xác định</b> khi có phân trang: không có {@code order by},
+     * database được phép trả về thứ tự khác nhau giữa hai lần gọi, và người dùng sẽ thấy món này
+     * lặp ở trang 2 còn món kia biến mất hẳn. Thứ tự do phía gọi truyền vào qua {@link Pageable}.
+     */
+    public Page<ClothingItem> findItems(
             String ownerUsername,
             String keyword,
             ClothingCategory category,
@@ -184,7 +200,9 @@ public class ClothingItemService {
             ClothingCondition condition,
             ClothingStatus status,
             Boolean favorite,
-            ColorTone colorTone
+            ColorTone colorTone,
+            Boolean hasImage,
+            Pageable pageable
     ) {
         return clothingItemRepository.findAll(
                 ClothingItemSpecifications.matchesFilters(
@@ -197,8 +215,10 @@ public class ClothingItemService {
                         status,
                         favorite,
                         colorTone,
+                        hasImage,
                         false
-                )
+                ),
+                pageable
         );
     }
 

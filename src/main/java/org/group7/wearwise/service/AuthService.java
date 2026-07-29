@@ -3,6 +3,7 @@ package org.group7.wearwise.service;
 import org.group7.wearwise.dto.response.AuthResponse;
 import org.group7.wearwise.dto.response.CurrentUserResponse;
 import org.group7.wearwise.entity.AppUser;
+import org.group7.wearwise.enums.AuditAction;
 import org.group7.wearwise.exception.AccountLockedException;
 import org.group7.wearwise.exception.AuthenticationFailedException;
 import org.group7.wearwise.repository.AppUserRepository;
@@ -24,6 +25,7 @@ public class AuthService {
     private final AuthTokenService authTokenService;
     private final AuthTokenRevocationService authTokenRevocationService;
     private final RefreshTokenService refreshTokenService;
+    private final AuditLogService auditLogService;
     private final int maxFailedLoginAttempts;
     private final long lockDurationSeconds;
 
@@ -33,6 +35,7 @@ public class AuthService {
             AuthTokenService authTokenService,
             AuthTokenRevocationService authTokenRevocationService,
             RefreshTokenService refreshTokenService,
+            AuditLogService auditLogService,
             @Value("${wearwise.auth.max-failed-login-attempts:5}") int maxFailedLoginAttempts,
             @Value("${wearwise.auth.lock-duration-seconds:900}") long lockDurationSeconds
     ) {
@@ -41,6 +44,7 @@ public class AuthService {
         this.authTokenService = authTokenService;
         this.authTokenRevocationService = authTokenRevocationService;
         this.refreshTokenService = refreshTokenService;
+        this.auditLogService = auditLogService;
         this.maxFailedLoginAttempts = maxFailedLoginAttempts;
         this.lockDurationSeconds = lockDurationSeconds;
     }
@@ -80,6 +84,7 @@ public class AuthService {
                 .build();
 
         appUserRepository.save(user);
+        auditLogService.record(AuditAction.ACCOUNT_REGISTERED, normalizedUsername, null);
         return issueTokens(user);
     }
 
@@ -96,15 +101,21 @@ public class AuthService {
      */
     @Transactional(noRollbackFor = {AuthenticationFailedException.class, AccountLockedException.class})
     public AuthResponse login(String usernameOrEmail, String password) {
-        AppUser user = findByUsernameOrEmail(usernameOrEmail)
-                .orElseThrow(AuthenticationFailedException::new);
+        AppUser user = findByUsernameOrEmail(usernameOrEmail).orElseGet(() -> {
+            // Ghi cả lần thử vào tài khoản không tồn tại: một loạt sự kiện như thế từ cùng một IP
+            // chính là dấu vết của đợt dò tài khoản, mà bộ đếm sai mật khẩu không thể thấy được.
+            auditLogService.record(AuditAction.LOGIN_FAILED, usernameOrEmail, null, "Tài khoản không tồn tại");
+            throw new AuthenticationFailedException();
+        });
 
         LocalDateTime now = LocalDateTime.now();
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
+            auditLogService.record(AuditAction.LOGIN_FAILED, user.getUsername(), "Tài khoản đang bị khóa");
             throw new AccountLockedException(Duration.between(now, user.getLockedUntil()).toSeconds());
         }
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            auditLogService.record(AuditAction.LOGIN_FAILED, user.getUsername(), "Sai mật khẩu");
             registerFailedLogin(user, now);
             throw new AuthenticationFailedException();
         }
@@ -115,6 +126,7 @@ public class AuthService {
             appUserRepository.save(user);
         }
 
+        auditLogService.record(AuditAction.LOGIN_SUCCEEDED, user.getUsername(), null);
         return issueTokens(user);
     }
 
@@ -147,11 +159,16 @@ public class AuthService {
     /** Thu hồi access token hiện tại; nếu client gửi kèm refresh token thì thu hồi luôn. */
     @Transactional
     public void logout(String authorizationHeader, String refreshToken) {
-        authTokenRevocationService.revoke(extractBearerToken(authorizationHeader));
+        String token = extractBearerToken(authorizationHeader);
+        authTokenRevocationService.revoke(token);
 
         if (refreshToken != null && !refreshToken.isBlank()) {
             refreshTokenService.revoke(refreshToken);
         }
+
+        authTokenService.validateAndGetDetails(token)
+                .ifPresent(details -> auditLogService.record(
+                        AuditAction.LOGGED_OUT, details.username(), null));
     }
 
     /**
@@ -179,6 +196,8 @@ public class AuthService {
         appUserRepository.save(user);
 
         refreshTokenService.revokeAllForUser(user.getUsername());
+        auditLogService.record(AuditAction.PASSWORD_CHANGED, user.getUsername(),
+                "Người dùng tự đổi; mọi phiên cũ bị thu hồi");
         return issueTokens(user);
     }
 
@@ -190,6 +209,9 @@ public class AuthService {
             user.setFailedLoginAttempts(0);
             user.setLockedUntil(now.plusSeconds(lockDurationSeconds));
             appUserRepository.save(user);
+            auditLogService.record(AuditAction.ACCOUNT_AUTO_LOCKED, user.getUsername(),
+                    "Sai mật khẩu " + maxFailedLoginAttempts + " lần liên tiếp; khóa "
+                            + lockDurationSeconds + " giây");
             throw new AccountLockedException(lockDurationSeconds);
         }
 

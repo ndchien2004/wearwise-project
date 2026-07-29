@@ -26,6 +26,7 @@ public final class ClothingItemSpecifications {
             ClothingStatus status,
             Boolean favorite,
             ColorTone colorTone,
+            Boolean hasImage,
             boolean archivedOnly
     ) {
         return (root, query, criteriaBuilder) -> {
@@ -73,6 +74,17 @@ public final class ClothingItemSpecifications {
 
             if (colorTone != null) {
                 predicate = criteriaBuilder.and(predicate, criteriaBuilder.equal(root.get("colorTone"), colorTone));
+            }
+
+            // Trang thử đồ chỉ dùng được món có ảnh. Lọc ở đây thay vì để frontend tự bỏ bớt sau
+            // khi tải: lọc phía client thì mỗi trang sẽ thiếu món, vì server đã cắt trang trước đó.
+            if (hasImage != null) {
+                predicate = criteriaBuilder.and(
+                        predicate,
+                        hasImage
+                                ? criteriaBuilder.isNotNull(root.get("imageUrl"))
+                                : criteriaBuilder.isNull(root.get("imageUrl"))
+                );
             }
 
             return predicate;

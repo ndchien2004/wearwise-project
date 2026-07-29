@@ -26,6 +26,20 @@ docker compose up -d mysql
 ./mvnw spring-boot:run
 ```
 
+Lệnh này chạy sẵn với profile `dev` (khai báo trong `pom.xml`), nên không cần cấu hình gì thêm.
+
+**Chạy trong IntelliJ**: chọn cấu hình **`WearwiseApplication [dev]`** trong danh sách Run — nó
+nằm sẵn trong thư mục `.run/` của repo. Bấm Run thẳng vào class `WearwiseApplication` sẽ chạy
+*không* profile nào, và ứng dụng dừng ngay với thông báo thiếu khóa ký: thiết lập profile `dev`
+trong `pom.xml` chỉ áp dụng cho lệnh Maven, IntelliJ không đọc nó.
+
+Bản đóng gói `java -jar` cũng **không** có profile `dev` và sẽ dừng nếu thiếu
+`WEARWISE_AUTH_TOKEN_SECRET` — xem [Khóa ký JWT](#khóa-ký-jwt).
+
+Cấu trúc bảng do **Flyway** dựng từ `src/main/resources/db/migration/`, Hibernate chỉ được
+`validate`. Muốn đổi bảng thì thêm file `V<n>__mo_ta.sql` mới, không sửa file cũ và không
+trông chờ Hibernate tự sửa.
+
 Swagger UI: http://localhost:8080/swagger-ui.html
 
 ### 3. Frontend (cổng 5173)
@@ -49,6 +63,59 @@ Mở http://localhost:5173 — dev server proxy sẵn `/api` sang backend nên k
 | Gợi ý outfit theo thời tiết (Open-Meteo, không cần API key) | `/api/outfits/suggestions` | Gợi ý thời tiết |
 | Thống kê tủ đồ (phân bố, mặc nhiều nhất, lâu chưa mặc) | `/api/statistics` | Thống kê |
 | Chia sẻ outfit/món đồ sang tài khoản khác bằng mã 8 ký tự | `/api/shares` | Chia sẻ |
+| Vận hành: tài khoản, hạn mức, nhật ký kiểm toán (chỉ `ROLE_ADMIN`) | `/api/admin/*` | Quản trị |
+
+### Quản trị viên
+
+Vai trò `ADMIN` là vai trò **vận hành**: quản lý tài khoản, không xem nội dung của người dùng.
+
+| Làm được | Cố tình KHÔNG làm được |
+|---|---|
+| Xem số liệu tổng hợp toàn hệ thống (ẩn danh) | Xem tủ đồ, outfit, ảnh cơ thể của người dùng |
+| Xem danh sách tài khoản: tên, email, ngày tạo, trạng thái khóa | Đăng nhập hộ người khác |
+| Khóa / mở khóa tài khoản (bắt buộc nhập lý do) | Đổi email hoặc đặt lại mật khẩu thay người dùng |
+| Đặt hạn mức AI / dịch vụ ngoài riêng cho từng tài khoản | Xóa dữ liệu người dùng |
+| Đọc nhật ký kiểm toán | Sửa hoặc xóa nhật ký kiểm toán |
+| | **Cấp quyền quản trị cho tài khoản khác** |
+
+Ảnh cơ thể dùng cho thử đồ là dữ liệu nhạy cảm — cho quản trị viên xem mặc định là rủi ro lớn hơn
+nhiều so với lợi ích. Cần xử lý báo cáo lạm dụng thì phải làm luồng riêng có sự đồng ý của chủ
+sở hữu.
+
+**Tạo admin đầu tiên** — không có API nào làm việc này, phải sửa thẳng database:
+
+```sql
+UPDATE app_users SET role = 'ADMIN' WHERE username = 'ten-dang-nhap';
+```
+
+Ma sát này là chủ đích: leo thang đặc quyền không thể thực hiện chỉ bằng một phiên đăng nhập bị
+chiếm, mà đòi hỏi quyền truy cập máy chủ. Vì lý do đó, quản trị viên cũng không khóa được tài
+khoản quản trị khác, và không tự khóa được chính mình.
+
+Sau khi đổi `role` trong database, **tải lại trang** để giao diện nhận vai trò mới — vai trò được
+lấy từ `/api/auth/me` chứ không phải từ access token đang giữ.
+
+Quản trị viên thấy một **menu hoàn toàn khác**, chỉ gồm ba mục **Tổng quan / Tài khoản / Nhật ký**
+(và Đăng xuất). Đây là tài khoản vận hành, không có tủ đồ để quản lý nên các mục Tủ đồ, Outfit,
+Thử đồ, Chia sẻ đều không xuất hiện; `/` cũng tự chuyển sang `/admin`.
+
+Tab **Nhật ký chạy trực tiếp**: sự kiện mới hiện ra ngay khi phát sinh, không cần tải lại trang.
+Kênh đẩy dùng Server-Sent Events (`GET /api/admin/audit-events/stream`), tự nối lại khi rớt mạng,
+và tải lại danh sách sau mỗi lần nối lại vì sự kiện xảy ra lúc mất kết nối không được gửi bù.
+
+Khóa tài khoản có hiệu lực **tức thì**: access token bị từ chối ngay ở bộ lọc xác thực và toàn bộ
+refresh token bị thu hồi, nên không có đường vòng nào để xin phiên mới.
+
+#### Nhật ký kiểm toán
+
+Bảng `audit_events` **chỉ ghi thêm** — không có API sửa hay xóa, kể cả cho quản trị viên; nhật ký
+mà người bị giám sát chỉnh được thì không còn là bằng chứng. Nội dung được ghi: đăng nhập thành
+công/thất bại (kể cả vào tài khoản không tồn tại — dấu vết của đợt dò tài khoản), khóa tự động,
+đăng xuất, đăng ký, đổi/đặt lại mật khẩu, phát hiện refresh token bị dùng lại, và mọi hành động
+của quản trị viên kèm lý do.
+
+Mỗi bản ghi nằm trong transaction riêng (`REQUIRES_NEW`), nên sự kiện phát sinh ngay trước một
+lỗi vẫn được lưu thay vì bị rollback cuốn theo.
 
 ### Xác thực (JWT)
 
@@ -81,6 +148,39 @@ Các biện pháp bảo vệ:
 - **Mã đặt lại dùng một lần**, hết hạn sau 30 phút, tối đa 5 yêu cầu/giờ/tài khoản; DB chỉ lưu bản băm.
 - **Đổi/đặt lại mật khẩu làm mọi phiên cũ hết hiệu lực** — refresh token bị thu hồi, và access token
   phát hành trước mốc `passwordChangedAt` bị từ chối.
+
+#### Nơi cất token
+
+| Token | Sống | Cất ở đâu | JavaScript đọc được? |
+|---|---|---|:---:|
+| Access token | 15 phút | Biến trong bộ nhớ tab | ✅ (buộc phải, để gắn header `Authorization`) |
+| Refresh token | 7 ngày | Cookie `HttpOnly` `wearwise_refresh`, `Path=/api/auth` | ❌ |
+
+Refresh token **không bao giờ xuất hiện trong JSON**. Một lỗ XSS bất kỳ — kể cả từ gói npm phụ
+thuộc — chỉ lấy được access token 15 phút, không mang được phiên 7 ngày đi nơi khác.
+
+Đổi lại phải tự chống CSRF, vì cookie thì trình duyệt gửi kèm tự động: server chỉ chấp nhận cookie
+khi request có header `X-Wearwise-Client`. Form HTML không đặt được header tự chế, còn JavaScript
+từ origin lạ thì vấp CORS preflight (danh sách origin do `wearwise.cors.allowed-origins` quy định).
+
+Tải lại trang làm mất access token trong bộ nhớ; ứng dụng tự gọi `/api/auth/refresh` bằng cookie
+để khôi phục phiên trước khi dựng giao diện.
+
+#### Khóa ký JWT
+
+`wearwise.auth.token-secret` **không có giá trị mặc định**. Thiếu nó thì ứng dụng báo lỗi và dừng
+ngay lúc khởi động — chạy êm bằng một khóa nằm sẵn trong git nghĩa là ai đọc được repo cũng tự
+phát hành được token cho mọi tài khoản.
+
+```bash
+openssl rand -base64 48        # sinh khóa, đặt vào WEARWISE_AUTH_TOKEN_SECRET
+```
+
+Chỉ profile `dev`/`test`/`local` mới được dùng khóa dùng chung trong `application-dev.properties`.
+
+> Gặp lỗi *"Chưa cấu hình wearwise.auth.token-secret"* khi chạy cục bộ? Gần như chắc chắn là
+> profile `dev` chưa bật — xem [phần chạy backend](#2-backend-cổng-8080). Khóa nằm trong
+> `application-dev.properties` chỉ được đọc khi profile đó đang hoạt động.
 
 #### Email là cố định
 
@@ -125,20 +225,31 @@ cho khỏi đọc nhầm). Người nhận vào trang **Chia sẻ**, nhập mã,
 ## Test
 
 ```bash
-./mvnw test        # backend (167 tests)
+./mvnw test        # backend (224 tests)
 cd frontend && npm run build   # kiểm tra build frontend
 ```
 
 ## Deploy
 
 Frontend là SPA tĩnh nên hợp với Cloudflare Pages; backend cần JVM + MySQL nên phải đặt ở nơi khác
-(Render, Railway, Fly.io, VPS...). Hai phần nối với nhau qua ba cấu hình:
+(Render, Railway, Fly.io, VPS...). Hai phần nối với nhau qua các cấu hình sau:
 
 | Nơi đặt | Biến | Giá trị |
 |---|---|---|
 | Cloudflare Pages (build) | `VITE_API_BASE_URL` | `https://<domain-backend>` |
+| Backend | `WEARWISE_AUTH_TOKEN_SECRET` | chuỗi ngẫu nhiên ≥ 32 ký tự — **thiếu thì app không khởi động** |
 | Backend | `WEARWISE_CORS_ALLOWED_ORIGINS` | `https://<domain-pages>,https://*.<domain-pages>` |
+| Backend | `WEARWISE_AUTH_REFRESH_COOKIE_SAME_SITE` | `None` |
+| Backend | `WEARWISE_AUTH_REFRESH_COOKIE_SECURE` | `true` |
 | Backend | `MAIL_RESET_URL_BASE` | `https://<domain-pages>/reset-password` |
+
+Hai biến cookie là **bắt buộc khi frontend và backend nằm ở hai domain khác nhau**: trình duyệt
+không gửi cookie `SameSite=Lax` sang site khác, nên để nguyên mặc định thì người dùng bị đăng
+xuất mỗi lần tải lại trang. `SameSite=None` bắt buộc đi kèm `Secure`, và ứng dụng từ chối khởi
+động nếu đặt sai cặp này.
+
+Sau khi chốt domain backend, nên siết `connect-src` trong `frontend/public/_headers` về đúng
+domain đó (file có sẵn hướng dẫn).
 
 ### Cloudflare Pages
 

@@ -20,6 +20,7 @@ import {
   TONE_LABELS,
   label,
 } from '../utils/labels';
+import { usePagedParams } from '../utils/usePagedParams';
 
 const EMPTY_FILTERS = {
   keyword: '',
@@ -32,22 +33,27 @@ const EMPTY_FILTERS = {
   colorTone: '',
 };
 
+const PER_PAGE = 12; // 4 cột x 3 dòng
+
 export default function WardrobePage() {
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const [items, setItems] = useState(null);
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const { searchParams, page, setPage, updateParams } = usePagedParams();
+
+  // Bộ lọc đọc thẳng từ URL: mở lại link đã dán là thấy đúng kết quả đã lọc, không phải chọn lại.
+  const filters = Object.fromEntries(
+    Object.keys(EMPTY_FILTERS).map((key) => [key, searchParams.get(key) ?? ''])
+  );
+
+  const [itemsPage, setItemsPage] = useState(null);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [triedIds, setTriedIds] = useState(() => new Set());
   const [modal, setModal] = useState(null); // null | { item?: object }
-  const [page, setPage] = useState(0);
   const [archived, setArchived] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
   const [bulkScan, setBulkScan] = useState(false);
   const [aiReady, setAiReady] = useState(false);
-
-  const PER_PAGE = 12; // 4 cột x 3 dòng
 
   // Các món đã từng thử đồ (để hiện badge "🪞 Đã thử" trên card).
   const loadTriedIds = useCallback(() => {
@@ -57,13 +63,17 @@ export default function WardrobePage() {
       .catch(() => setTriedIds(new Set()));
   }, []);
 
-  const load = useCallback(async (activeFilters) => {
+  // Chuỗi hóa bộ lọc để dùng làm dependency: `filters` là object mới sau mỗi lần render nên
+  // so sánh tham chiếu sẽ khiến effect chạy vô hạn.
+  const filterKey = JSON.stringify(filters);
+
+  const load = useCallback(async () => {
     try {
-      setItems(await itemsApi.findItems(activeFilters));
+      setItemsPage(await itemsApi.findItems({ ...JSON.parse(filterKey), page, size: PER_PAGE }));
     } catch (err) {
       setError(err.message);
     }
-  }, []);
+  }, [filterKey, page]);
 
   // Món đã ẩn nằm ở danh sách riêng, không trộn vào tủ đồ đang dùng.
   const loadArchived = useCallback(async () => {
@@ -85,21 +95,19 @@ export default function WardrobePage() {
       .catch(() => setAiReady(false));
   }, []);
 
+  // Gõ từ khóa thì chờ 300ms rồi mới gọi, tránh bắn một request cho mỗi phím.
   useEffect(() => {
-    const timer = setTimeout(() => load(filters), filters.keyword ? 300 : 0);
+    const timer = setTimeout(load, filters.keyword ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [filters, load]);
+  }, [load, filters.keyword]);
 
   useEffect(() => {
     loadTriedIds();
   }, [loadTriedIds]);
 
-  // Đổi bộ lọc thì quay về trang 1.
-  useEffect(() => {
-    setPage(0);
-  }, [filters]);
-
-  const setFilter = (key) => (e) => setFilters((f) => ({ ...f, [key]: e.target.value }));
+  // Đổi bộ lọc thì quay về trang 1: giữ nguyên trang 5 với kết quả mới gần như chắc chắn ra
+  // danh sách rỗng.
+  const setFilter = (key) => (e) => updateParams({ [key]: e.target.value || null, page: null });
 
   const toastOk = (message) => setNotice({ message, variant: 'success' });
   const toastErr = (message) => setNotice({ message, variant: 'error' });
@@ -130,7 +138,7 @@ export default function WardrobePage() {
       await itemsApi.createItem(payload);
     }
     setModal(null);
-    await load(filters);
+    await load();
     toastOk(editing ? `Đã cập nhật "${payload.name}"! ✏️` : `Đã thêm "${payload.name}" vào tủ đồ! 🎉`);
   };
 
@@ -150,7 +158,7 @@ export default function WardrobePage() {
 
     try {
       await itemsApi.deleteItem(item.id);
-      await load(filters);
+      await load();
       toastOk(`Đã xóa "${item.name}" khỏi tủ đồ. 🗑️`);
       return;
     } catch (err) {
@@ -173,7 +181,7 @@ export default function WardrobePage() {
 
       try {
         await itemsApi.archiveItem(item.id);
-        await load(filters);
+        await load();
         toastOk(`Đã ẩn "${item.name}". Xem lại ở mục Đã ẩn.`);
       } catch (archiveError) {
         toastErr(archiveError.message);
@@ -185,7 +193,7 @@ export default function WardrobePage() {
     try {
       await itemsApi.restoreItem(item.id);
       await loadArchived();
-      await load(filters);
+      await load();
       toastOk(`Đã khôi phục "${item.name}" về tủ đồ.`);
     } catch (err) {
       toastErr(err.message);
@@ -195,7 +203,9 @@ export default function WardrobePage() {
   const handleToggleFavorite = async (item) => {
     try {
       const updated = await itemsApi.setItemFavorite(item.id, !item.favorite);
-      setItems((list) => list.map((i) => (i.id === updated.id ? updated : i)));
+      setItemsPage((current) =>
+        current ? { ...current, content: current.content.map((i) => (i.id === updated.id ? updated : i)) } : current
+      );
     } catch (err) {
       toastErr(err.message);
     }
@@ -204,7 +214,9 @@ export default function WardrobePage() {
   const handleWear = async (item) => {
     try {
       const updated = await itemsApi.markItemWorn(item.id);
-      setItems((list) => list.map((i) => (i.id === updated.id ? updated : i)));
+      setItemsPage((current) =>
+        current ? { ...current, content: current.content.map((i) => (i.id === updated.id ? updated : i)) } : current
+      );
       toastOk(`Đã ghi nhận mặc "${item.name}" hôm nay! 👣`);
     } catch (err) {
       toastErr(err.message);
@@ -215,7 +227,9 @@ export default function WardrobePage() {
   const handleWashed = async (item) => {
     try {
       const updated = await patchItem(item, { status: 'AVAILABLE' });
-      setItems((list) => list.map((i) => (i.id === updated.id ? updated : i)));
+      setItemsPage((current) =>
+        current ? { ...current, content: current.content.map((i) => (i.id === updated.id ? updated : i)) } : current
+      );
       toastOk(`"${item.name}" đã giặt xong, sẵn sàng mặc! ✅`);
     } catch (err) {
       toastErr(err.message);
@@ -289,27 +303,33 @@ export default function WardrobePage() {
               <option value="false">Chưa yêu thích</option>
             </select>
           </Field>
-          <Button className="filter-reset" onClick={() => setFilters(EMPTY_FILTERS)}>
+          <Button
+            className="filter-reset"
+            onClick={() =>
+              updateParams({
+                ...Object.fromEntries(Object.keys(EMPTY_FILTERS).map((key) => [key, null])),
+                page: null,
+              })
+            }
+          >
             🔄 Xóa lọc
           </Button>
         </div>
       </div>
 
-      {items === null ? (
+      {itemsPage === null ? (
         <Loading />
-      ) : items.length === 0 ? (
+      ) : itemsPage.content.length === 0 ? (
         <EmptyState emoji="🧺">
           Chưa có món đồ nào. Bấm "Thêm món đồ" để bắt đầu xây dựng tủ đồ của bạn!
         </EmptyState>
       ) : (
         (() => {
-          const pageCount = Math.ceil(items.length / PER_PAGE);
-          const safePage = Math.min(page, pageCount - 1);
-          const pageItems = items.slice(safePage * PER_PAGE, (safePage + 1) * PER_PAGE);
+          const pageCount = itemsPage.totalPages || 1;
           return (
             <>
               <div className="card-grid">
-                {pageItems.map((item) => (
+                {itemsPage.content.map((item) => (
                   <ItemCard
                     key={item.id}
                     item={item}
@@ -323,7 +343,7 @@ export default function WardrobePage() {
                   />
                 ))}
               </div>
-              <Pagination page={safePage} pageCount={pageCount} onChange={setPage} />
+              <Pagination page={page} pageCount={pageCount} onChange={setPage} />
             </>
           );
         })()
@@ -381,7 +401,7 @@ export default function WardrobePage() {
           onClose={() => setBulkScan(false)}
           onDone={async (count) => {
             setBulkScan(false);
-            await load(filters);
+            await load();
             toastOk(`Đã thêm ${count} món vào tủ đồ! 🎉`);
           }}
         />

@@ -26,6 +26,23 @@ export function formatDateTime(isoDateTime) {
   });
 }
 
+/**
+ * Có cả giờ phút — dùng cho nhật ký kiểm toán, nơi thứ tự các sự kiện trong cùng một ngày
+ * mới là thông tin có giá trị.
+ */
+export function formatDateTimeFull(isoDateTime) {
+  if (!isoDateTime) return '—';
+  const date = new Date(isoDateTime);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function isWornToday(isoDateTime) {
   if (!isoDateTime) return false;
   const date = new Date(isoDateTime);

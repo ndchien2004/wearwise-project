@@ -1,6 +1,8 @@
 package org.group7.wearwise.controller;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.group7.wearwise.config.RefreshTokenCookie;
 import org.group7.wearwise.dto.request.RegisterRequest;
 import org.group7.wearwise.dto.request.VerifyOtpRequest;
 import org.group7.wearwise.dto.response.AuthResponse;
@@ -17,9 +19,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class RegistrationController {
 
     private final RegistrationService registrationService;
+    private final RefreshTokenCookie refreshTokenCookie;
 
-    public RegistrationController(RegistrationService registrationService) {
+    public RegistrationController(
+            RegistrationService registrationService,
+            RefreshTokenCookie refreshTokenCookie
+    ) {
         this.registrationService = registrationService;
+        this.refreshTokenCookie = refreshTokenCookie;
     }
 
     /** Bước 1: kiểm tra thông tin, gửi mã OTP tới email. Chưa tạo tài khoản ở bước này. */
@@ -30,7 +37,9 @@ public class RegistrationController {
 
     /** Bước 2: nhập đúng OTP thì tạo tài khoản và trả về token đăng nhập luôn. */
     @PostMapping("/verify")
-    public AuthResponse verify(@Valid @RequestBody VerifyOtpRequest request) {
-        return registrationService.verifyOtp(request.email(), request.otp());
+    public AuthResponse verify(@Valid @RequestBody VerifyOtpRequest request, HttpServletResponse response) {
+        AuthResponse tokens = registrationService.verifyOtp(request.email(), request.otp());
+        refreshTokenCookie.write(response, tokens.refreshToken());
+        return tokens;
     }
 }

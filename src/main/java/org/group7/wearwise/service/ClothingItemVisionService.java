@@ -62,8 +62,6 @@ public class ClothingItemVisionService {
     /** Mỗi món tốn khoảng 60 token output, cộng dư ra cho phần dấu ngoặc của mảng. */
     private static final int MAX_BATCH_OUTPUT_TOKENS = 60 * MAX_ITEMS_PER_IMAGE + 100;
 
-    private static final long MAX_UPLOAD_BYTES = 10L * 1024 * 1024;
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/jpg", "image/png");
 
     /**
      * Prompt cố tình ngắn: mọi ràng buộc giá trị hợp lệ đã nằm trong responseSchema nên không
@@ -88,12 +86,14 @@ public class ClothingItemVisionService {
             """;
 
     private final GeminiClient geminiClient;
+    private final ImageValidator imageValidator;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final JsonNode responseSchema = buildResponseSchema();
     private final JsonNode batchResponseSchema = buildBatchResponseSchema();
 
-    public ClothingItemVisionService(GeminiClient geminiClient) {
+    public ClothingItemVisionService(GeminiClient geminiClient, ImageValidator imageValidator) {
         this.geminiClient = geminiClient;
+        this.imageValidator = imageValidator;
     }
 
     public boolean isConfigured() {
@@ -195,28 +195,7 @@ public class ClothingItemVisionService {
     }
 
     private BufferedImage readImage(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new TryOnImageException("Vui lòng chọn một ảnh để nhận diện.");
-        }
-
-        String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
-            throw new TryOnImageException("Ảnh phải ở định dạng JPG hoặc PNG.");
-        }
-
-        if (file.getSize() > MAX_UPLOAD_BYTES) {
-            throw new TryOnImageException("Ảnh quá lớn (tối đa 10MB). Vui lòng chọn ảnh nhẹ hơn.");
-        }
-
-        try {
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(file.getBytes()));
-            if (image == null) {
-                throw new TryOnImageException("Không đọc được ảnh. Hãy thử một ảnh JPG/PNG rõ nét khác.");
-            }
-            return image;
-        } catch (IOException exception) {
-            throw new TryOnImageException("Không đọc được tệp ảnh. Vui lòng thử lại.");
-        }
+        return imageValidator.read(file, "Vui lòng chọn một ảnh để nhận diện.").image();
     }
 
     /**

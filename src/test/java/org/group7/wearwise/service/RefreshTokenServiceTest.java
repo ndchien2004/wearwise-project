@@ -27,13 +27,17 @@ class RefreshTokenServiceTest {
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     private SecureTokenGenerator secureTokenGenerator;
     private RefreshTokenService refreshTokenService;
 
     @BeforeEach
     void setUp() {
         secureTokenGenerator = new SecureTokenGenerator();
-        refreshTokenService = new RefreshTokenService(refreshTokenRepository, secureTokenGenerator, 604800);
+        refreshTokenService = new RefreshTokenService(
+                refreshTokenRepository, secureTokenGenerator, auditLogService, 604800);
     }
 
     @Test
@@ -126,7 +130,8 @@ class RefreshTokenServiceTest {
 
     @Test
     void expirationMustBePositive() {
-        assertThatThrownBy(() -> new RefreshTokenService(refreshTokenRepository, secureTokenGenerator, 0))
+        assertThatThrownBy(() ->
+                new RefreshTokenService(refreshTokenRepository, secureTokenGenerator, auditLogService, 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Refresh token expiration must be at least 1 second.");
     }

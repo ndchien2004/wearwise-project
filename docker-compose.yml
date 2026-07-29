@@ -31,6 +31,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/wearwise_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: wearwise_user
       SPRING_DATASOURCE_PASSWORD: wearwise_pass
+      # Bắt buộc: compose sẽ báo lỗi và không khởi động nếu biến này chưa được đặt.
+      # Sinh khóa mới:  openssl rand -base64 48
+      WEARWISE_AUTH_TOKEN_SECRET: ${WEARWISE_AUTH_TOKEN_SECRET:?can dat WEARWISE_AUTH_TOKEN_SECRET (toi thieu 32 ky tu) truoc khi chay}
       WEARWISE_CONSOLE_ENABLED: false
       WEARWISE_SEED_ENABLED: false
     ports:

@@ -47,11 +47,21 @@ public class TryOnController {
         return tryOnService.deleteBodyPhoto(authentication.getName());
     }
 
-    /** Ghép một món đồ (có ảnh) lên ảnh của người dùng và lưu kết quả. */
+    /**
+     * Ghép một món đồ (có ảnh) lên ảnh của người dùng và lưu kết quả.
+     *
+     * @param baseResultId tuỳ chọn — ghép chồng lên ảnh kết quả này thay vì ảnh cơ thể gốc,
+     *                     để mặc lần lượt quần rồi áo lên cùng một người
+     */
     @PostMapping("/items/{itemId}")
     @ResponseStatus(HttpStatus.CREATED)
-    public TryOnResultResponse generateForItem(Authentication authentication, @PathVariable Long itemId) {
-        return TryOnResultResponse.from(tryOnService.generateForItem(authentication.getName(), itemId));
+    public TryOnResultResponse generateForItem(
+            Authentication authentication,
+            @PathVariable Long itemId,
+            @RequestParam(required = false) Long baseResultId
+    ) {
+        return TryOnResultResponse.from(
+                tryOnService.generateForItem(authentication.getName(), itemId, baseResultId));
     }
 
     /** Lịch sử ảnh thử đồ của riêng một món đồ (để hiển thị ở trang chi tiết trong tủ đồ). */
@@ -66,8 +76,13 @@ public class TryOnController {
     /** Thử nguyên một outfit (ghép tất cả món có ảnh) lên ảnh của người dùng. */
     @PostMapping("/outfits/{outfitId}")
     @ResponseStatus(HttpStatus.CREATED)
-    public TryOnResultResponse generateForOutfit(Authentication authentication, @PathVariable Long outfitId) {
-        return TryOnResultResponse.from(tryOnService.generateForOutfit(authentication.getName(), outfitId));
+    public TryOnResultResponse generateForOutfit(
+            Authentication authentication,
+            @PathVariable Long outfitId,
+            @RequestParam(required = false) Long baseResultId
+    ) {
+        return TryOnResultResponse.from(
+                tryOnService.generateForOutfit(authentication.getName(), outfitId, baseResultId));
     }
 
     /** Lịch sử ảnh thử đồ của riêng một outfit (hiển thị ở trang chi tiết outfit). */

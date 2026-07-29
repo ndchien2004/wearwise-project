@@ -59,10 +59,45 @@ export function Modal({ title, wide, onClose, children }) {
   );
 }
 
-/** Phân trang đơn giản: nút ← số trang → . page là 0-based. */
+/** Số nút trang tối đa hiển thị cùng lúc; nhiều hơn thì rút gọn bằng dấu "…". */
+const PAGE_WINDOW = 7;
+
+/**
+ * Dãy số trang quanh trang hiện tại, luôn giữ trang đầu và trang cuối.
+ * Trả về mảng số, xen kẽ chuỗi '…' ở chỗ bị cắt.
+ */
+function pageWindow(page, pageCount) {
+  if (pageCount <= PAGE_WINDOW) {
+    return Array.from({ length: pageCount }, (_, i) => i);
+  }
+
+  const last = pageCount - 1;
+  const side = Math.floor((PAGE_WINDOW - 3) / 2); // trừ trang đầu, trang cuối và trang hiện tại
+  let start = Math.max(1, page - side);
+  let end = Math.min(last - 1, page + side);
+
+  // Giữ cửa sổ luôn đủ rộng khi trang hiện tại nằm sát hai đầu.
+  if (page - side < 1) end = Math.min(last - 1, end + (1 - (page - side)));
+  if (page + side > last - 1) start = Math.max(1, start - (page + side - (last - 1)));
+
+  const pages = [0];
+  if (start > 1) pages.push('…');
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (end < last - 1) pages.push('…');
+  pages.push(last);
+
+  return pages;
+}
+
+/**
+ * Phân trang: nút ← số trang → . `page` là 0-based.
+ *
+ * Nhật ký kiểm toán có thể lên tới hàng trăm trang, nên danh sách số trang được rút gọn thay vì
+ * đổ hết ra — bản cũ render mỗi trang một nút.
+ */
 export function Pagination({ page, pageCount, onChange }) {
   if (pageCount <= 1) return null;
-  const pages = Array.from({ length: pageCount }, (_, i) => i);
+  const pages = pageWindow(page, pageCount);
   return (
     <div className="pagination">
       <button
@@ -74,16 +109,23 @@ export function Pagination({ page, pageCount, onChange }) {
       >
         ←
       </button>
-      {pages.map((p) => (
-        <button
-          key={p}
-          type="button"
-          className={`nb-btn nb-btn--sm ${p === page ? 'nb-btn--dark' : ''}`}
-          onClick={() => onChange(p)}
-        >
-          {p + 1}
-        </button>
-      ))}
+      {pages.map((p, index) =>
+        p === '…' ? (
+          <span key={`gap-${index}`} className="pagination-gap" aria-hidden="true">
+            …
+          </span>
+        ) : (
+          <button
+            key={p}
+            type="button"
+            className={`nb-btn nb-btn--sm ${p === page ? 'nb-btn--dark' : ''}`}
+            onClick={() => onChange(p)}
+            aria-current={p === page ? 'page' : undefined}
+          >
+            {p + 1}
+          </button>
+        )
+      )}
       <button
         type="button"
         className="nb-btn nb-btn--sm"

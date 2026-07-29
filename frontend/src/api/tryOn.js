@@ -14,8 +14,15 @@ export function deleteBodyPhoto() {
   return apiFetch('/api/try-on/body-photo', { method: 'DELETE' });
 }
 
-export function generateTryOn(itemId) {
-  return apiFetch(`/api/try-on/items/${itemId}`, { method: 'POST' });
+/**
+ * Ghép một món đồ lên ảnh người dùng.
+ *
+ * @param baseResultId truyền id của một ảnh kết quả trước đó để **mặc chồng** món này lên trên nó
+ *                     (vd đã mặc quần, giờ mặc thêm áo). Bỏ trống thì ghép từ ảnh cơ thể gốc.
+ */
+export function generateTryOn(itemId, baseResultId) {
+  const query = baseResultId ? `?baseResultId=${baseResultId}` : '';
+  return apiFetch(`/api/try-on/items/${itemId}${query}`, { method: 'POST' });
 }
 
 export function listTryOns() {
@@ -27,9 +34,10 @@ export function listTryOnsForItem(itemId) {
   return apiFetch(`/api/try-on/items/${itemId}`);
 }
 
-// Thử nguyên một outfit (ghép tất cả món có ảnh).
-export function generateOutfitTryOn(outfitId) {
-  return apiFetch(`/api/try-on/outfits/${outfitId}`, { method: 'POST' });
+// Thử nguyên một outfit (ghép tất cả món có ảnh trong một lần gọi).
+export function generateOutfitTryOn(outfitId, baseResultId) {
+  const query = baseResultId ? `?baseResultId=${baseResultId}` : '';
+  return apiFetch(`/api/try-on/outfits/${outfitId}${query}`, { method: 'POST' });
 }
 
 // Lịch sử ảnh thử đồ của riêng một outfit.

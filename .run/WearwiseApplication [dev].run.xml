@@ -1,0 +1,21 @@
+<!--
+  Cấu hình chạy cho IntelliJ, để trong .run/ nên được commit và ai mở project cũng thấy.
+
+  Lý do phải có: profile `dev` (nơi chứa khóa ký JWT dùng chung) chỉ được bật sẵn cho lệnh
+  `mvnw spring-boot:run` — thiết lập đó nằm trong spring-boot-maven-plugin và IntelliJ không
+  đọc nó. Bấm Run thẳng vào WearwiseApplication sẽ chạy không profile nào, khiến
+  wearwise.auth.token-secret rỗng và ứng dụng dừng ngay lúc khởi động.
+
+  Dùng type="Application" (không phải SpringBootApplicationConfigurationType) để chạy được
+  trên cả IntelliJ Community lẫn Ultimate.
+-->
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="WearwiseApplication [dev]" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="org.group7.wearwise.WearwiseApplication" />
+    <module name="wearwise" />
+    <option name="VM_PARAMETERS" value="-Dspring.profiles.active=dev" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

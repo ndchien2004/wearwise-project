@@ -11,6 +11,10 @@ import org.group7.wearwise.exception.GlobalExceptionHandler;
 import org.group7.wearwise.service.ClothingItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +25,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -101,18 +106,7 @@ class ClothingItemControllerTest {
     @Test
     void findItemsPassesCombinedFilters() throws Exception {
         ClothingItem sneaker = item(2L, "Running Sneakers", "Gray", ClothingCategory.SHOES, Season.SUMMER, Style.SPORT, true);
-        when(clothingItemService.findItems(
-                OWNER,
-                "run",
-                ClothingCategory.SHOES,
-                Season.SUMMER,
-                Style.SPORT,
-                ClothingCondition.GOOD,
-                ClothingStatus.AVAILABLE,
-                true,
-                null
-        ))
-                .thenReturn(List.of(sneaker));
+        stubFindItems(sneaker);
 
         mockMvc.perform(get("/api/clothing-items")
                         .principal(authentication())
@@ -124,8 +118,74 @@ class ClothingItemControllerTest {
                         .param("status", "AVAILABLE")
                         .param("favorite", "true"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(2))
-                .andExpect(jsonPath("$[0].category").value("SHOES"));
+                // Phần tử nằm trong `content` vì endpoint trả về Page chứ không phải mảng phẳng.
+                .andExpect(jsonPath("$.content[0].id").value(2))
+                .andExpect(jsonPath("$.content[0].category").value("SHOES"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    /**
+     * Chốt chặn quan trọng nhất của phân trang: tham số trang phải đi xuống tới tầng service để
+     * thành `limit` trong SQL. Nếu ai đó lỡ quay về kiểu lấy hết rồi cắt bằng JavaScript, bài
+     * kiểm tra này hỏng ngay.
+     */
+    @Test
+    void findItemsForwardsPagingToTheService() throws Exception {
+        stubFindItems(item(2L, "Running Sneakers", "Gray", ClothingCategory.SHOES, Season.SUMMER, Style.SPORT, true));
+
+        mockMvc.perform(get("/api/clothing-items")
+                        .principal(authentication())
+                        .param("page", "2")
+                        .param("size", "12"))
+                .andExpect(status().isOk());
+
+        Pageable pageable = capturedPageable();
+        assertThat(pageable.getPageNumber()).isEqualTo(2);
+        assertThat(pageable.getPageSize()).isEqualTo(12);
+        // Thiếu ORDER BY thì database không cam kết thứ tự, món sẽ lặp ở trang này và mất ở trang kia.
+        assertThat(pageable.getSort().isSorted()).isTrue();
+    }
+
+    /** Chặn trên kích thước trang: một request không được kéo cả tủ đồ về. */
+    @Test
+    void findItemsCapsAnExcessivePageSize() throws Exception {
+        stubFindItems(item(2L, "Running Sneakers", "Gray", ClothingCategory.SHOES, Season.SUMMER, Style.SPORT, true));
+
+        mockMvc.perform(get("/api/clothing-items")
+                        .principal(authentication())
+                        .param("size", "100000"))
+                .andExpect(status().isOk());
+
+        assertThat(capturedPageable().getPageSize()).isEqualTo(100);
+    }
+
+    /** Ô chọn món khi phối outfit phải thấy được cả tủ, nên có đường thoát khỏi phân trang. */
+    @Test
+    void findItemsSupportsUnpagedForThePicker() throws Exception {
+        stubFindItems(item(2L, "Running Sneakers", "Gray", ClothingCategory.SHOES, Season.SUMMER, Style.SPORT, true));
+
+        mockMvc.perform(get("/api/clothing-items")
+                        .principal(authentication())
+                        .param("unpaged", "true"))
+                .andExpect(status().isOk());
+
+        assertThat(capturedPageable().isPaged()).isFalse();
+    }
+
+    private void stubFindItems(ClothingItem... items) {
+        // Trang trả về luôn dùng PageRequest cụ thể: Jackson không serialize được PageImpl dựng
+        // trên Pageable.unpaged() (đọc số trang của một trang "không phân trang" là vô nghĩa).
+        when(clothingItemService.findItems(
+                eq(OWNER), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(
+                        List.of(items), PageRequest.of(0, Math.max(1, items.length)), items.length));
+    }
+
+    private Pageable capturedPageable() {
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(clothingItemService).findItems(
+                eq(OWNER), any(), any(), any(), any(), any(), any(), any(), any(), any(), captor.capture());
+        return captor.getValue();
     }
 
     @Test

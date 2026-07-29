@@ -59,6 +59,9 @@ public interface ClothingItemRepository extends JpaRepository<ClothingItem, Long
 
     long countByOwner_UsernameAndArchivedAtIsNull(String username);
 
+    /** Tổng số món đồ chưa bị ẩn trên toàn hệ thống — chỉ dùng cho thống kê quản trị. */
+    long countByArchivedAtIsNull();
+
     long countByOwner_UsernameAndArchivedAtIsNullAndFavoriteTrue(String username);
 
     long countByOwner_UsernameAndArchivedAtIsNotNull(String username);

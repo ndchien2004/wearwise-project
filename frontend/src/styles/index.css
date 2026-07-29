@@ -828,6 +828,9 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  /* Dùng được cho cả <a> (Tủ đồ/Outfit) lẫn <button> (tab trang quản trị) — thẻ button
+     mang sẵn viền mặc định của trình duyệt nên phải gỡ đi. */
+  border: 0;
   font-family: var(--font-display);
   font-size: 23px;
   font-weight: 900;
@@ -996,6 +999,54 @@ a {
   box-shadow: var(--shadow);
 }
 
+/* ---------- Dropdown ----------
+   Trình duyệt vẽ <select> theo giao diện hệ điều hành: bo góc mảnh, mũi tên xám nhạt, viền 1px —
+   lạc hẳn giữa các ô nhập viền 3px của hệ thống này. Tắt appearance rồi tự vẽ lại:
+
+   - mũi tên là SVG nhúng thẳng (data URI) nên không phát sinh request và không phụ thuộc file
+     ngoài, quan trọng vì Content-Security-Policy chặn tài nguyên từ host khác;
+   - dải màu vàng bên phải làm vùng bấm nhìn thấy được, thay cho nút mũi tên mà hệ điều hành vẽ. */
+.nb-select {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  font-weight: 600;
+  /* Chừa chỗ cho dải mũi tên; nếu không chữ dài sẽ chạy đè lên nó. */
+  padding-right: 48px;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111111' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 9 12 16 19 9'/%3E%3C/svg%3E"),
+    linear-gradient(var(--yellow), var(--yellow));
+  background-repeat: no-repeat, no-repeat;
+  background-position: right 10px center, right 0 center;
+  background-size: 17px 17px, 37px 100%;
+  /* Dải vàng chạm tới mép trong của viền, không đè lên chính viền. */
+  background-origin: content-box, padding-box;
+}
+
+/* Rê chuột: dải vàng chuyển đen, mũi tên chuyển trắng cho đủ tương phản. */
+.nb-select:hover {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='5 9 12 16 19 9'/%3E%3C/svg%3E"),
+    linear-gradient(var(--ink), var(--ink));
+}
+
+.nb-select:focus {
+  box-shadow: var(--shadow);
+}
+
+/* Danh sách xổ xuống do hệ điều hành vẽ, CSS gần như không can thiệp được — chỉ đặt được
+   màu nền và chữ để nó không chói so với phần còn lại. */
+.nb-select option {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.nb-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .nb-textarea {
   resize: vertical;
   min-height: 80px;
@@ -1134,6 +1185,14 @@ a {
   justify-content: center;
   gap: 6px;
   margin-top: 22px;
+}
+
+/* Dấu "…" ở chỗ dãy số trang bị rút gọn */
+.pagination-gap {
+  font-weight: 900;
+  color: var(--muted);
+  padding: 0 2px;
+  user-select: none;
 }
 
 /* ---------- Thanh lọc ----------
@@ -2016,7 +2075,7 @@ a {
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: #fff;
-  height: 260px;
+  height: 200px;
 }
 
 .tryon-result-photo img {
@@ -2033,6 +2092,13 @@ a {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 18px;
   margin-bottom: 28px;
+}
+
+/* Dùng khi hàng chỉ có hai, ba ô: `1fr` sẽ kéo chúng ngang gần 800px mỗi ô trên màn hình rộng,
+   nhìn như hai tấm biển hơn là ô số liệu. Chặn bề ngang và dồn về trái. */
+.stat-row--compact {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 300px));
+  justify-content: start;
 }
 
 .stat-tile {
@@ -3027,6 +3093,693 @@ a {
 
 @media (max-width: 1000px) {
   .two-col { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Trang quản trị
+   ------------------------------------------------------------
+   Dùng lại .stack-list, .stat-tile, .filter-bar, .nb-card của hệ thống sẵn có; phần dưới đây
+   chỉ bổ sung những gì thật sự chưa có. Hàng dữ liệu chọn kiểu "thẻ xếp chồng" thay vì bảng
+   <table> vì nội dung mỗi hàng dài ngắn khác nhau (lý do khóa, user-agent) và bảng sẽ vỡ trên
+   màn hình hẹp.
+   ============================================================ */
+
+.admin-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+}
+
+/* Tài khoản đang bị khóa: viền đứt + nền đỏ nhạt để nhận ra ngay khi lướt danh sách */
+.admin-row.is-locked {
+  border-style: dashed;
+  background: #fff2f2;
+}
+
+.admin-row-avatar {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--yellow);
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.admin-row-avatar.is-admin {
+  background: var(--purple);
+}
+
+.admin-row--audit .admin-row-avatar {
+  background: var(--paper);
+  font-size: 21px;
+}
+
+.admin-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-row-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.admin-row-actor {
+  font-weight: 800;
+}
+
+.admin-row-arrow {
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.admin-row-detail {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.admin-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* User-agent rất dài — cắt gọn, giữ toàn văn ở tooltip */
+.admin-row-agent {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Ô tìm kiếm co giãn, các nút giữ nguyên bề ngang */
+.admin-search-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-search-row .nb-input,
+.admin-search-row .nb-select {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.admin-preset-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   Thử đồ ảo — khung so sánh trước/sau và xem ảnh phóng to
+   ============================================================ */
+
+/* Khung so sánh bên trái, ô chọn đồ bên phải — cả hai vừa trong một màn hình.
+   Cột trái rộng hơn vì nó còn phải chia đôi cho hai ảnh trước/sau. */
+.tryon-layout {
+  /* Chiều cao chung cho cả hai cột, tính theo màn hình để khối chọn đồ luôn nằm trọn trong
+     tầm nhìn. 72vh chừa lại chỗ cho thanh HUD, tiêu đề trang và một phần bộ sưu tập nhô lên —
+     đủ để người dùng biết bên dưới còn nội dung mà không phải cuộn để dùng tính năng chính. */
+  --tryon-h: clamp(380px, 72vh, 760px);
+
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 20px;
+  /* stretch (mặc định) để hai thẻ luôn cao bằng nhau, kể cả khi nội dung bên trong lệch nhau */
+  align-items: stretch;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1000px) {
+  .tryon-layout {
+    grid-template-columns: 1fr;
+    --tryon-h: auto;
+  }
+}
+
+/* Cả hai thẻ là cột flex, phần ruột giãn để lấp hết chiều cao còn lại */
+.tryon-stage,
+.tryon-picker {
+  display: flex;
+  flex-direction: column;
+  min-height: var(--tryon-h);
+  padding: 14px;
+}
+
+.tryon-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.tryon-stage-head .chart-title,
+.tryon-picker .chart-title {
+  font-size: 16px;
+}
+
+.tryon-stage-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Hai ô bằng nhau tuyệt đối: lệch kích thước là mắt không so sánh được nữa */
+.tryon-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.tryon-pane {
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tryon-pane-label {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  padding: 2px 8px;
+  margin-bottom: 5px;
+}
+
+.tryon-pane-label--after {
+  background: var(--green);
+}
+
+.tryon-pane-img {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  /* Giãn để lấp hết chiều cao thẻ thay vì theo tỉ lệ ảnh: tỉ lệ cố định làm ô cao vống lên trên
+     màn rộng và đẩy phần chọn đồ xuống dưới tầm nhìn. Giãn thì hai ô cũng luôn bằng nhau và
+     không nhảy kích thước lúc ảnh mới tải xong. */
+  flex: 1;
+  min-height: 0;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: 0;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.tryon-pane-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.tryon-pane-img--placeholder {
+  cursor: default;
+  padding: 14px;
+  text-align: center;
+  border-style: dashed;
+  font-size: 13px;
+}
+
+.tryon-spinner {
+  font-size: 30px;
+  line-height: 1;
+}
+
+/* Dấu hiệu bấm được — không phải ai cũng nghĩ tới việc bấm vào ảnh */
+.tryon-zoom-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--yellow);
+  font-size: 12px;
+}
+
+.tryon-layer-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.tryon-layer-bar .muted-note {
+  flex: 1;
+  min-width: 160px;
+  font-size: 12px;
+}
+
+/* ---------- Ô chọn đồ (cột phải) ---------- */
+
+.tryon-picker-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* Bộ lọc mini: ô tìm co giãn, dropdown giữ bề ngang vừa đủ đọc nhãn */
+.tryon-filter {
+  display: flex;
+  gap: 8px;
+}
+
+.tryon-filter .nb-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.tryon-filter .nb-input,
+.tryon-filter .nb-select {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.tryon-filter .nb-select {
+  flex: 0 0 130px;
+  padding-right: 42px;
+  background-size: 15px 15px, 32px 100%;
+}
+
+/* Ruột: [◀] [lưới] [▶] — mũi tên sát hai mép, lưới chiếm phần còn lại */
+.tryon-picker-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.tryon-arrow {
+  width: 34px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.tryon-arrow:hover:not(:disabled) {
+  background: var(--yellow);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.tryon-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.tryon-pager-label {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* Lưới 2x2 lấp trọn chiều cao còn lại — bốn món luôn nằm gọn trong khung */
+.tryon-picker .tryon-item-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+
+.tryon-picker .tryon-item {
+  gap: 6px;
+  padding: 8px;
+  min-height: 0;
+}
+
+/* Ảnh giãn theo ô thay vì giữ tỉ lệ vuông, để bốn món vừa khít chiều cao khung */
+.tryon-picker .tryon-item-photo,
+.tryon-picker .tryon-outfit-thumbs {
+  flex: 1;
+  min-height: 0;
+  aspect-ratio: auto;
+  position: relative;
+}
+
+.tryon-picker .tryon-item-name {
+  font-size: 12px;
+}
+
+.tryon-picker .nb-btn {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* ---------- Trạng thái của món: đang ghép / đang mặc ---------- */
+
+.tryon-item.is-generating {
+  border-color: var(--ink);
+  background: var(--yellow);
+}
+
+.tryon-item.is-wearing {
+  background: var(--green);
+  box-shadow: var(--shadow);
+}
+
+/* Nhãn nổi trên ảnh — nhìn một cái là biết món nào đang trên người */
+.tryon-item-flag {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  right: 5px;
+  text-align: center;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--yellow);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tryon-item-flag.is-wearing {
+  background: var(--green);
+}
+
+@media (max-width: 520px) {
+  .tryon-arrow {
+    width: 30px;
+    height: 52px;
+    font-size: 22px;
+  }
+}
+
+/* Ảnh thu nhỏ các món trong một bộ, xếp lưới 2x2 ở ô chọn outfit */
+.tryon-outfit-thumbs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  aspect-ratio: 1;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg);
+  margin-bottom: 6px;
+}
+
+.tryon-outfit-thumbs img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Chỉ có một ảnh thì cho nó chiếm trọn ô thay vì nằm lệch một góc */
+.tryon-outfit-thumbs img:only-child {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+}
+
+.tryon-guidelines-card summary {
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tryon-guidelines-card ul {
+  margin-top: 10px;
+  padding-left: 20px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Ảnh trong bộ sưu tập giờ bấm được để phóng to */
+button.tryon-result-photo {
+  border: var(--border);
+  padding: 0;
+  cursor: zoom-in;
+  width: 100%;
+}
+
+.item-card.is-active {
+  box-shadow: var(--shadow-lg);
+  background: var(--yellow);
+}
+
+@media (max-width: 720px) {
+  .tryon-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Xem ảnh phóng to ---------- */
+
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(17, 17, 17, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+}
+
+.lightbox-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.lightbox-zoom-value {
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: #fff;
+  min-width: 58px;
+  text-align: center;
+}
+
+.lightbox-stage {
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  /* Không transition: kéo ảnh mà có độ trễ thì cảm giác như bị dính */
+  transform-origin: center center;
+  user-select: none;
+  touch-action: none;
+}
+
+.lightbox-hint {
+  margin-top: 10px;
+  color: #d8d8d8;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ---------- Màn hình khi giao diện gặp lỗi (ErrorBoundary) ---------- */
+
+.crash-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.crash-card {
+  max-width: 540px;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.crash-emoji {
+  font-size: 56px;
+  line-height: 1;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.crash-title {
+  font-size: 26px;
+  margin-bottom: 12px;
+}
+
+.crash-text {
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+/* Thông điệp lỗi để người dùng chụp màn hình gửi lại — dài mấy cũng không được phá vỡ bố cục */
+.crash-detail {
+  display: block;
+  font-family: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+  font-size: 13px;
+  text-align: left;
+  background: var(--bg);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 18px;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.crash-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ---------- Nhật ký trực tiếp ---------- */
+
+.audit-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.audit-status-text {
+  flex: 1;
+  min-width: 200px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+/* Chấm báo trạng thái kênh: xám khi mất kết nối, xanh và đập nhẹ khi đang nhận dữ liệu */
+.live-dot {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: #b9b9b9;
+  flex: 0 0 auto;
+}
+
+.live-dot.is-live {
+  background: var(--green);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(126, 217, 87, 0.9); }
+  70% { box-shadow: 0 0 0 7px rgba(126, 217, 87, 0); }
+}
+
+/* Dòng vừa được đẩy về: nháy vàng rồi trả về nền thường, đủ để mắt bắt được mà không đọng lại */
+.admin-row.is-fresh {
+  animation: audit-flash 6s ease-out;
+}
+
+@keyframes audit-flash {
+  0% { background: var(--yellow); box-shadow: var(--shadow-lg); }
+  15% { background: var(--yellow); box-shadow: var(--shadow-lg); }
+  100% { background: var(--paper); box-shadow: var(--shadow); }
+}
+
+/* Người dùng đã tắt hiệu ứng chuyển động trong hệ điều hành thì bỏ mọi animation, giữ lại
+   thông tin bằng màu tĩnh. */
+@media (prefers-reduced-motion: reduce) {
+  .live-dot.is-live { animation: none; }
+  .admin-row.is-fresh { animation: none; background: var(--yellow); }
+}
+
+@media (max-width: 760px) {
+  .admin-row {
+    flex-wrap: wrap;
+  }
+
+  .admin-row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .admin-row-agent {
+    max-width: 100%;
+  }
 }
 
 /* Bố cục kiểu masonry (2 cột tự cân) cho trang chi tiết — lấp khoảng trống */

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Badge, Button } from './ui';
+import { Button } from './ui';
 import { isWornToday } from '../utils/date';
 
 export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, onToggleFavorite, onWear }) {

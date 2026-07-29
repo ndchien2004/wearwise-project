@@ -48,6 +48,9 @@ class PasswordResetServiceTest {
     @Mock
     private RefreshTokenService refreshTokenService;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     private SecureTokenGenerator secureTokenGenerator;
     private PasswordEncoder passwordEncoder;
     private PasswordResetService passwordResetService;
@@ -63,6 +66,7 @@ class PasswordResetServiceTest {
                 authMailService,
                 refreshTokenService,
                 passwordEncoder,
+                auditLogService,
                 EXPIRES_IN_SECONDS,
                 MAX_REQUESTS_PER_HOUR
         );

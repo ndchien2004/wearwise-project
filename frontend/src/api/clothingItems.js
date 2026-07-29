@@ -11,8 +11,25 @@ function buildQuery(params) {
   return s ? `?${s}` : '';
 }
 
+/**
+ * Danh sách món đồ — **đã cắt trang ở server**. Trả về đối tượng Page của Spring Data:
+ * `{ content, totalPages, totalElements, number, ... }`, không phải mảng.
+ *
+ * @param filters gồm cả bộ lọc (keyword, category...) lẫn phân trang (`page` 0-based, `size`)
+ */
 export function findItems(filters = {}) {
   return apiFetch(`/api/clothing-items${buildQuery(filters)}`);
+}
+
+/**
+ * Lấy trọn tủ đồ trong một lần gọi, trả về mảng phẳng.
+ *
+ * Chỉ dùng cho ô chọn món khi phối outfit: ở đó người dùng phải chọn được bất kỳ món nào, cắt
+ * trang sẽ khiến món ở trang sau không bao giờ chọn tới. Đừng dùng cho danh sách hiển thị —
+ * đó chính là thứ vừa được sửa đi.
+ */
+export function findAllItems(filters = {}) {
+  return findItems({ ...filters, unpaged: true }).then((page) => page.content ?? []);
 }
 
 export function getItem(id) {

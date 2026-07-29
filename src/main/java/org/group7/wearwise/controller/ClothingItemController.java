@@ -17,6 +17,10 @@ import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.service.ClothingItemService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -35,14 +39,36 @@ import java.util.List;
 @RequestMapping("/api/clothing-items")
 public class ClothingItemController {
 
+    /**
+     * Thứ tự cố định theo id tăng dần. Bắt buộc phải có khi phân trang: thiếu {@code order by},
+     * database không cam kết trả về cùng một thứ tự giữa hai lần gọi, và người dùng sẽ thấy có
+     * món lặp lại ở trang sau còn món khác thì biến mất. Chọn id vì nó giữ nguyên thứ tự mà
+     * giao diện vẫn hiển thị từ trước tới nay (món thêm trước đứng trước).
+     */
+    private static final Sort ITEM_SORT = Sort.by(Sort.Direction.ASC, "id");
+
+    /** Chặn trên kích thước trang để một request không kéo cả tủ đồ về. */
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final ClothingItemService clothingItemService;
 
     public ClothingItemController(ClothingItemService clothingItemService) {
         this.clothingItemService = clothingItemService;
     }
 
+    /**
+     * Danh sách món đồ, cắt trang ở database.
+     *
+     * <p>Trả về {@code Page<>} nên phần tử nằm trong {@code content}, kèm {@code totalPages} và
+     * {@code totalElements} để giao diện dựng thanh phân trang mà không phải tự đếm.
+     *
+     * <p>{@code unpaged=true} lấy toàn bộ kết quả trong một lần gọi. Chỉ dành cho ô chọn món khi
+     * phối outfit — ở đó người dùng phải chọn được bất kỳ món nào trong tủ, cắt trang sẽ khiến
+     * món ở trang sau không bao giờ chọn tới. Đây là dữ liệu của riêng một người dùng nên khối
+     * lượng có giới hạn tự nhiên; đừng dùng cờ này cho danh sách hiển thị thông thường.
+     */
     @GetMapping
-    public List<ClothingItemResponse> findItems(
+    public Page<ClothingItemResponse> findItems(
             Authentication authentication,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) ClothingCategory category,
@@ -51,12 +77,20 @@ public class ClothingItemController {
             @RequestParam(required = false) ClothingCondition condition,
             @RequestParam(required = false) ClothingStatus status,
             @RequestParam(required = false) Boolean favorite,
-            @RequestParam(required = false) ColorTone colorTone
+            @RequestParam(required = false) ColorTone colorTone,
+            @RequestParam(required = false) Boolean hasImage,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "24") int size,
+            @RequestParam(defaultValue = "false") boolean unpaged
     ) {
-        return clothingItemService.findItems(authentication.getName(), keyword, category, season, style, condition, status, favorite, colorTone)
-                .stream()
-                .map(ClothingItemResponse::from)
-                .toList();
+        Pageable pageable = unpaged
+                ? Pageable.unpaged(ITEM_SORT)
+                : PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), MAX_PAGE_SIZE), ITEM_SORT);
+
+        return clothingItemService
+                .findItems(authentication.getName(), keyword, category, season, style,
+                        condition, status, favorite, colorTone, hasImage, pageable)
+                .map(ClothingItemResponse::from);
     }
 
     @GetMapping("/recently-worn")

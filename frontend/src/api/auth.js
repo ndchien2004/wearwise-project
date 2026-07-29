@@ -1,4 +1,4 @@
-import { apiFetch, apiUpload, getRefreshToken } from './client';
+import { apiFetch, apiUpload } from './client';
 
 // Đăng ký 2 bước: xin mã OTP gửi qua email, rồi xác nhận mã để tạo tài khoản.
 export function registerRequestOtp(username, email, password) {
@@ -25,11 +25,9 @@ export function getCurrentUser() {
   return apiFetch('/api/auth/me');
 }
 
+// Không gửi refresh token trong body: server tự đọc từ cookie HttpOnly rồi thu hồi và xóa nó.
 export function logout() {
-  return apiFetch('/api/auth/logout', {
-    method: 'POST',
-    body: { refreshToken: getRefreshToken() },
-  });
+  return apiFetch('/api/auth/logout', { method: 'POST' });
 }
 
 export function forgotPassword(email) {

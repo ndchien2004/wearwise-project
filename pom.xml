@@ -77,6 +77,19 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Flyway — lịch sử schema có phiên bản, thay cho ddl-auto=update.
+             Spring Boot 4 tách auto-configuration ra từng module riêng, nên phải lấy starter:
+             chỉ khai báo flyway-core thì thư viện có mặt nhưng không ai kích hoạt nó. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <!-- Bắt buộc từ Flyway 10: phần hỗ trợ MySQL nằm ở artifact riêng. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
@@ -115,6 +128,13 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <!-- `mvnw spring-boot:run` là lệnh chạy trên máy lập trình viên nên bật sẵn
+                         profile dev (có khóa ký JWT dùng chung). Bản đóng gói chạy bằng
+                         `java -jar` KHÔNG có profile này: thiếu WEARWISE_AUTH_TOKEN_SECRET thì
+                         nó dừng ngay thay vì chạy bằng khóa công khai. -->
+                    <profiles>
+                        <profile>dev</profile>
+                    </profiles>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
