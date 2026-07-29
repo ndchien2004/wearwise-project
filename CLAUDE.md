@@ -17,7 +17,7 @@ lên lịch mặc theo ngày, nhận gợi ý theo thời tiết, thử đồ �
 | Backend | Spring Boot 4.0.6, Java 17 (JDK cài sẵn là 21 — **đừng dùng API Java 21** như `Math.clamp`) |
 | Database | MySQL 8.4 qua Docker; schema quản lý bằng Flyway |
 | Frontend | React 18 + Vite 5, JavaScript thuần (không TypeScript), CSS tự viết theo phong cách neobrutalism |
-| Test | JUnit 5 + Mockito + AssertJ, chạy trên H2. 261 test, tất cả phải xanh |
+| Test | JUnit 5 + Mockito + AssertJ, chạy trên H2. 264 test, tất cả phải xanh |
 | Dịch vụ ngoài | Cloudinary (ảnh), Google Gemini (nhận diện + gợi ý), tryon-api.com (thử đồ ảo), Open-Meteo (thời tiết, không cần key) |
 
 Quy mô: ~148 file Java, ~47 file JS/JSX. Đây là đồ án nhóm nhưng được xây theo chuẩn sản phẩm thật.
@@ -46,7 +46,7 @@ chứ không phải khóa sai.
 **Kiểm tra trước khi báo xong việc:**
 
 ```bash
-./mvnw test                      # backend — phải 261/261 xanh
+./mvnw test                      # backend — phải 264/264 xanh
 cd frontend && npm run lint      # frontend — phải 0 lỗi
 cd frontend && npm run build     # frontend — phải build được
 ```
@@ -219,6 +219,14 @@ sang `/admin` với vai trò này.
 - Model sinh ảnh **bắt buộc có hậu tố `-image`** (`gemini-3.1-flash-lite-image`). Model text như
   `gemini-3.1-flash-lite` không sinh được ảnh. Endpoint cũng khác: `/v1beta/interactions` chứ không
   phải `:generateContent`.
+- **Một lời gọi = đúng một ảnh trang phục.** Trường `garment_images` của nhà cung cấp là mảng nên
+  trông như gửi được cả bộ, nhưng model không ghép nổi nhiều món trong một lượt và trả lỗi. Vì vậy
+  `TryOnApiClient.generateTryOn` chỉ nhận một `String`; đừng mở lại bản nhận `List`.
+- **Thử cả bộ dùng ảnh riêng của outfit** (`outfits.image_url`), không phải ảnh của từng món gộp
+  lại. Bộ chưa có ảnh riêng thì `generateForOutfit` từ chối ngay và `OutfitPicker` lọc bỏ khỏi
+  danh sách — mời người dùng bấm một nút chắc chắn lỗi còn tệ hơn là không cho bấm. Ghép nối tiếp
+  từng món không phải lời giải thay thế: mỗi lớp là một lần model vẽ lại toàn bộ ảnh nên mặt và
+  dáng người trôi dần, lại tốn N lượt trong hạn mức 15 lượt/giờ.
 - **Mặc chồng lớp**: `baseResultId` trỏ tới một kết quả trước đó, khi đó ảnh nền là ảnh kết quả đó
   thay vì ảnh cơ thể. Bắt buộc tra qua `findByIdAndOwner_Username` — tra theo mỗi id thì người dùng
   A truyền id của B là ghép được đồ lên ảnh cơ thể người khác.
@@ -315,7 +323,7 @@ gọi `fetch` trực tiếp ở component.
 
 | Việc | Vì sao đáng làm |
 |---|---|
-| CI (GitHub Actions chạy `mvnw test` + `npm run build`) | Có 261 test mà không ai chạy tự động thì phí |
+| CI (GitHub Actions chạy `mvnw test` + `npm run build`) | Có 264 test mà không ai chạy tự động thì phí |
 | Actuator + health check + Micrometer | Chưa có cách nào biết hệ thống đang sống hay đang chết; cũng là nền để đếm lượt gọi Gemini (hiện `AdminOverviewResponse` cố tình bỏ trống con số này thay vì bịa) |
 | Request-id trong log (MDC) | User báo lỗi thì hiện không tra ngược được request nào |
 | Index composite `(owner_id, archived_at, wear_count)` | Mọi truy vấn đều lọc theo bộ này |
@@ -365,7 +373,7 @@ gọi `fetch` trực tiếp ở component.
 
 ## 8. Trước khi báo cáo hoàn thành
 
-1. `./mvnw test` — 261/261 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
+1. `./mvnw test` — 264/264 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
 2. `cd frontend && npm run build` — build được.
 3. Sửa entity → đã có migration tương ứng chưa? Đã chạy thử trên DB trống chưa?
 4. Thêm endpoint gọi dịch vụ trả tiền → đã xếp vào `TRY_ON`/`UPLOAD` trong `groupOf()` chưa?

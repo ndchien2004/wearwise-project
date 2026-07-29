@@ -239,7 +239,7 @@ cho khỏi đọc nhầm). Người nhận vào trang **Chia sẻ**, nhập mã,
 ## Test
 
 ```bash
-./mvnw test        # backend (261 tests)
+./mvnw test        # backend (264 tests)
 cd frontend && npm run build   # kiểm tra build frontend
 ```
 

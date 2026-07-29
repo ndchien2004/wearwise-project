@@ -68,29 +68,27 @@ public class TryOnApiClient {
 
     /**
      * Ghép trang phục ({@code clothImageUrl}) lên ảnh người ({@code humanImageUrl}).
+     *
+     * <p>Cố tình chỉ nhận <b>một</b> ảnh trang phục. Trường {@code garment_images} của nhà cung
+     * cấp là mảng nên trông như gửi được cả bộ, nhưng model không ghép nổi nhiều món trong một
+     * lượt và sẽ trả lỗi. Muốn mặc nhiều lớp thì gọi nhiều lần, mỗi lần lấy kết quả trước làm
+     * ảnh nền (xem {@code TryOnService.generateForItem}).</p>
+     *
      * @return URL ảnh kết quả (do tryon-api host — nên tải về lưu lại ngay đề phòng hết hạn).
      */
     public String generateTryOn(String humanImageUrl, String clothImageUrl) {
-        return generateTryOn(humanImageUrl, List.of(clothImageUrl));
-    }
-
-    /**
-     * Ghép nhiều món trang phục (nguyên outfit) lên ảnh người trong một lần gọi.
-     */
-    public String generateTryOn(String humanImageUrl, List<String> clothImageUrls) {
         if (!isConfigured()) {
             throw new TryOnUnavailableException(
                     "Dịch vụ thử đồ chưa được cấu hình. Hãy điền wearwise.tryon.api-key vào application.properties.");
         }
-        if (clothImageUrls == null || clothImageUrls.isEmpty()) {
-            throw new TryOnImageException("Cần ít nhất một ảnh trang phục để thử.");
+        if (clothImageUrl == null || clothImageUrl.isBlank()) {
+            throw new TryOnImageException("Cần một ảnh trang phục để thử.");
         }
 
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("model", model);
         payload.putArray("person_images").add(humanImageUrl);
-        var garments = payload.putArray("garment_images");
-        clothImageUrls.forEach(garments::add);
+        payload.putArray("garment_images").add(clothImageUrl);
         if (!category.isBlank()) {
             payload.put("category", category);
         }

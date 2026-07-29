@@ -142,13 +142,17 @@ public class TryOnService {
     }
 
     /**
-     * Thử nguyên một outfit: ghép tất cả món có ảnh trong outfit lên ảnh người dùng.
+     * Thử nguyên một outfit: ghép <b>ảnh của bộ</b> lên ảnh người dùng.
      *
-     * <p>Gửi cả bộ trong <b>một</b> lời gọi thay vì ghép lần lượt từng món: mỗi lần ghép là một
-     * lần model vẽ lại toàn bộ ảnh, nên ghép nối tiếp sẽ khiến khuôn mặt và dáng người trôi dần
-     * sau mỗi lớp. Đổi lại, chất lượng phụ thuộc vào việc nhà cung cấp có xử lý tốt nhiều món
-     * cùng lúc hay không — nếu kết quả kém, dùng chế độ mặc chồng lớp ở
-     * {@link #generateForItem} để kiểm soát từng bước.</p>
+     * <p>Trước đây chỗ này gom ảnh của từng món trong bộ rồi gửi cả mảng trong một lời gọi. Nhà
+     * cung cấp không ghép được nhiều món cùng lúc nên lời gọi đó hỏng, và bộ càng nhiều món thì
+     * càng chắc chắn hỏng. Ghép nối tiếp từng món cũng không phải lời giải: mỗi lớp là một lần
+     * model vẽ lại toàn bộ ảnh nên khuôn mặt và dáng người trôi dần, lại tốn N lượt trong hạn
+     * mức 15 lượt/giờ.</p>
+     *
+     * <p>Vì vậy bộ <b>bắt buộc</b> có ảnh riêng thì mới thử được — luôn đúng một ảnh trang phục
+     * cho mỗi lời gọi, giống hệt đường thử từng món. Người dùng muốn kiểm soát từng lớp thì dùng
+     * chế độ mặc chồng ở {@link #generateForItem}.</p>
      */
     @Transactional
     public TryOnResult generateForOutfit(String username, Long outfitId, Long baseResultId) {
@@ -160,18 +164,15 @@ public class TryOnService {
         Outfit outfit = outfitRepository.findByIdAndOwner_Username(outfitId, user.getUsername())
                 .orElseThrow(() -> new OutfitNotFoundException(outfitId));
 
-        List<String> garmentUrls = outfit.getClothingItems().stream()
-                .map(ClothingItem::getImageUrl)
-                .filter(url -> url != null && !url.isBlank())
-                .toList();
-
-        if (garmentUrls.isEmpty()) {
+        String garmentUrl = outfit.getImageUrl();
+        if (garmentUrl == null || garmentUrl.isBlank()) {
             throw new TryOnImageException(
-                    "Outfit này chưa có món đồ nào có ảnh minh họa. Hãy thêm ảnh cho các món trong bộ trước khi thử.");
+                    "Bộ này chưa có ảnh riêng. Hãy thêm ảnh cho bộ ở trang Outfit rồi quay lại thử, "
+                            + "hoặc thử lần lượt từng món ở tab Món đồ.");
         }
 
-        // 1. Ghép toàn bộ trang phục của outfit lên ảnh nền.
-        String resultUrl = tryOnApiClient.generateTryOn(baseImageUrl, garmentUrls);
+        // 1. Ghép ảnh của bộ lên ảnh nền.
+        String resultUrl = tryOnApiClient.generateTryOn(baseImageUrl, garmentUrl);
 
         // 2. Lưu vĩnh viễn lên Cloudinary (URL của nhà cung cấp có thể hết hạn).
         String storedUrl = storeResult(resultUrl);
@@ -181,7 +182,7 @@ public class TryOnService {
                 .owner(user)
                 .outfitId(outfit.getId())
                 .outfitName(outfit.getName())
-                .garmentImageUrl(garmentUrls.get(0))
+                .garmentImageUrl(garmentUrl)
                 .resultImageUrl(storedUrl)
                 .baseImageUrl(baseImageUrl)
                 .baseResultId(baseResultId)

@@ -582,21 +582,21 @@ function OutfitPicker({ outfits, keyword, busy, generatingId, activeOutfitId, on
 
   if (outfits === null) return <Loading>Đang tải outfit...</Loading>;
 
-  // Bộ không có món nào kèm ảnh thì server cũng sẽ từ chối — lọc sẵn để khỏi mời người dùng
-  // bấm vào một nút chắc chắn báo lỗi.
+  // Thử cả bộ chỉ gửi được đúng một ảnh trang phục, và đó là ảnh của bộ. Bộ chưa có ảnh riêng
+  // thì server từ chối — lọc sẵn để khỏi mời người dùng bấm vào một nút chắc chắn báo lỗi.
   const needle = keyword.trim().toLowerCase();
   const wearable = outfits
-    .filter((outfit) => (outfit.clothingItems || []).some((item) => item.imageUrl))
+    .filter((outfit) => outfit.imageUrl)
     .filter((outfit) => !needle || outfit.name.toLowerCase().includes(needle));
 
   if (wearable.length === 0) {
     return (
       <EmptyState emoji="🧢">
-        Không có bộ nào khớp.{' '}
+        Không có bộ nào có ảnh riêng để thử.{' '}
         <Link to="/outfits" style={{ fontWeight: 700 }}>
-          Phối một bộ
+          Thêm ảnh cho bộ
         </Link>{' '}
-        từ những món đã có ảnh rồi quay lại nhé.
+        rồi quay lại, hoặc thử lần lượt từng món ở tab Món đồ.
       </EmptyState>
     );
   }
@@ -611,7 +611,7 @@ function OutfitPicker({ outfits, keyword, busy, generatingId, activeOutfitId, on
     <PagerFrame page={safePage} pageCount={pageCount} onPageChange={setPage}>
       <div className="tryon-item-grid">
         {shown.map((outfit) => {
-          const photos = (outfit.clothingItems || []).filter((item) => item.imageUrl);
+          const itemCount = (outfit.clothingItems || []).length;
           const generating = generatingId === `outfit-${outfit.id}`;
           const active = activeOutfitId === outfit.id;
           return (
@@ -619,15 +619,14 @@ function OutfitPicker({ outfits, keyword, busy, generatingId, activeOutfitId, on
               key={outfit.id}
               className={`tryon-item ${generating ? 'is-generating' : ''} ${active ? 'is-wearing' : ''}`}
             >
-              <div className="tryon-outfit-thumbs">
-                {photos.slice(0, 4).map((item) => (
-                  <img key={item.id} src={item.imageUrl} alt={item.name} />
-                ))}
+              {/* Đúng tấm ảnh sẽ được gửi đi ghép — xem trước thấy gì thì thử ra thứ đó */}
+              <div className="tryon-item-photo">
+                <img src={outfit.imageUrl} alt={outfit.name} />
                 {generating && <span className="tryon-item-flag">⏳ Đang ghép</span>}
                 {!generating && active && <span className="tryon-item-flag is-wearing">✓ Đang mặc</span>}
               </div>
               <div className="tryon-item-name" title={outfit.name}>
-                🧢 {outfit.name} · {photos.length} món
+                🧢 {outfit.name} · {itemCount} món
               </div>
               <Button size="sm" variant={active ? 'dark' : 'green'} onClick={() => onPick(outfit)} disabled={busy}>
                 {generating ? '⏳ Đang ghép...' : active ? '↻ Ghép lại' : '✨ Thử cả bộ'}
