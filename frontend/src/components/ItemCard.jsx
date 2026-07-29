@@ -2,6 +2,8 @@ import { Badge, Button } from './ui';
 import {
   CATEGORY_COLORS,
   CATEGORY_EMOJIS,
+  BLOCK_REASON_EMOJIS,
+  BLOCK_REASON_LABELS,
   CATEGORY_LABELS,
   CONDITION_LABELS,
   SEASON_EMOJIS,
@@ -18,7 +20,10 @@ import { formatDateTime, isWornToday } from '../utils/date';
 
 export default function ItemCard({ item, tried, onOpen, onEdit, onDelete, onToggleFavorite, onWear, onWashed }) {
   const wornToday = isWornToday(item.lastWornAt);
-  const inLaundry = item.status === 'LAUNDRY';
+  const inLaundry = item.blockReason === 'LAUNDRY';
+  // Đồ hư hỏng / chưa dùng được cũng không mặc được, chỉ là không có nút "Giặt xong" để bấm.
+  // Trước đây chỗ này chỉ biết mỗi LAUNDRY nên hai trạng thái kia vẫn hiện nút Mặc rồi báo lỗi.
+  const otherwiseBlocked = Boolean(item.blockReason) && !inLaundry;
 
   const stop = (handler) => (e) => {
     e.stopPropagation();
@@ -93,6 +98,15 @@ export default function ItemCard({ item, tried, onOpen, onEdit, onDelete, onTogg
         {inLaundry ? (
           <Button size="sm" variant="green" onClick={stop(onWashed)}>
             ✅ Giặt xong
+          </Button>
+        ) : otherwiseBlocked ? (
+          <Button
+            size="sm"
+            disabled
+            onClick={(e) => e.stopPropagation()}
+            title={label(BLOCK_REASON_LABELS, item.blockReason)}
+          >
+            {BLOCK_REASON_EMOJIS[item.blockReason] ?? '⚠️'} Chưa mặc được
           </Button>
         ) : wornToday ? (
           <Button size="sm" disabled onClick={(e) => e.stopPropagation()}>

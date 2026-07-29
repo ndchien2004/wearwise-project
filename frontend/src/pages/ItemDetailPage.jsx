@@ -8,6 +8,8 @@ import ShareModal from '../components/ShareModal';
 import { Badge, Button, EmptyState, ErrorBanner, Loading, Toast } from '../components/ui';
 import { useConfirm } from '../context/ConfirmContext';
 import {
+  BLOCK_REASON_EMOJIS,
+  BLOCK_REASON_LABELS,
   CATEGORY_COLORS,
   CATEGORY_EMOJIS,
   CATEGORY_LABELS,
@@ -300,9 +302,16 @@ export default function ItemDetailPage() {
           </div>
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-            {item.status === 'LAUNDRY' ? (
+            {item.blockReason === 'LAUNDRY' ? (
               <Button variant="green" onClick={handleWashed} disabled={busy}>
                 ✅ Giặt xong
+              </Button>
+            ) : item.blockReason ? (
+              // Hư hỏng / chưa dùng được: không có nút bấm một phát cho xong như giặt, người dùng
+              // phải đổi trạng thái hoặc tình trạng ở ngay dưới.
+              <Button disabled title={label(BLOCK_REASON_LABELS, item.blockReason)}>
+                {BLOCK_REASON_EMOJIS[item.blockReason] ?? '⚠️'} Chưa mặc được (
+                {label(BLOCK_REASON_LABELS, item.blockReason)})
               </Button>
             ) : wornToday ? (
               <Button disabled>✅ Đã mặc hôm nay</Button>

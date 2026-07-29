@@ -13,6 +13,7 @@ import {
   SEASON_EMOJIS,
   SEASON_LABELS,
   STYLE_LABELS,
+  describeBlockers,
   label,
 } from '../utils/labels';
 import { daysSince, formatDateTime, isWornToday } from '../utils/date';
@@ -149,6 +150,10 @@ export default function OutfitDetailPage() {
   }
 
   const wornToday = isWornToday(outfit.lastWornAt);
+  // Chặn ngay trên nút thay vì để người dùng bấm rồi nhận thông báo từ chối — giống hệt cách
+  // OutfitCard làm ở trang danh sách.
+  const notWearable = outfit.wearableNow === false;
+  const blockerText = describeBlockers(outfit.blockingItems);
   const days = daysSince(outfit.lastWornAt);
   const collageImages = outfit.clothingItems.filter((item) => item.imageUrl).slice(0, 4);
 
@@ -206,8 +211,21 @@ export default function OutfitDetailPage() {
               </p>
             )}
 
+            {notWearable && (
+              <p className="detail-blocker-note">
+                ⚠️ Chưa mặc được hôm nay — {blockerText}.
+                {outfit.available === false
+                  ? ' Hãy sửa bộ và thay bằng món đang có trong tủ.'
+                  : ' Đánh dấu 🧺 Giặt xong ở tủ đồ là dùng lại được ngay.'}
+              </p>
+            )}
+
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
-              {wornToday ? (
+              {notWearable ? (
+                <Button disabled title={blockerText}>
+                  {outfit.available === false ? '⚠️ Thiếu món' : '🧺 Chưa sẵn sàng'}
+                </Button>
+              ) : wornToday ? (
                 <Button disabled>✅ Đã mặc hôm nay</Button>
               ) : (
                 <Button variant="green" onClick={handleWear} disabled={busy}>

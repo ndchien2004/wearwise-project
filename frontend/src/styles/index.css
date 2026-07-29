@@ -4225,3 +4225,15 @@ button.tryon-result-photo {
   border-radius: 6px;
   object-fit: cover;
 }
+
+/* Lý do bộ chưa mặc được, ở trang chi tiết outfit */
+.detail-blocker-note {
+  background: var(--orange);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  margin: 14px 0 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}

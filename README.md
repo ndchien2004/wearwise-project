@@ -65,6 +65,7 @@ Mở http://localhost:5173 — dev server proxy sẵn `/api` sang backend nên k
 | Thống kê tủ đồ (phân bố, mặc nhiều nhất, lâu chưa mặc) | `/api/statistics` | Thống kê |
 | Lịch sử mặc theo ngày (mặc gì nhiều nhất trong tháng, số ngày có mặc) | `/api/statistics/history` | Trang chủ |
 | Chia sẻ outfit/món đồ sang tài khoản khác bằng mã 8 ký tự | `/api/shares` | Chia sẻ |
+| Vận hành: tài khoản, hạn mức, nhật ký kiểm toán (chỉ `ROLE_ADMIN`) | `/api/admin/*` | Quản trị |
 
 ### Bộ đồ "chưa mặc được"
 
@@ -75,6 +76,11 @@ thời tiết và xếp hạng AI cũng bỏ qua những bộ này: gợi ý ra 
 Đồ đang giặt chỉ chặn **hôm nay**. Bộ vẫn còn đủ món nên vẫn lên lịch cho ngày sau được — tới lúc
 đó rất có thể đã giặt xong. Chỉ bộ **thiếu món** (có món bị ẩn khỏi tủ) mới không lên lịch được,
 vì đó là hỏng thật, phải sửa bộ mới dùng lại.
+
+Món lẻ cũng vậy: nút *Mặc* bị khóa kèm lý do ngay trên thẻ và trang chi tiết, thay vì bấm rồi mới
+nhận thông báo từ chối. Lý do do server tính (`ClothingItemResponse.blockReason`) chứ không để
+giao diện tự suy từ `status` và `condition` — chép lại luật sang JavaScript là mở đường cho hai bên
+lệch nhau.
 
 ### Kế hoạch mặc do AI sinh
 
@@ -93,7 +99,6 @@ hoạch bình thường, còn cả đợt hiện thành một thẻ ở Trang ch
 
 Luật xếp lịch nằm ở `src/main/resources/prompts/wear-plan.md` — sửa file đó là đổi cách AI gợi ý,
 không cần đụng vào code Java.
-| Vận hành: tài khoản, hạn mức, nhật ký kiểm toán (chỉ `ROLE_ADMIN`) | `/api/admin/*` | Quản trị |
 
 ### Quản trị viên
 
@@ -269,7 +274,7 @@ cho khỏi đọc nhầm). Người nhận vào trang **Chia sẻ**, nhập mã,
 
 ```bash
 ./mvnw test        # backend (275 tests)
-cd frontend && npm run build   # kiểm tra build frontend
+cd frontend && npm run check  # frontend: lint + smoke render + build
 ```
 
 ## Deploy

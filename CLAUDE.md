@@ -47,15 +47,32 @@ chứ không phải khóa sai.
 
 ```bash
 ./mvnw test                      # backend — phải 275/275 xanh
-cd frontend && npm run lint      # frontend — phải 0 lỗi
-cd frontend && npm run build     # frontend — phải build được
+cd frontend && npm run check     # lint + smoke + build, cả ba phải sạch
 ```
+
+`npm run check` chạy lần lượt ba thứ, mỗi thứ bắt một loại lỗi khác nhau:
+
+| Lệnh | Bắt được | Bỏ lọt |
+|---|---|---|
+| `npm run lint` | biến không tồn tại, **import sai tên**, import module không có thật | lỗi chỉ lộ ra khi render |
+| `npm run smoke` | lỗi lúc render component với dữ liệu thật (`X is not defined`, đọc thuộc tính của `undefined`) | mọi thứ cần tương tác chuột |
+| `npm run build` | lỗi cú pháp | gần như mọi lỗi logic |
 
 **`npm run lint` là bắt buộc, không phải tùy chọn.** `vite build` chỉ dịch mã, nó **không** kiểm
 tra biến có tồn tại hay không: một lần đổi tên còn sót chỗ dùng vẫn build xanh và chỉ vỡ lúc chạy,
 đúng nhánh giao diện hiếm khi hiển thị, thành màn hình trắng. Đã xảy ra đúng một lần như vậy
 (`wearableItems` ở trang Thử đồ). Cấu hình cố tình chỉ giữ luật bắt lỗi thật, không có luật định
 dạng — thêm nhiễu là người ta quen tay bỏ qua cảnh báo, rồi bỏ qua luôn cảnh báo thật.
+
+**`no-undef` một mình là chưa đủ.** Nó không bắt được import sai tên: một tên đã import thì luôn
+"được định nghĩa" dưới mắt nó, kể cả khi module nguồn chẳng hề export cái tên đó. Vì vậy có thêm
+`import/named`, `import/default`, `import/no-unresolved` — chúng đối chiếu thật với module nguồn.
+
+**`npm run smoke` bù nốt phần còn lại.** `scripts/smoke-render.jsx` render từng component bằng
+`react-dom/server` với dữ liệu giả, phủ cả những nhánh hiếm hiển thị (bộ đang vướng đồ giặt, món
+hư hỏng, thiếu ảnh, server cũ chưa trả trường mới). Đó là loại lỗi mà lint không thấy vì nó không
+biết nhánh nào thực sự chạy. Thêm nhánh giao diện mới thì thêm một `check(...)` vào file đó —
+`useEffect` không chạy khi render phía server nên không cần mock API.
 
 ---
 
@@ -425,7 +442,7 @@ gọi `fetch` trực tiếp ở component.
 ## 8. Trước khi báo cáo hoàn thành
 
 1. `./mvnw test` — 275/275 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
-2. `cd frontend && npm run build` — build được.
+2. `cd frontend && npm run check` — lint + smoke + build, cả ba phải sạch.
 3. Sửa entity → đã có migration tương ứng chưa? Đã chạy thử trên DB trống chưa?
 4. Thêm endpoint gọi dịch vụ trả tiền → đã xếp vào `TRY_ON`/`UPLOAD` trong `groupOf()` chưa?
 5. Thêm endpoint `/api/admin/**` → có vô tình mở đường xem nội dung người dùng không?

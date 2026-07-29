@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import importPlugin from 'eslint-plugin-import';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 
@@ -37,6 +38,13 @@ export default [
     plugins: {
       react,
       'react-hooks': reactHooks,
+      import: importPlugin,
+    },
+    settings: {
+      react: { version: 'detect' },
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx'] },
+      },
     },
     rules: {
       // Cần plugin react thì `no-unused-vars` mới hiểu <Button /> là có dùng Button; thiếu nó
@@ -46,6 +54,14 @@ export default [
 
       // Lỗi nguy hiểm nhất trong dự án không có TypeScript: dùng biến không tồn tại.
       'no-undef': 'error',
+
+      // `no-undef` KHÔNG bắt được import sai tên: một tên đã import thì luôn "được định nghĩa"
+      // dưới mắt nó, kể cả khi module nguồn chẳng hề export cái tên đó. Lỗi kiểu ấy lọt qua cả
+      // lint lẫn `vite build`, rồi vỡ ra lúc chạy thành "X is not defined" giữa trang. Ba luật
+      // dưới đây đối chiếu thật với module nguồn.
+      'import/named': 'error',
+      'import/default': 'error',
+      'import/no-unresolved': 'error',
 
       // Biến thừa thường là dấu vết của một lần refactor làm dở.
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
