@@ -154,6 +154,39 @@ export const AUDIT_ACTION_BADGES = {
   ADMIN_CHANGED_RATE_LIMIT: 'nb-badge--purple',
 };
 
+/** Vì sao một món chưa mặc được — khớp enum ItemBlockReason ở backend. */
+export const BLOCK_REASON_LABELS = {
+  ARCHIVED: 'đã ẩn khỏi tủ',
+  LAUNDRY: 'đang giặt',
+  UNAVAILABLE: 'chưa dùng được',
+  DAMAGED: 'đang hư hỏng',
+};
+
+export const BLOCK_REASON_EMOJIS = {
+  ARCHIVED: '📦',
+  LAUNDRY: '🧺',
+  UNAVAILABLE: '🚫',
+  DAMAGED: '🩹',
+};
+
+/**
+ * Câu tóm tắt vì sao bộ chưa mặc được, gom các món cùng lý do lại: "🧺 Áo sơ mi, Quần jean đang
+ * giặt" thay vì lặp cụm "đang giặt" sau từng tên món.
+ */
+export function describeBlockers(blockingItems) {
+  if (!blockingItems?.length) return '';
+
+  const byReason = new Map();
+  blockingItems.forEach(({ itemName, reason }) => {
+    if (!byReason.has(reason)) byReason.set(reason, []);
+    byReason.get(reason).push(itemName);
+  });
+
+  return [...byReason.entries()]
+    .map(([reason, names]) => `${BLOCK_REASON_EMOJIS[reason] ?? '⚠️'} ${names.join(', ')} ${label(BLOCK_REASON_LABELS, reason)}`)
+    .join(' · ');
+}
+
 export function label(map, key) {
   return map[key] ?? key ?? '—';
 }

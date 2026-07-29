@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from './ui';
 import { isWornToday } from '../utils/date';
+import { describeBlockers } from '../utils/labels';
 
 export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, onToggleFavorite, onWear }) {
   const collageImages = outfit.clothingItems.filter((item) => item.imageUrl).slice(0, 4);
@@ -33,16 +34,19 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
     </div>
   );
 
-  // Bộ có món đã bị ẩn thì không mặc được — làm mờ và chặn nút "Mặc" ngay trên card
-  // thay vì để người dùng bấm rồi nhận lỗi từ server.
-  const unavailable = outfit.available === false;
+  // Bộ chưa mặc được thì chặn nút "Mặc" ngay trên card thay vì để người dùng bấm rồi nhận lỗi.
+  // Tách hai mức: thiếu món là hỏng hẳn, phải vào sửa bộ; đang giặt thì chờ là dùng lại được,
+  // nên không tô cảnh báo nặng nề và vẫn để nút Sửa ở dạng thường.
+  const incomplete = outfit.available === false;
+  const notWearable = outfit.wearableNow === false;
+  const blockerText = describeBlockers(outfit.blockingItems);
 
   return (
     <div
-      className={`nb-card nb-card--hover item-card ${unavailable ? 'is-unavailable' : ''}`}
+      className={`nb-card nb-card--hover item-card ${incomplete ? 'is-unavailable' : ''}`}
       style={{ cursor: 'pointer' }}
       onClick={() => onOpen(outfit)}
-      title={unavailable ? `Thiếu món: ${outfit.archivedItemNames.join(', ')}` : 'Bấm để xem chi tiết'}
+      title={notWearable ? blockerText : 'Bấm để xem chi tiết'}
     >
       {flippable ? (
         <div
@@ -82,9 +86,7 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
         <div style={{ minWidth: 0 }}>
           <div className="item-name" title={outfit.name}>🧢 {outfit.name}</div>
           <div className="item-meta">
-            {unavailable
-              ? `⚠️ Thiếu: ${outfit.archivedItemNames.join(', ')}`
-              : outfit.description || `${outfit.clothingItems.length} món đồ`}
+            {notWearable ? blockerText : outfit.description || `${outfit.clothingItems.length} món đồ`}
           </div>
         </div>
         <button
@@ -98,9 +100,13 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
       </div>
 
       <div className="card-actions">
-        {unavailable ? (
-          <Button size="sm" disabled onClick={(e) => e.stopPropagation()} title="Bộ đang thiếu món">
+        {incomplete ? (
+          <Button size="sm" disabled onClick={(e) => e.stopPropagation()} title={blockerText}>
             ⚠️ Thiếu món
+          </Button>
+        ) : notWearable ? (
+          <Button size="sm" disabled onClick={(e) => e.stopPropagation()} title={blockerText}>
+            🧺 Chưa sẵn sàng
           </Button>
         ) : wornToday ? (
           <Button size="sm" disabled onClick={(e) => e.stopPropagation()}>
@@ -111,7 +117,7 @@ export default function OutfitCard({ outfit, tried, onOpen, onEdit, onDelete, on
             👣 Mặc
           </Button>
         )}
-        <Button size="sm" variant={unavailable ? 'primary' : undefined} onClick={stop(onEdit)}>
+        <Button size="sm" variant={incomplete ? 'primary' : undefined} onClick={stop(onEdit)}>
           ✏️ Sửa
         </Button>
         <Button size="sm" variant="danger" onClick={stop(onDelete)}>

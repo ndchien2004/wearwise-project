@@ -60,10 +60,34 @@ Mở http://localhost:5173 — dev server proxy sẵn `/api` sang backend nên k
 | Quản lý quần áo (CRUD, lọc theo danh mục/mùa/phong cách/tình trạng, yêu thích, đánh dấu đã mặc) | `/api/clothing-items` | Tủ đồ |
 | Phối outfit từ các món đồ | `/api/outfits` | Outfit |
 | Lịch phối đồ theo ngày (lên kế hoạch, đánh dấu đã mặc) | `/api/outfit-plans` | Lịch phối đồ |
+| Kế hoạch mặc nhiều ngày do AI sinh theo mục đích người dùng viết | `/api/ai/wear-plans`, `/api/wear-plans` | Lịch phối đồ, Trang chủ |
 | Gợi ý outfit theo thời tiết (Open-Meteo, không cần API key) | `/api/outfits/suggestions` | Gợi ý thời tiết |
 | Thống kê tủ đồ (phân bố, mặc nhiều nhất, lâu chưa mặc) | `/api/statistics` | Thống kê |
 | Lịch sử mặc theo ngày (mặc gì nhiều nhất trong tháng, số ngày có mặc) | `/api/statistics/history` | Trang chủ |
 | Chia sẻ outfit/món đồ sang tài khoản khác bằng mã 8 ký tự | `/api/shares` | Chia sẻ |
+
+### Bộ đồ "chưa mặc được"
+
+Một bộ có món **đang giặt**, **hư hỏng** hay **chưa dùng được** sẽ nằm ở mục *Chưa mặc được* dưới
+trang Outfit, kèm tên món đang vướng — thay vì nằm lẫn ở trên rồi báo lỗi lúc bấm "Mặc". Gợi ý
+thời tiết và xếp hạng AI cũng bỏ qua những bộ này: gợi ý ra thứ không mặc được thì cũng vô dụng.
+
+Đồ đang giặt chỉ chặn **hôm nay**. Bộ vẫn còn đủ món nên vẫn lên lịch cho ngày sau được — tới lúc
+đó rất có thể đã giặt xong. Chỉ bộ **thiếu món** (có món bị ẩn khỏi tủ) mới không lên lịch được,
+vì đó là hỏng thật, phải sửa bộ mới dùng lại.
+
+### Kế hoạch mặc do AI sinh
+
+Ở trang Lịch phối đồ, bấm **✨ AI lên kế hoạch** rồi gõ mong muốn bằng lời — *"7 ngày đi làm, thứ
+Sáu gặp khách nên cần lịch sự hơn"*. AI xếp lịch từ chính các bộ đang có trong tủ, mỗi ngày kèm một
+câu giải thích.
+
+Kế hoạch hiện ra ở dạng **xem trước, chưa lưu gì**. Ngày nào bạn đã tự đặt lịch sẵn sẽ được đánh
+dấu và **giữ nguyên** trừ khi bạn tự tick ghi đè. Bấm lưu thì các ngày đổ vào lịch tháng như kế
+hoạch bình thường, còn cả đợt hiện thành một thẻ ở Trang chủ kèm tiến độ và bộ của hôm nay.
+
+Luật xếp lịch nằm ở `src/main/resources/prompts/wear-plan.md` — sửa file đó là đổi cách AI gợi ý,
+không cần đụng vào code Java.
 | Vận hành: tài khoản, hạn mức, nhật ký kiểm toán (chỉ `ROLE_ADMIN`) | `/api/admin/*` | Quản trị |
 
 ### Quản trị viên
@@ -239,7 +263,7 @@ cho khỏi đọc nhầm). Người nhận vào trang **Chia sẻ**, nhập mã,
 ## Test
 
 ```bash
-./mvnw test        # backend (264 tests)
+./mvnw test        # backend (275 tests)
 cd frontend && npm run build   # kiểm tra build frontend
 ```
 

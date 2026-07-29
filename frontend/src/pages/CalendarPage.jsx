@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import * as outfitsApi from '../api/outfits';
 import * as plansApi from '../api/plans';
+import AiPlanModal from '../components/AiPlanModal';
 import CalendarPlanChip from '../components/CalendarPlanChip';
 import { Button, ErrorBanner, Field, Modal } from '../components/ui';
 import { useConfirm } from '../context/ConfirmContext';
@@ -172,6 +173,7 @@ export default function CalendarPage() {
   const [outfits, setOutfits] = useState([]);
   const [error, setError] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
+  const [aiPlanning, setAiPlanning] = useState(false);
 
   const cells = useMemo(() => buildMonthGrid(year, month), [year, month]);
   const today = todayIso();
@@ -221,6 +223,9 @@ export default function CalendarPage() {
           <h1 className="page-title">📅 Lịch phối đồ</h1>
         </div>
         <div className="calendar-nav">
+          <Button size="sm" variant="green" onClick={() => setAiPlanning(true)}>
+            ✨ AI lên kế hoạch
+          </Button>
           <Button size="sm" onClick={() => changeMonth(-1)}>← Trước</Button>
           <span className="calendar-month-label">
             {MONTH_NAMES[month]} {year}
@@ -279,6 +284,20 @@ export default function CalendarPage() {
           outfits={outfits}
           onChanged={load}
           onClose={() => setSelectedDay(null)}
+        />
+      )}
+
+      {aiPlanning && (
+        <AiPlanModal
+          onSaved={async (saved) => {
+            // Nhảy tới tháng chứa kế hoạch vừa lưu, nếu không người dùng bấm xong chẳng thấy gì
+            // thay đổi vì đợt kế hoạch rơi sang tháng sau.
+            const start = new Date(`${saved.startDate}T00:00:00`);
+            setYear(start.getFullYear());
+            setMonth(start.getMonth());
+            await load();
+          }}
+          onClose={() => setAiPlanning(false)}
         />
       )}
     </div>

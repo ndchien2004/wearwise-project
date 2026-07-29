@@ -5,6 +5,7 @@ import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingStatus;
+import org.group7.wearwise.enums.ItemBlockReason;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.enums.WearSource;
@@ -227,8 +228,9 @@ public class OutfitService {
 
         return findOutfits(ownerUsername, null, null, null, null)
                 .stream()
-                // Bộ đang thiếu món thì không gợi ý — có gợi ý cũng không mặc được.
-                .filter(OutfitService::isAvailable)
+                // Gợi ý cho HÔM NAY nên chỉ lấy bộ mặc được ngay: thiếu món, đang giặt hay hư hỏng
+                // thì gợi ý ra cũng chỉ để người dùng bấm vào rồi nhận thông báo từ chối.
+                .filter(OutfitService::isWearableNow)
                 .map(outfit -> scoreOutfit(outfit, cold, hot, raining))
                 .sorted(Comparator
                         .comparingInt(OutfitSuggestion::score).reversed()
@@ -314,9 +316,36 @@ public class OutfitService {
     /**
      * Outfit chỉ khả dụng khi mọi món trong bộ còn nằm trong tủ đồ. Món bị ẩn không xóa outfit
      * mà làm bộ "không hoàn chỉnh" — người dùng vào sửa, thay bằng món khác là dùng lại được.
+     *
+     * <p>Cố tình <b>không</b> tính đồ đang giặt: đó là trạng thái tạm thời, lên lịch mặc thứ Sáu
+     * cho một bộ đang giặt hôm thứ Hai là hoàn toàn hợp lý. Câu hỏi "hôm nay mặc được không"
+     * do {@link #isWearableNow} trả lời.</p>
      */
     public static boolean isAvailable(Outfit outfit) {
         return outfit.getClothingItems().stream().noneMatch(item -> item.getArchivedAt() != null);
+    }
+
+    /**
+     * Những món đang cản việc mặc bộ này <i>ngay bây giờ</i>, kèm lý do — dùng cho mục "Không khả
+     * dụng" ở giao diện và để loại khỏi gợi ý hôm nay.
+     */
+    public static List<OutfitBlocker> blockingItems(Outfit outfit) {
+        return outfit.getClothingItems().stream()
+                .flatMap(item -> ClothingItemService.blockReason(item)
+                        .map(reason -> new OutfitBlocker(item.getName(), reason))
+                        .stream())
+                .sorted(Comparator.comparing(OutfitBlocker::reason).thenComparing(OutfitBlocker::itemName))
+                .toList();
+    }
+
+    /** Mặc được ngay hôm nay: không thiếu món, và không món nào đang giặt / hỏng / chưa dùng được. */
+    public static boolean isWearableNow(Outfit outfit) {
+        return outfit.getClothingItems().stream()
+                .allMatch(item -> ClothingItemService.blockReason(item).isEmpty());
+    }
+
+    /** Một món đang cản việc mặc, kèm lý do. */
+    public record OutfitBlocker(String itemName, ItemBlockReason reason) {
     }
 
     private void assertComplete(Outfit outfit) {

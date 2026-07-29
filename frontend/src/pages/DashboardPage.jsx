@@ -4,6 +4,7 @@ import * as itemsApi from '../api/clothingItems';
 import * as plansApi from '../api/plans';
 import { getStatistics } from '../api/statistics';
 import { DEFAULT_CITY, getWeather } from '../api/weather';
+import * as wearPlansApi from '../api/wearPlans';
 import WearHistoryCard from '../components/WearHistoryCard';
 import { ItemPreviewChip, OutfitPreviewChip } from '../components/WearPreview';
 import { Badge, ErrorBanner, Loading } from '../components/ui';
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   const [leastWorn, setLeastWorn] = useState([]);
   const [recentlyWorn, setRecentlyWorn] = useState([]);
   const [weather, setWeather] = useState(null);
+  const [activePlans, setActivePlans] = useState([]);
   const [error, setError] = useState(null);
   const [loaded, setLoaded] = useState(false);
 
@@ -36,12 +38,16 @@ export default function DashboardPage() {
       plansApi.findPlans(today, today),
       itemsApi.getLeastWornItems(4),
       itemsApi.getRecentlyWornItems(4),
+      // Đợt kế hoạch là tính năng phụ: hỏng thì trang chủ vẫn phải mở được, nên nuốt lỗi ở đây
+      // thay vì để nó kéo cả Promise.all xuống.
+      wearPlansApi.findActiveWearPlans().catch(() => []),
     ])
-      .then(([s, plans, least, recent]) => {
+      .then(([s, plans, least, recent, active]) => {
         setStats(s);
         setTodayPlans(plans);
         setLeastWorn(least);
         setRecentlyWorn(recent);
+        setActivePlans(active);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoaded(true));
@@ -98,6 +104,53 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {activePlans.map((plan) => {
+        const today = todayIso();
+        const todayDay = plan.days?.find((day) => day.date === today);
+        const percent = plan.dayCount === 0 ? 0 : Math.round((plan.doneCount / plan.dayCount) * 100);
+
+        return (
+          <div key={plan.id} className="nb-card wear-plan-card" style={{ marginBottom: 18 }}>
+            <h3 className="chart-title" style={{ marginBottom: 4 }}>✨ {plan.title}</h3>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>
+              {plan.doneCount}/{plan.dayCount} ngày đã mặc · tới {plan.endDate}
+            </div>
+            <div className="wear-plan-progress">
+              <span style={{ width: `${percent}%` }} />
+            </div>
+            {plan.summary && (
+              <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5 }}>💡 {plan.summary}</div>
+            )}
+
+            {todayDay ? (
+              <div className="wear-plan-today">
+                {todayDay.outfit.imageUrl && (
+                  <img src={todayDay.outfit.imageUrl} alt={todayDay.outfit.name} />
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 800 }}>
+                    {todayDay.completed ? '✅' : '🕐'} Hôm nay: {todayDay.outfit.name}
+                  </div>
+                  {todayDay.reason && (
+                    <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.4 }}>
+                      {todayDay.reason}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>
+                Đợt này không xếp bộ nào cho hôm nay.
+              </div>
+            )}
+
+            <Link to="/calendar" className="nb-btn nb-btn--sm" style={{ marginTop: 10 }}>
+              📅 Xem cả đợt trong lịch →
+            </Link>
+          </div>
+        );
+      })}
 
       <div className="two-col">
         <div className="nb-card">

@@ -55,6 +55,17 @@ public class OutfitPlan {
     @JoinColumn(name = "owner_id")
     private AppUser owner;
 
+    /**
+     * Đợt kế hoạch đã sinh ra ngày này, NULL nếu người dùng tự đặt tay. Nhờ nó mà xóa cả đợt gỡ
+     * đúng những ngày của đợt đó, không đụng vào lịch người dùng tự thêm xen kẽ.
+     *
+     * <p>Lý do AI chọn bộ cho ngày này nằm ở {@link #note} chứ không phải một cột riêng: nó vốn
+     * là ghi chú của ngày, và để ở đó thì lịch tháng hiện sẵn mà không cần sửa gì.</p>
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "wear_plan_id")
+    private WearPlan wearPlan;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

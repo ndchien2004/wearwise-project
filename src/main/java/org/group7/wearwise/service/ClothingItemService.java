@@ -7,6 +7,7 @@ import org.group7.wearwise.enums.ClothingCategory;
 import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.ColorTone;
+import org.group7.wearwise.enums.ItemBlockReason;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
 import org.group7.wearwise.enums.WearSource;
@@ -29,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ClothingItemService {
@@ -354,28 +356,47 @@ public class ClothingItemService {
         return lastWornAt != null && lastWornAt.toLocalDate().equals(date);
     }
 
-    /** Ném lỗi nếu món đồ đã bị ẩn / đang giặt / chưa dùng được / hư hỏng — không thể mặc. */
-    public static void assertWearable(ClothingItem item) {
+    /**
+     * Món này có gì cản việc mặc không — rỗng nghĩa là mặc được ngay.
+     *
+     * <p>Đây là <b>nguồn sự thật duy nhất</b> cho câu hỏi đó: {@link #assertWearable} ném lỗi dựa
+     * trên chính nó, và giao diện dùng nó để xếp bộ vào mục "Không khả dụng". Tách làm hai chỗ thì
+     * sớm muộn cũng lệch — bộ nằm ở mục dùng được nhưng bấm vào lại báo lỗi.</p>
+     */
+    public static Optional<ItemBlockReason> blockReason(ClothingItem item) {
         if (item.getArchivedAt() != null) {
-            throw new BusinessRuleException(
-                    ErrorCode.CLOTHING_ITEM_ARCHIVED,
-                    "\"" + item.getName() + "\" đã bị ẩn khỏi tủ đồ. Hãy khôi phục món này hoặc thay bằng món khác.");
+            return Optional.of(ItemBlockReason.ARCHIVED);
         }
         if (item.getStatus() == ClothingStatus.LAUNDRY) {
-            throw new BusinessRuleException(
-                    ErrorCode.ITEM_NOT_WEARABLE,
-                    "\"" + item.getName() + "\" đang giặt nên chưa mặc được. Hãy bấm \"Giặt xong\" khi đã giặt xong.");
+            return Optional.of(ItemBlockReason.LAUNDRY);
         }
         if (item.getStatus() == ClothingStatus.UNAVAILABLE) {
-            throw new BusinessRuleException(
-                    ErrorCode.ITEM_NOT_WEARABLE,
-                    "\"" + item.getName() + "\" đang ở trạng thái chưa dùng được nên chưa mặc được.");
+            return Optional.of(ItemBlockReason.UNAVAILABLE);
         }
         if (item.getCondition() == ClothingCondition.DAMAGED) {
-            throw new BusinessRuleException(
-                    ErrorCode.ITEM_NOT_WEARABLE,
-                    "\"" + item.getName() + "\" đang hư hỏng nên không nên mặc. Hãy sửa lại hoặc bỏ đánh dấu hư hỏng.");
+            return Optional.of(ItemBlockReason.DAMAGED);
         }
+        return Optional.empty();
+    }
+
+    /** Ném lỗi nếu món đồ đã bị ẩn / đang giặt / chưa dùng được / hư hỏng — không thể mặc. */
+    public static void assertWearable(ClothingItem item) {
+        blockReason(item).ifPresent(reason -> {
+            throw switch (reason) {
+                case ARCHIVED -> new BusinessRuleException(
+                        ErrorCode.CLOTHING_ITEM_ARCHIVED,
+                        "\"" + item.getName() + "\" đã bị ẩn khỏi tủ đồ. Hãy khôi phục món này hoặc thay bằng món khác.");
+                case LAUNDRY -> new BusinessRuleException(
+                        ErrorCode.ITEM_NOT_WEARABLE,
+                        "\"" + item.getName() + "\" đang giặt nên chưa mặc được. Hãy bấm \"Giặt xong\" khi đã giặt xong.");
+                case UNAVAILABLE -> new BusinessRuleException(
+                        ErrorCode.ITEM_NOT_WEARABLE,
+                        "\"" + item.getName() + "\" đang ở trạng thái chưa dùng được nên chưa mặc được.");
+                case DAMAGED -> new BusinessRuleException(
+                        ErrorCode.ITEM_NOT_WEARABLE,
+                        "\"" + item.getName() + "\" đang hư hỏng nên không nên mặc. Hãy sửa lại hoặc bỏ đánh dấu hư hỏng.");
+            };
+        });
     }
 
     public List<ClothingItem> searchByName(String ownerUsername, String keyword) {

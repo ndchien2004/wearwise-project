@@ -67,6 +67,30 @@ public class AiSuggestionService {
         return geminiClient.isConfigured();
     }
 
+    /**
+     * Các bộ mặc được ngay, kèm thông báo phân biệt "chưa có bộ nào" với "có nhưng đang vướng".
+     * Hai tình huống này cần hai hành động khác nhau, gộp chung một câu thì người dùng đi tạo
+     * thêm outfit trong khi thứ họ cần làm chỉ là bấm "Giặt xong".
+     */
+    private List<Outfit> wearableOutfits(String username, String action) {
+        List<Outfit> all = outfitService.findOutfits(username, null, null, null, null);
+
+        if (all.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Bạn chưa có outfit nào để AI " + action + ". Hãy tạo vài bộ ở mục Outfit trước nhé!");
+        }
+
+        List<Outfit> wearable = all.stream().filter(OutfitService::isWearableNow).toList();
+
+        if (wearable.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Mọi outfit của bạn đang vướng đồ giặt, đồ hỏng hoặc thiếu món nên chưa "
+                            + action + " được. Hãy đánh dấu \"Giặt xong\" hoặc sửa lại các bộ ở mục Outfit.");
+        }
+
+        return wearable;
+    }
+
     @Transactional(readOnly = true)
     public List<AiOutfitSuggestionResponse> suggest(
             String username,
@@ -115,12 +139,9 @@ public class AiSuggestionService {
             String weatherDescription,
             ColorTone tone
     ) {
-        List<Outfit> outfits = outfitService.findOutfits(username, null, null, null, null);
-
-        if (outfits.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Bạn chưa có outfit nào để AI xếp hạng. Hãy tạo vài bộ ở mục Outfit trước nhé!");
-        }
+        // Xếp hạng "mặc gì hôm nay" nên chỉ đưa AI những bộ mặc được ngay — xếp hạng cao cho một
+        // bộ đang giặt là gợi ý người dùng làm việc họ không làm được.
+        List<Outfit> outfits = wearableOutfits(username, "xếp hạng");
 
         Map<Long, Outfit> outfitsById = new LinkedHashMap<>();
         outfits.forEach(outfit -> outfitsById.put(outfit.getId(), outfit));
@@ -141,12 +162,8 @@ public class AiSuggestionService {
             List<AiWeeklyPlanRequest.DayForecast> days,
             ColorTone tone
     ) {
-        List<Outfit> outfits = outfitService.findOutfits(username, null, null, null, null);
+        List<Outfit> outfits = wearableOutfits(username, "lên kế hoạch");
 
-        if (outfits.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Bạn chưa có outfit nào để AI lên kế hoạch. Hãy tạo vài bộ ở mục Outfit trước nhé!");
-        }
         if (days == null || days.isEmpty()) {
             throw new IllegalArgumentException("Thiếu dữ liệu dự báo thời tiết.");
         }
@@ -519,14 +536,7 @@ public class AiSuggestionService {
     }
 
     private String toneLabel(ColorTone tone) {
-        return switch (tone) {
-            case WARM -> "Tông ấm";
-            case COOL -> "Tông lạnh";
-            case NEUTRAL -> "Trung tính";
-            case PASTEL -> "Pastel";
-            case BRIGHT -> "Rực rỡ";
-            case DARK -> "Tông tối";
-        };
+        return tone.getLabel();
     }
 
     private String categoryLabel(ClothingItem item) {

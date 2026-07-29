@@ -22,6 +22,11 @@ public interface OutfitPlanRepository extends JpaRepository<OutfitPlan, Long> {
 
     List<OutfitPlan> findAllByOutfit_Id(Long outfitId);
 
+    @EntityGraph(attributePaths = {"outfit", "outfit.clothingItems"})
+    List<OutfitPlan> findAllByWearPlan_IdOrderByPlanDateAsc(Long wearPlanId);
+
+    List<OutfitPlan> findAllByOwner_UsernameAndPlanDateBetween(String ownerUsername, LocalDate start, LocalDate end);
+
     boolean existsByOwner_UsernameAndPlanDateAndOutfit_Id(String ownerUsername, LocalDate planDate, Long outfitId);
 
     boolean existsByOwner_UsernameAndPlanDateAndOutfit_IdAndIdNot(

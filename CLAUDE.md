@@ -17,7 +17,7 @@ lên lịch mặc theo ngày, nhận gợi ý theo thời tiết, thử đồ �
 | Backend | Spring Boot 4.0.6, Java 17 (JDK cài sẵn là 21 — **đừng dùng API Java 21** như `Math.clamp`) |
 | Database | MySQL 8.4 qua Docker; schema quản lý bằng Flyway |
 | Frontend | React 18 + Vite 5, JavaScript thuần (không TypeScript), CSS tự viết theo phong cách neobrutalism |
-| Test | JUnit 5 + Mockito + AssertJ, chạy trên H2. 264 test, tất cả phải xanh |
+| Test | JUnit 5 + Mockito + AssertJ, chạy trên H2. 275 test, tất cả phải xanh |
 | Dịch vụ ngoài | Cloudinary (ảnh), Google Gemini (nhận diện + gợi ý), tryon-api.com (thử đồ ảo), Open-Meteo (thời tiết, không cần key) |
 
 Quy mô: ~148 file Java, ~47 file JS/JSX. Đây là đồ án nhóm nhưng được xây theo chuẩn sản phẩm thật.
@@ -46,7 +46,7 @@ chứ không phải khóa sai.
 **Kiểm tra trước khi báo xong việc:**
 
 ```bash
-./mvnw test                      # backend — phải 264/264 xanh
+./mvnw test                      # backend — phải 275/275 xanh
 cd frontend && npm run lint      # frontend — phải 0 lỗi
 cd frontend && npm run build     # frontend — phải build được
 ```
@@ -77,7 +77,7 @@ src/main/resources/
 ├── application.properties          Cấu hình chung, an toàn để commit
 ├── application-dev.properties       CHỈ dành cho máy lập trình viên
 ├── application-secrets.properties   API key thật — ĐÃ GITIGNORE, không commit
-└── db/migration/                    Flyway: V1__init.sql … V4__wear_logs.sql
+└── db/migration/                    Flyway: V1__init.sql … V5__wear_plans.sql
 
 frontend/src/
 ├── api/         Một file cho mỗi nhóm endpoint; client.js là lớp fetch dùng chung
@@ -234,6 +234,51 @@ sang `/admin` với vai trò này.
   cũng được, và khi đó mọi kết quả cũ sẽ bị đem so với một ảnh gốc không liên quan.
 - Hướng dẫn chuẩn bị ảnh và viết prompt: `docs/TRY_ON_IMAGE_GUIDE.md`.
 
+### 4.12 Khả dụng của outfit — hai câu hỏi khác nhau
+
+Đừng gộp chúng làm một. Gộp rồi thì hoặc là không lên lịch được vì hôm nay có cái áo đang giặt,
+hoặc là bấm "Mặc" xong mới nhận thông báo từ chối.
+
+| Câu hỏi | Hàm | Tính những gì | Chặn cái gì |
+|---|---|---|---|
+| Bộ còn lành lặn không? | `OutfitService.isAvailable` | món bị **ẩn** | mặc, lên lịch, gợi ý |
+| Hôm nay mặc được không? | `OutfitService.isWearableNow` | thêm **đang giặt / hư hỏng / chưa dùng được** | mặc, gợi ý hôm nay |
+
+- Đồ đang giặt là **tạm thời** nên vẫn lên lịch cho ngày sau được — tới lúc đó rất có thể đã giặt
+  xong. Vì vậy nó không đụng tới `available`, và `DayModal` ở trang Lịch vẫn lọc theo `available`.
+- `ClothingItemService.blockReason()` là **nguồn sự thật duy nhất** cho câu "món này vướng gì".
+  `assertWearable()` ném lỗi dựa trên chính nó. Tách làm hai chỗ thì sớm muộn cũng lệch: bộ nằm ở
+  mục dùng được nhưng bấm vào lại báo lỗi.
+- `OutfitResponse` trả kèm `wearableNow` + `blockingItems` (tên món + `ItemBlockReason`), nhờ đó
+  giao diện xếp bộ vào mục "Chưa mặc được" kèm lý do **trước khi** người dùng bấm. Frontend rẽ
+  nhánh theo hằng số, lời văn nằm ở `BLOCK_REASON_LABELS` trong `utils/labels.js`.
+- Gợi ý thời tiết, xếp hạng AI và `planWeek` đều lọc theo `isWearableNow`.
+
+### 4.13 Kế hoạch mặc do AI sinh
+
+Người dùng gõ một câu ("7 ngày đi làm, thứ Sáu gặp khách"), AI xếp lịch từ **các bộ đã có**.
+
+- **Sinh và lưu là hai bước tách bạch.** `POST /api/ai/wear-plans` chỉ trả về bản xem trước, không
+  ghi gì vào database. Đổ thẳng vào lịch thì mỗi lần kế hoạch không ưng ý người dùng lại phải đi
+  dọn từng ngày — và tệ hơn, những ngày họ tự đặt tay đã bị ghi đè mất.
+- **Đường dẫn sinh nằm dưới `/api/ai/**` là bắt buộc**, để `RateLimitFilter` xếp vào nhóm AI. Dời
+  sang `/api/wear-plans` là đẩy nó vào GENERAL = 240 lượt/phút.
+- **Ngày đã có kế hoạch chỉ bị thay khi người dùng tick ghi đè** (`replaceExisting` từng ngày).
+  Không tick thì bỏ qua ngày đó; mất một ngày trong đợt AI còn hơn mất kế hoạch họ tự đặt.
+- `wear_plans` là **cái vỏ**: từng ngày vẫn là `outfit_plans` bình thường (có `wear_plan_id` trỏ
+  về), nên lịch tháng, đánh dấu đã mặc và nhật ký mặc chạy y như cũ mà không cần biết ngày đó đến
+  từ đâu. Lý do AI chọn bộ nằm ở `outfit_plans.note` — vốn là ghi chú của ngày, để đó thì lịch
+  hiện sẵn.
+- **Luật xếp lịch nằm ở `src/main/resources/prompts/wear-plan.md`, không nằm trong code.** Đó là
+  phần phải chỉnh đi chỉnh lại nhiều nhất, và nó là văn bản tiếng Việt thuần. File nằm trong
+  classpath (không phải `docs/`) để bản `java -jar` đọc được; phần trước dấu `---` là ghi chú cho
+  lập trình viên và bị cắt bỏ trước khi gửi cho model. Nạp **một lần lúc dựng bean**: file hỏng thì
+  hỏng ngay lúc khởi động, rõ hơn nhiều so với lỗi chỉ hiện khi có người bấm nút.
+- Số ngày do **JSON schema** ép (`minItems`/`maxItems`), không phải dặn bằng lời — một câu "hãy trả
+  đủ 7 ngày" thì model bỏ qua lúc nào không hay. Trần `WearPlan.MAX_DAYS` = 14.
+- Model trả về id bịa hoặc ngày ngoài khoảng thì **bỏ dòng đó**, không ném lỗi cả lượt: mất một
+  ngày còn hơn mất cả kế hoạch lẫn một lượt gọi trả tiền.
+
 ### 4.11 Phân trang
 
 **Mọi danh sách đều phân trang ở database** (`Pageable` → SQL `limit ?, ?` kèm `count(*)`), trả về
@@ -323,7 +368,7 @@ gọi `fetch` trực tiếp ở component.
 
 | Việc | Vì sao đáng làm |
 |---|---|
-| CI (GitHub Actions chạy `mvnw test` + `npm run build`) | Có 264 test mà không ai chạy tự động thì phí |
+| CI (GitHub Actions chạy `mvnw test` + `npm run build`) | Có 275 test mà không ai chạy tự động thì phí |
 | Actuator + health check + Micrometer | Chưa có cách nào biết hệ thống đang sống hay đang chết; cũng là nền để đếm lượt gọi Gemini (hiện `AdminOverviewResponse` cố tình bỏ trống con số này thay vì bịa) |
 | Request-id trong log (MDC) | User báo lỗi thì hiện không tra ngược được request nào |
 | Index composite `(owner_id, archived_at, wear_count)` | Mọi truy vấn đều lọc theo bộ này |
@@ -373,7 +418,7 @@ gọi `fetch` trực tiếp ở component.
 
 ## 8. Trước khi báo cáo hoàn thành
 
-1. `./mvnw test` — 264/264 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
+1. `./mvnw test` — 275/275 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
 2. `cd frontend && npm run build` — build được.
 3. Sửa entity → đã có migration tương ứng chưa? Đã chạy thử trên DB trống chưa?
 4. Thêm endpoint gọi dịch vụ trả tiền → đã xếp vào `TRY_ON`/`UPLOAD` trong `groupOf()` chưa?

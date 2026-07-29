@@ -148,10 +148,12 @@ export default function OutfitsPage() {
         </EmptyState>
       ) : (
         (() => {
-          // Bộ thiếu món (do có món bị ẩn) tách xuống dưới thay vì biến mất — người dùng phải
-          // thấy được nó để vào sửa, đó là cách duy nhất đưa bộ về trạng thái dùng lại được.
-          const usable = outfits.filter((o) => o.available !== false);
-          const broken = outfits.filter((o) => o.available === false);
+          // Bộ chưa mặc được tách xuống dưới thay vì biến mất — người dùng phải thấy được nó để
+          // biết cần làm gì (sửa bộ, hay chỉ là đợi giặt xong). Trước đây chỉ bộ thiếu món mới
+          // xuống đây, còn bộ vướng đồ đang giặt vẫn nằm trên và chỉ báo lỗi lúc bấm "Mặc".
+          const usable = outfits.filter((o) => o.wearableNow !== false);
+          const broken = outfits.filter((o) => o.wearableNow === false);
+          const laundryOnly = broken.every((o) => o.available !== false);
 
           const renderCard = (outfit) => (
             <OutfitCard
@@ -172,16 +174,27 @@ export default function OutfitsPage() {
                 <div className="card-grid">{usable.map(renderCard)}</div>
               ) : (
                 <EmptyState emoji="🧢">
-                  Mọi outfit đang thiếu món. Hãy sửa các bộ bên dưới hoặc khôi phục món đã ẩn.
+                  Chưa bộ nào mặc được hôm nay. Xem mục bên dưới để biết bộ nào đang vướng gì.
                 </EmptyState>
               )}
 
               {broken.length > 0 && (
                 <div className="unavailable-section">
-                  <h2 className="unavailable-title">⚠️ Không khả dụng ({broken.length})</h2>
+                  <h2 className="unavailable-title">⚠️ Chưa mặc được ({broken.length})</h2>
                   <p className="unavailable-note">
-                    Các bộ này có món đã bị ẩn khỏi tủ đồ nên chưa mặc hay lên lịch được. Bấm
-                    <strong> ✏️ Sửa</strong> rồi thay bằng món đang có để dùng lại.
+                    {laundryOnly ? (
+                      <>
+                        Các bộ này có món đang giặt hoặc chưa dùng được. Đánh dấu
+                        <strong> 🧺 Giặt xong</strong> ở tủ đồ là chúng quay lại ngay — bộ vẫn còn
+                        nguyên món nên lên lịch cho ngày sau vẫn được.
+                      </>
+                    ) : (
+                      <>
+                        Các bộ này chưa mặc được hôm nay. Bộ <strong>thiếu món</strong> thì bấm
+                        <strong> ✏️ Sửa</strong> rồi thay bằng món đang có; bộ chỉ vướng
+                        <strong> 🧺 đồ đang giặt</strong> thì đánh dấu giặt xong ở tủ đồ là dùng lại được.
+                      </>
+                    )}
                   </p>
                   <div className="card-grid">{broken.map(renderCard)}</div>
                 </div>
