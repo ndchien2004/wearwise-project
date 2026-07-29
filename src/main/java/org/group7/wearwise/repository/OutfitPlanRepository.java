@@ -23,4 +23,11 @@ public interface OutfitPlanRepository extends JpaRepository<OutfitPlan, Long> {
     List<OutfitPlan> findAllByOutfit_Id(Long outfitId);
 
     boolean existsByOwner_UsernameAndPlanDateAndOutfit_Id(String ownerUsername, LocalDate planDate, Long outfitId);
+
+    boolean existsByOwner_UsernameAndPlanDateAndOutfit_IdAndIdNot(
+            String ownerUsername,
+            LocalDate planDate,
+            Long outfitId,
+            Long excludedPlanId
+    );
 }

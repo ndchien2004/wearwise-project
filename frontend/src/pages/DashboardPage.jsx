@@ -4,9 +4,10 @@ import * as itemsApi from '../api/clothingItems';
 import * as plansApi from '../api/plans';
 import { getStatistics } from '../api/statistics';
 import { DEFAULT_CITY, getWeather } from '../api/weather';
+import WearHistoryCard from '../components/WearHistoryCard';
+import { ItemPreviewChip, OutfitPreviewChip } from '../components/WearPreview';
 import { Badge, ErrorBanner, Loading } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
-import { CATEGORY_EMOJIS } from '../utils/labels';
 import { daysSince, formatDateTime, todayIso } from '../utils/date';
 
 function loadSavedCity() {
@@ -120,14 +121,17 @@ export default function DashboardPage() {
               {todayPlans.map((plan) => (
                 <div key={plan.id} className="nb-card nb-card--flat" style={{ padding: '10px 14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <strong>
+                    <OutfitPreviewChip
+                      outfit={plan.outfit}
+                      meta={plan.completed ? '✅ Đã mặc' : '🕐 Chưa mặc'}
+                      note={plan.note}
+                      className="wear-chip wear-chip--strong"
+                    >
                       {plan.completed ? '✅' : '🕐'} {plan.outfit.name}
-                    </strong>
+                    </OutfitPreviewChip>
                     <div className="badge-row">
                       {plan.outfit.clothingItems.slice(0, 4).map((item) => (
-                        <Badge key={item.id}>
-                          {CATEGORY_EMOJIS[item.category]} {item.name}
-                        </Badge>
+                        <ItemPreviewChip key={item.id} item={item} className="wear-chip wear-chip--badge" />
                       ))}
                     </div>
                   </div>
@@ -155,9 +159,7 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {recentlyWorn.map((item) => (
                 <div key={item.id} className="mini-row">
-                  <span className="mini-row-name">
-                    {CATEGORY_EMOJIS[item.category]} {item.name}
-                  </span>
+                  <ItemPreviewChip item={item} className="wear-chip mini-row-name" />
                   <span className="mini-row-value">{formatDateTime(item.lastWornAt)}</span>
                 </div>
               ))}
@@ -173,9 +175,7 @@ export default function DashboardPage() {
                 const days = daysSince(item.lastWornAt);
                 return (
                   <div key={item.id} className="mini-row">
-                    <span className="mini-row-name">
-                      {CATEGORY_EMOJIS[item.category]} {item.name}
-                    </span>
+                    <ItemPreviewChip item={item} className="wear-chip mini-row-name" />
                     <Badge color={days === null ? 'red' : 'orange'}>
                       {days === null ? 'Chưa mặc bao giờ' : `${days} ngày trước`}
                     </Badge>
@@ -189,6 +189,8 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      <WearHistoryCard />
     </div>
   );
 }

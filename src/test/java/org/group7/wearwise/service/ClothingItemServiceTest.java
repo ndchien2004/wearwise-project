@@ -7,6 +7,7 @@ import org.group7.wearwise.enums.ClothingCondition;
 import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
+import org.group7.wearwise.enums.WearSource;
 import org.group7.wearwise.exception.BusinessRuleException;
 import org.group7.wearwise.exception.ClothingItemInUseException;
 import org.group7.wearwise.exception.ErrorCode;
@@ -58,6 +59,9 @@ class ClothingItemServiceTest {
 
     @Mock
     private ShareRepository shareRepository;
+
+    @Mock
+    private WearLogService wearLogService;
 
     @InjectMocks
     private ClothingItemService clothingItemService;
@@ -151,30 +155,31 @@ class ClothingItemServiceTest {
         verify(clothingItemRepository).save(item);
     }
 
+    /** Việc đếm nằm ở nhật ký mặc; ở đây chỉ cần chắc lượt mặc được chuyển tới đó đúng nguồn. */
     @Test
-    void markAsWornIncrementsWearCountAndUpdatesLastWornAt() {
+    void markAsWornRecordsTheWearInTheLog() {
+        AppUser owner = AppUser.builder().username(OWNER).build();
         ClothingItem item = ClothingItem.builder()
                 .id(1L)
                 .name("Black Jeans")
-                .color("Black")
                 .category(ClothingCategory.PANTS)
                 .season(Season.ALL_SEASON)
                 .style(Style.CASUAL)
                 .condition(ClothingCondition.GOOD)
                 .status(ClothingStatus.AVAILABLE)
                 .wearCount(2)
-                .favorite(false)
+                .owner(owner)
                 .build();
         LocalDateTime beforeUpdate = LocalDateTime.now().minusSeconds(1);
 
         when(clothingItemRepository.findByIdAndOwner_Username(1L, OWNER)).thenReturn(Optional.of(item));
-        when(clothingItemRepository.save(any(ClothingItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ClothingItem updatedItem = clothingItemService.markAsWorn(OWNER, 1L);
+        clothingItemService.markAsWorn(OWNER, 1L);
 
-        assertThat(updatedItem.getWearCount()).isEqualTo(3);
-        assertThat(updatedItem.getLastWornAt()).isAfter(beforeUpdate);
-        verify(clothingItemRepository).save(item);
+        ArgumentCaptor<LocalDateTime> wornAt = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(wearLogService).recordItemWear(
+                eq(owner), eq(item), wornAt.capture(), eq(WearSource.ITEM), eq(null));
+        assertThat(wornAt.getValue()).isAfter(beforeUpdate);
     }
 
     @Test
@@ -234,23 +239,6 @@ class ClothingItemServiceTest {
 
         assertThat(updatedItem.getWearCount()).isEqualTo(5);
         verify(clothingItemRepository, never()).save(any(ClothingItem.class));
-    }
-
-    @Test
-    void markAsWornTreatsNullWearCountAsZero() {
-        ClothingItem item = ClothingItem.builder()
-                .id(2L)
-                .name("White Shirt")
-                .wearCount(null)
-                .build();
-
-        when(clothingItemRepository.findByIdAndOwner_Username(2L, OWNER)).thenReturn(Optional.of(item));
-        when(clothingItemRepository.save(any(ClothingItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        ClothingItem updatedItem = clothingItemService.markAsWorn(OWNER, 2L);
-
-        assertThat(updatedItem.getWearCount()).isEqualTo(1);
-        assertThat(updatedItem.getLastWornAt()).isNotNull();
     }
 
     @Test

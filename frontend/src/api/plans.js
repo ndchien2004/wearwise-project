@@ -20,6 +20,10 @@ export function completePlan(id) {
   return apiFetch(`/api/outfit-plans/${id}/complete`, { method: 'PATCH' });
 }
 
+export function uncompletePlan(id) {
+  return apiFetch(`/api/outfit-plans/${id}/uncomplete`, { method: 'PATCH' });
+}
+
 export function deletePlan(id) {
   return apiFetch(`/api/outfit-plans/${id}`, { method: 'DELETE' });
 }

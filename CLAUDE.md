@@ -17,7 +17,7 @@ lên lịch mặc theo ngày, nhận gợi ý theo thời tiết, thử đồ �
 | Backend | Spring Boot 4.0.6, Java 17 (JDK cài sẵn là 21 — **đừng dùng API Java 21** như `Math.clamp`) |
 | Database | MySQL 8.4 qua Docker; schema quản lý bằng Flyway |
 | Frontend | React 18 + Vite 5, JavaScript thuần (không TypeScript), CSS tự viết theo phong cách neobrutalism |
-| Test | JUnit 5 + Mockito + AssertJ, chạy trên H2. 224 test, tất cả phải xanh |
+| Test | JUnit 5 + Mockito + AssertJ, chạy trên H2. 261 test, tất cả phải xanh |
 | Dịch vụ ngoài | Cloudinary (ảnh), Google Gemini (nhận diện + gợi ý), tryon-api.com (thử đồ ảo), Open-Meteo (thời tiết, không cần key) |
 
 Quy mô: ~148 file Java, ~47 file JS/JSX. Đây là đồ án nhóm nhưng được xây theo chuẩn sản phẩm thật.
@@ -46,7 +46,7 @@ chứ không phải khóa sai.
 **Kiểm tra trước khi báo xong việc:**
 
 ```bash
-./mvnw test                      # backend — phải 227/227 xanh
+./mvnw test                      # backend — phải 261/261 xanh
 cd frontend && npm run lint      # frontend — phải 0 lỗi
 cd frontend && npm run build     # frontend — phải build được
 ```
@@ -77,7 +77,7 @@ src/main/resources/
 ├── application.properties          Cấu hình chung, an toàn để commit
 ├── application-dev.properties       CHỈ dành cho máy lập trình viên
 ├── application-secrets.properties   API key thật — ĐÃ GITIGNORE, không commit
-└── db/migration/                    Flyway: V1__init.sql, V2__audit_log_and_admin_quotas.sql
+└── db/migration/                    Flyway: V1__init.sql … V4__wear_logs.sql
 
 frontend/src/
 ├── api/         Một file cho mỗi nhóm endpoint; client.js là lớp fetch dùng chung
@@ -136,20 +136,26 @@ xác thực thật.
 
 ### 4.4 Giới hạn tần suất
 
-Bốn nhóm trong `RateLimitFilter`, xếp theo mức "đắt":
+Năm nhóm trong `RateLimitFilter`, xếp theo mức "đắt":
 
 | Nhóm | Đường dẫn | Mặc định |
 |---|---|---|
-| `AI` | `POST /api/ai/**` (Gemini) | 40/giờ |
-| `EXTERNAL` | `POST` tới `/api/try-on/items|outfits|body-photo`, `/api/images`, `/api/auth/avatar` | 30/giờ |
+| `AI` | `/api/ai/**` (Gemini), trừ `/api/ai/status` | 40/giờ |
+| `TRY_ON` | `POST /api/try-on/items/*`, `POST /api/try-on/outfits/*` | 15/giờ |
+| `UPLOAD` | `POST` tới `/api/images/*`, `/api/try-on/body-photo`, `/api/auth/avatar` | 80/giờ |
 | `AUTH` | `/api/auth/**` trừ `/me`, `/avatar`, `/logout` | 20/phút |
 | `GENERAL` | còn lại | 240/phút |
 
-- Hai nhóm đầu **chỉ tính trên `POST`** — GET chỉ đọc kết quả đã lưu, không tốn tiền.
-- Thêm endpoint gọi dịch vụ trả tiền thì **phải** thêm vào `isPaidExternalCall()`, nếu không nó rơi
-  vào GENERAL = 240 lượt/phút và đốt sạch quota.
+- `TRY_ON` và `UPLOAD` **chỉ tính trên `POST`** — GET chỉ đọc kết quả đã lưu, không tốn tiền.
+  `/api/ai/status` được loại trừ riêng vì giao diện gọi nó mỗi lần mở form.
+- Thử đồ tách khỏi tải ảnh vì chênh lệch chi phí quá lớn: gộp chung một túi thì thêm vài món quần
+  áo là hết lượt ghép ảnh một cách vô lý.
+- Thêm endpoint gọi dịch vụ trả tiền thì **phải** xếp nó vào `TRY_ON` hoặc `UPLOAD` trong
+  `groupOf()`, nếu không nó rơi vào GENERAL = 240 lượt/phút và đốt sạch quota.
 - Quản trị viên đặt được hạn mức riêng cho từng tài khoản; giá trị nằm trong `app_users` và được
   đệm ở `UserRateLimitOverrides` (không truy vấn DB trong filter — filter chạy trên mọi request).
+  Núm "dịch vụ ngoài" nới **cả** `TRY_ON` lẫn `UPLOAD` — tách thành hai núm cần thêm cột và một
+  migration, chưa đáng khi chưa có nhu cầu thật.
 - `RateLimiter` là token bucket **trong bộ nhớ mỗi tiến trình**. Chạy nhiều instance thì hạn mức
   nhân lên theo số instance. Đây không phải lớp chống DDoS.
 
@@ -309,14 +315,13 @@ gọi `fetch` trực tiếp ở component.
 
 | Việc | Vì sao đáng làm |
 |---|---|
-| CI (GitHub Actions chạy `mvnw test` + `npm run build`) | Có 224 test mà không ai chạy tự động thì phí |
+| CI (GitHub Actions chạy `mvnw test` + `npm run build`) | Có 261 test mà không ai chạy tự động thì phí |
 | Actuator + health check + Micrometer | Chưa có cách nào biết hệ thống đang sống hay đang chết; cũng là nền để đếm lượt gọi Gemini (hiện `AdminOverviewResponse` cố tình bỏ trống con số này thay vì bịa) |
 | Request-id trong log (MDC) | User báo lỗi thì hiện không tra ngược được request nào |
 | Index composite `(owner_id, archived_at, wear_count)` | Mọi truy vấn đều lọc theo bộ này |
 | Cache thống kê | Dashboard chạy 11 truy vấn mỗi lần tải |
 | Try-on chạy bất đồng bộ | Đang chặn thread request tới 60s; 200 người thử đồ là nghẽn toàn bộ API |
 | Dọn token hết hạn bằng `@Scheduled` | Đang chạy inline trong luồng login, người dùng gánh chi phí DELETE |
-| Giao diện cho khu vực admin | API đã xong, hiện phải dùng qua Swagger UI |
 | Cost-per-wear (giá mua + `wearCount`) | Đúng bài toán của app tủ đồ, hạ tầng đã có sẵn |
 
 ---
@@ -360,9 +365,9 @@ gọi `fetch` trực tiếp ở component.
 
 ## 8. Trước khi báo cáo hoàn thành
 
-1. `./mvnw test` — 224/224 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
+1. `./mvnw test` — 261/261 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
 2. `cd frontend && npm run build` — build được.
 3. Sửa entity → đã có migration tương ứng chưa? Đã chạy thử trên DB trống chưa?
-4. Thêm endpoint gọi dịch vụ trả tiền → đã thêm vào `isPaidExternalCall()` chưa?
+4. Thêm endpoint gọi dịch vụ trả tiền → đã xếp vào `TRY_ON`/`UPLOAD` trong `groupOf()` chưa?
 5. Thêm endpoint `/api/admin/**` → có vô tình mở đường xem nội dung người dùng không?
 6. Đổi hành vi bảo mật → đã cập nhật `README.md` và mục 4 của file này chưa?

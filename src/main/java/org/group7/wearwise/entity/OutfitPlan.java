@@ -47,6 +47,10 @@ public class OutfitPlan {
     @JoinColumn(name = "outfit_id", nullable = false)
     private Outfit outfit;
 
+    /** Thời điểm đánh dấu đã mặc; nhật ký mặc của kế hoạch được tìm theo {@link #id}. */
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     private AppUser owner;

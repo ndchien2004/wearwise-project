@@ -53,6 +53,12 @@ public enum ErrorCode {
     /** Outfit phải có ít nhất một món đồ. */
     OUTFIT_NEEDS_ITEM(HttpStatus.BAD_REQUEST),
 
+    // ----- Lịch phối đồ -----
+    /** Same outfit already planned for that date. */
+    PLAN_DUPLICATE(HttpStatus.CONFLICT),
+    /** Cannot mark a plan as worn before its date has arrived. */
+    PLAN_NOT_DUE(HttpStatus.CONFLICT),
+
     // ----- Chia sẻ -----
     SHARE_OWN_CODE(HttpStatus.BAD_REQUEST),
     SHARE_REVOKED(HttpStatus.NOT_FOUND),

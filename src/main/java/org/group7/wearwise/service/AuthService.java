@@ -6,6 +6,8 @@ import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.enums.AuditAction;
 import org.group7.wearwise.exception.AccountLockedException;
 import org.group7.wearwise.exception.AuthenticationFailedException;
+import org.group7.wearwise.exception.BusinessRuleException;
+import org.group7.wearwise.exception.ErrorCode;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -69,11 +71,13 @@ public class AuthService {
         String normalizedEmail = normalizeEmail(email);
 
         if (appUserRepository.existsByUsername(normalizedUsername)) {
-            throw new IllegalArgumentException("Tên đăng nhập này đã có người sử dụng.");
+            throw new BusinessRuleException(
+                    ErrorCode.USERNAME_TAKEN, "Tên đăng nhập này đã có người sử dụng.");
         }
 
         if (appUserRepository.existsByEmail(normalizedEmail)) {
-            throw new IllegalArgumentException("Email này đã được dùng cho một tài khoản khác.");
+            throw new BusinessRuleException(
+                    ErrorCode.EMAIL_TAKEN, "Email này đã được dùng cho một tài khoản khác.");
         }
 
         AppUser user = AppUser.builder()

@@ -3,6 +3,9 @@ package org.group7.wearwise.service;
 import org.group7.wearwise.dto.response.AuthResponse;
 import org.group7.wearwise.dto.response.RegistrationOtpResponse;
 import org.group7.wearwise.entity.PendingRegistration;
+import org.group7.wearwise.exception.AppException;
+import org.group7.wearwise.exception.BusinessRuleException;
+import org.group7.wearwise.exception.ErrorCode;
 import org.group7.wearwise.repository.AppUserRepository;
 import org.group7.wearwise.repository.PendingRegistrationRepository;
 import org.slf4j.Logger;
@@ -67,14 +70,14 @@ public class RegistrationService {
         String normalizedUsername = normalizeUsername(username);
         String normalizedEmail = normalizeEmail(email);
 
-        if (appUserRepository.existsByUsername(normalizedUsername)) {
-            throw new IllegalArgumentException("Tên đăng nhập này đã có người sử dụng.");
-        }
+        LocalDateTime now = LocalDateTime.now();
+        assertUsernameFree(normalizedUsername, normalizedEmail, now);
+
         if (appUserRepository.existsByEmail(normalizedEmail)) {
-            throw new IllegalArgumentException("Email này đã được dùng cho một tài khoản khác.");
+            throw new BusinessRuleException(
+                    ErrorCode.EMAIL_TAKEN, "Email này đã được dùng cho một tài khoản khác.");
         }
 
-        LocalDateTime now = LocalDateTime.now();
         long recentRequests = pendingRegistrationRepository
                 .countByEmailAndCreatedAtAfter(normalizedEmail, now.minusHours(1));
         if (maxRequestsPerHour > 0 && recentRequests >= maxRequestsPerHour) {
@@ -107,9 +110,10 @@ public class RegistrationService {
 
     /**
      * {@code noRollbackFor} để lần nhập sai OTP vẫn ghi nhận được số lần thử — nếu không, việc
-     * ném lỗi sẽ cuốn theo cả bản ghi attempts vừa tăng, và bộ đếm mãi bằng 0.
+     * ném lỗi sẽ cuốn theo cả bản ghi attempts vừa tăng, và bộ đếm mãi bằng 0. Lý do tương tự
+     * với {@link AppException}: yêu cầu bị đánh dấu đã dùng phải nằm lại được trong DB.
      */
-    @Transactional(noRollbackFor = IllegalArgumentException.class)
+    @Transactional(noRollbackFor = {IllegalArgumentException.class, AppException.class})
     public AuthResponse verifyOtp(String email, String otp) {
         String normalizedEmail = normalizeEmail(email);
         if (otp == null || !otp.matches("\\d{6}")) {
@@ -138,6 +142,18 @@ public class RegistrationService {
             throw new IllegalArgumentException("Mã xác nhận không đúng. Vui lòng thử lại.");
         }
 
+        // Someone else may have taken the username while this OTP was in flight. Burn the request
+        // so the user is not left retrying an OTP that can never succeed.
+        if (appUserRepository.existsByUsername(pending.getUsername())) {
+            pending.setUsedAt(now);
+            pendingRegistrationRepository.save(pending);
+            throw new BusinessRuleException(
+                    ErrorCode.USERNAME_TAKEN,
+                    "Tên đăng nhập \"" + pending.getUsername() + "\" vừa có người khác sử dụng. "
+                            + "Hãy đăng ký lại với một tên đăng nhập khác."
+            );
+        }
+
         // Đúng OTP → tạo tài khoản từ mật khẩu đã băm sẵn và cấp token đăng nhập luôn.
         AuthResponse response = authService.registerWithHashedPassword(
                 pending.getUsername(), pending.getEmail(), pending.getPasswordHash());
@@ -146,6 +162,22 @@ public class RegistrationService {
         pendingRegistrationRepository.save(pending);
         log.info("Đã tạo tài khoản {} sau khi xác thực OTP.", pending.getUsername());
         return response;
+    }
+
+    /**
+     * A username is free only when no account holds it and no other email is sitting on an
+     * unexpired OTP for it — otherwise both people would pass registration and the slower one
+     * would be rejected after already receiving a code.
+     */
+    private void assertUsernameFree(String username, String email, LocalDateTime now) {
+        boolean taken = appUserRepository.existsByUsername(username)
+                || pendingRegistrationRepository
+                        .existsByUsernameAndEmailNotAndUsedAtIsNullAndExpiresAtAfter(username, email, now);
+
+        if (taken) {
+            throw new BusinessRuleException(
+                    ErrorCode.USERNAME_TAKEN, "Tên đăng nhập này đã có người sử dụng.");
+        }
     }
 
     private String generateOtp() {

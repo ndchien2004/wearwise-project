@@ -25,6 +25,7 @@ export default function TryOnPage() {
   const fileInputRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -46,10 +47,22 @@ export default function TryOnPage() {
   const [itemsPage, setItemsPage] = useState(null);
   const [outfits, setOutfits] = useState(null);
 
-  useEffect(() => {
-    tryOnApi.getTryOnProfile().then(setProfile).catch((err) => setError(err.message));
-    tryOnApi.listTryOns().then(setResults).catch(() => setResults([]));
+  const loadProfile = useCallback(() => {
+    setLoadingProfile(true);
+    setError(null);
+    tryOnApi
+      .getTryOnProfile()
+      .then(setProfile)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoadingProfile(false));
   }, []);
+
+  useEffect(() => {
+    loadProfile();
+    // Danh sách món để chọn được tải riêng theo trang ở effect bên dưới — kéo cả tủ đồ về đây
+    // vừa thừa vừa khiến mỗi trang thiếu món khi lọc lại ở phía client.
+    tryOnApi.listTryOns().then(setResults).catch(() => setResults([]));
+  }, [loadProfile]);
 
   // hasImage=true lọc ngay ở database. Lọc phía client sau khi server đã cắt trang thì mỗi trang
   // sẽ thiếu món một cách ngẫu nhiên — trang này 4 món, trang kia 6.
@@ -173,7 +186,16 @@ export default function TryOnPage() {
     return (
       <div>
         <ErrorBanner error={error} onDismiss={() => setError(null)} />
-        <Loading>Đang mở phòng thử đồ...</Loading>
+        {loadingProfile ? (
+          <Loading>Đang mở phòng thử đồ...</Loading>
+        ) : (
+          <EmptyState emoji="🚪">
+            Không mở được phòng thử đồ.{' '}
+            <Button size="sm" onClick={loadProfile}>
+              🔄 Thử lại
+            </Button>
+          </EmptyState>
+        )}
       </div>
     );
   }

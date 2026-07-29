@@ -1,8 +1,21 @@
 import { apiFetch, apiUpload } from './client';
 
-/** Trạng thái cấu hình Gemini (để ẩn/hiện phần gợi ý AI). */
+let aiStatusPromise = null;
+
+/**
+ * Trạng thái cấu hình Gemini (để ẩn/hiện phần gợi ý AI). Server-side configuration cannot change
+ * mid-session, so the answer is fetched once and shared — every mount of the item form used to
+ * fire its own request.
+ */
 export function getAiStatus() {
-  return apiFetch('/api/ai/status');
+  if (!aiStatusPromise) {
+    aiStatusPromise = apiFetch('/api/ai/status').catch((error) => {
+      aiStatusPromise = null;
+      throw error;
+    });
+  }
+
+  return aiStatusPromise;
 }
 
 /**
