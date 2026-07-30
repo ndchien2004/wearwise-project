@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.group7.wearwise.dto.request.AiWeeklyPlanRequest;
 import org.group7.wearwise.dto.response.AiOutfitRankingResponse;
 import org.group7.wearwise.dto.response.AiOutfitSuggestionResponse;
-import org.group7.wearwise.dto.response.AiWeeklyDayPlanResponse;
 import org.group7.wearwise.dto.response.ClothingItemResponse;
 import org.group7.wearwise.dto.response.OutfitResponse;
 import org.group7.wearwise.entity.ClothingItem;
@@ -150,117 +148,6 @@ public class AiSuggestionService {
         String rawJson = geminiClient.generateJson(prompt);
 
         return parseRankings(rawJson, outfitsById);
-    }
-
-    /**
-     * Nhờ Gemini xếp lịch mặc cho nhiều ngày dựa vào dự báo thời tiết,
-     * ưu tiên đa dạng (hạn chế lặp lại cùng một bộ). Trả về mỗi ngày một outfit + lý do.
-     */
-    @Transactional(readOnly = true)
-    public List<AiWeeklyDayPlanResponse> planWeek(
-            String username,
-            List<AiWeeklyPlanRequest.DayForecast> days,
-            ColorTone tone
-    ) {
-        List<Outfit> outfits = wearableOutfits(username, "lên kế hoạch");
-
-        if (days == null || days.isEmpty()) {
-            throw new IllegalArgumentException("Thiếu dữ liệu dự báo thời tiết.");
-        }
-
-        Map<Long, Outfit> outfitsById = new LinkedHashMap<>();
-        outfits.forEach(outfit -> outfitsById.put(outfit.getId(), outfit));
-
-        String prompt = buildWeeklyPrompt(outfits, days, tone);
-        String rawJson = geminiClient.generateJson(prompt);
-
-        return parseWeeklyPlan(rawJson, outfitsById);
-    }
-
-    private String buildWeeklyPrompt(
-            List<Outfit> outfits,
-            List<AiWeeklyPlanRequest.DayForecast> days,
-            ColorTone tone
-    ) {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append("Bạn là một stylist. Hãy lên kế hoạch mặc cho từng ngày dựa vào dự báo thời tiết, ")
-                .append("dùng các BỘ ĐỒ CÓ SẴN của người dùng.\n\n");
-
-        if (tone != null) {
-            prompt.append("Người dùng thiên về tone màu: ").append(toneLabel(tone)).append(".\n");
-        }
-
-        prompt.append("Dự báo các ngày (ngày | nhiệt độ thấp-cao°C | xác suất mưa% | mô tả):\n");
-        for (AiWeeklyPlanRequest.DayForecast day : days) {
-            prompt.append(day.date()).append(" | ")
-                    .append(day.tempMin() == null ? "?" : Math.round(day.tempMin())).append("-")
-                    .append(day.tempMax() == null ? "?" : Math.round(day.tempMax())).append("°C | ")
-                    .append(day.rainChance() == null ? "?" : day.rainChance()).append("% | ")
-                    .append(day.description() == null ? "" : day.description()).append("\n");
-        }
-
-        prompt.append("\nDanh sách outfit có sẵn (id | tên | mùa | phong cách | các món [loại-màu]):\n");
-        for (Outfit outfit : outfits) {
-            prompt.append(outfit.getId()).append(" | ")
-                    .append(outfit.getName()).append(" | ")
-                    .append(outfitSeasonLabel(outfit)).append(" | ")
-                    .append(outfitStyleLabel(outfit)).append(" | ");
-            String items = outfit.getClothingItems().stream()
-                    .map(item -> categoryLabel(item) + "-" + (item.getColor() == null ? "?" : item.getColor()))
-                    .reduce((a, b) -> a + ", " + b)
-                    .orElse("(trống)");
-            prompt.append(items).append("\n");
-        }
-
-        prompt.append("""
-
-                Yêu cầu:
-                - Gán cho MỖI ngày đúng 1 outfit có id trong danh sách (không bịa id).
-                - Ưu tiên ĐA DẠNG: hạn chế lặp lại cùng một bộ trong tuần nếu còn lựa chọn khác.
-                - Chọn bộ hợp thời tiết từng ngày (lạnh/mưa nên có áo khoác; nóng tránh đồ dày).
-                - "reason": 1 câu tiếng Việt ngắn gọn giải thích lựa chọn cho ngày đó.
-
-                Chỉ trả về JSON đúng cấu trúc sau, không thêm chữ nào khác:
-                {"plan":[{"date":"YYYY-MM-DD","outfitId":1,"reason":"..."}]}
-                """);
-
-        return prompt.toString();
-    }
-
-    private List<AiWeeklyDayPlanResponse> parseWeeklyPlan(String rawJson, Map<Long, Outfit> outfitsById) {
-        JsonNode root;
-        try {
-            root = objectMapper.readTree(rawJson);
-        } catch (IOException exception) {
-            log.warn("Gemini returned non-JSON payload: {}", rawJson);
-            throw new AiUnavailableException("AI trả về dữ liệu không đọc được. Vui lòng thử lại.");
-        }
-
-        JsonNode plan = root.path("plan");
-        List<AiWeeklyDayPlanResponse> result = new ArrayList<>();
-
-        if (plan.isArray()) {
-            for (JsonNode day : plan) {
-                String date = day.path("date").asText(null);
-                JsonNode idNode = day.path("outfitId");
-                if (date == null || !idNode.canConvertToLong()) {
-                    continue;
-                }
-                Outfit outfit = outfitsById.get(idNode.asLong());
-                if (outfit == null) {
-                    continue;
-                }
-                String reason = day.path("reason").asText("");
-                result.add(new AiWeeklyDayPlanResponse(date, OutfitResponse.from(outfit), reason));
-            }
-        }
-
-        if (result.isEmpty()) {
-            log.warn("Gemini returned no usable weekly plan: {}", rawJson);
-            throw new AiUnavailableException("AI chưa lên được kế hoạch. Vui lòng thử lại.");
-        }
-
-        return result;
     }
 
     private String buildRankingPrompt(

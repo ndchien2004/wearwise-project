@@ -106,10 +106,11 @@ Rẻ → đắt, chất lượng thấp → cao:
 Với thử đồ ảo, khuyến nghị bắt đầu ở `gemini-3.1-flash-image`: bản lite nhanh và rẻ nhưng hay sai
 chi tiết vải và đường may — đúng thứ mà thử đồ cần đúng.
 
-> `GeminiImageClient` đã viết theo tài liệu chính thức và endpoint đã xác nhận là tới được model
-> (lỗi trả về là lỗi **hạn mức**, không phải "model không tồn tại"). Nhưng phần **đọc phản hồi**
-> chưa chạy thử được lần nào vì hạn mức bằng 0. Khi bật billing, việc đầu tiên là chạy thử và đối
-> chiếu lại hàm `extractImage`.
+> Từng có `GeminiImageClient` làm lựa chọn thay thế, **đã xóa 30/07/2026** vì không được đấu dây vào
+> `TryOnService` (lấy lại bằng `git log -- src/main/java/.../GeminiImageClient.java`). Phần dựng
+> request đã xác nhận là tới được model — lỗi trả về là lỗi **hạn mức**, không phải "model không tồn
+> tại". Phần **đọc phản hồi** thì chưa chạy thử lần nào vì hạn mức bằng 0, nên khi bật billing đừng
+> tin nó: viết lại theo phản hồi thật.
 
 ### Prompt mẫu
 

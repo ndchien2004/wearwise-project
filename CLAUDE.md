@@ -242,14 +242,21 @@ sang `/admin` với vai trò này.
 
 ### 4.10 Thử đồ ảo
 
-- Nhà cung cấp hiện dùng là **tryon-api.com** (`TryOnApiClient`). `GeminiImageClient` là lựa chọn
-  thay thế, đã viết nhưng **chưa chạy thử được lần nào** — xem lý do ngay bên dưới.
-- **Model sinh ảnh của Gemini đòi API key đã bật thanh toán.** Kiểm chứng 27/07/2026: cả bốn model
-  ảnh đều trả `429 limit: 0` với key gói miễn phí, trong khi model text vẫn 200. Đừng mất thời gian
-  debug code — đó là hạn mức, không phải lỗi lập trình.
-- Model sinh ảnh **bắt buộc có hậu tố `-image`** (`gemini-3.1-flash-lite-image`). Model text như
-  `gemini-3.1-flash-lite` không sinh được ảnh. Endpoint cũng khác: `/v1beta/interactions` chứ không
-  phải `:generateContent`.
+- Nhà cung cấp **duy nhất** là tryon-api.com (`TryOnApiClient`). `TryOnService` gọi thẳng nó, không
+  có cơ chế chọn nhà cung cấp.
+- **Từng có `GeminiImageClient` làm lựa chọn thay thế, đã xóa 30/07/2026** (lấy lại bằng
+  `git log -- src/main/java/org/group7/wearwise/service/GeminiImageClient.java` nếu cần). Lý do xóa:
+  nó **không được inject ở đâu cả** nên "nhà cung cấp thay thế" chưa bao giờ đúng — muốn đổi vẫn phải
+  tự viết phần đấu dây; và nửa đọc phản hồi thì chưa chạy thật lần nào (xem gạch đầu dòng dưới). Bốn
+  điều đã học được thì giữ lại ngay đây, vì đó mới là phần tốn công:
+  - **Model sinh ảnh của Gemini đòi API key đã bật thanh toán.** Kiểm chứng 27/07/2026: cả bốn model
+    ảnh đều trả `429 limit: 0` với key gói miễn phí, trong khi model text vẫn 200. Đừng mất thời gian
+    debug code — đó là hạn mức, không phải lỗi lập trình.
+  - Model sinh ảnh **bắt buộc có hậu tố `-image`** (`gemini-3.1-flash-lite-image`). Model text như
+    `gemini-3.1-flash-lite` không sinh được ảnh.
+  - Endpoint cũng khác: `/v1beta/interactions`, không phải `:generateContent`.
+  - Request dựng theo tài liệu đã tới được model (lỗi trả về là lỗi hạn mức, không phải sai định
+    dạng); phần **đọc** phản hồi thì mới chỉ theo tài liệu, chưa ai đối chiếu với phản hồi thật.
 - **Một lời gọi = đúng một ảnh trang phục.** Trường `garment_images` của nhà cung cấp là mảng nên
   trông như gửi được cả bộ, nhưng model không ghép nổi nhiều món trong một lượt và trả lỗi. Vì vậy
   `TryOnApiClient.generateTryOn` chỉ nhận một `String`; đừng mở lại bản nhận `List`.
@@ -283,7 +290,7 @@ hoặc là bấm "Mặc" xong mới nhận thông báo từ chối.
 - `OutfitResponse` trả kèm `wearableNow` + `blockingItems` (tên món + `ItemBlockReason`), nhờ đó
   giao diện xếp bộ vào mục "Chưa mặc được" kèm lý do **trước khi** người dùng bấm. Frontend rẽ
   nhánh theo hằng số, lời văn nằm ở `BLOCK_REASON_LABELS` trong `utils/labels.js`.
-- Gợi ý thời tiết, xếp hạng AI và `planWeek` đều lọc theo `isWearableNow`.
+- Gợi ý thời tiết, xếp hạng AI và kế hoạch mặc nhiều ngày đều lọc theo `isWearableNow`.
 - Nút "✅ Đã mặc" trong `DayModal` cũng khóa theo `wearableNow` (nhãn đổi thành "⚠️ Chưa mặc được"
   kèm câu lý do từ `describeBlockers`). Ngày mai bộ đó giặt xong là bấm được lại — vì vậy kế hoạch
   **không** bị xóa, chỉ nút bị khóa.
@@ -326,10 +333,11 @@ Người dùng gõ một câu ("7 ngày đi làm, thứ Sáu gặp khách"), AI 
   ngày còn hơn mất cả kế hoạch lẫn một lượt gọi trả tiền.
 - `AiPlanModal` là **cửa duy nhất** vào tính năng này; trang Lịch và trang Gợi ý thời tiết cùng mở
   nó, khác nhau ở chỗ trang Gợi ý truyền thêm `forecast`. Trước đây trang Gợi ý có luồng riêng
-  ("Để AI lên kế hoạch" → `/api/ai/weekly-plan`) chạy ngay không hỏi gì rồi thêm từng ngày vào lịch.
-  Hai nút tên gần giống nhau ở hai trang khiến người dùng bấm nhầm và tưởng tính năng mới bị hỏng —
-  đừng dựng lại lối vào thứ hai. **`/api/ai/weekly-plan` và `AiSuggestionService.planWeek` hiện
-  không còn client nào gọi**, giữ lại chỉ vì chưa ai quyết định xóa.
+  ("Để AI lên kế hoạch" → `POST /api/ai/weekly-plan`) chạy ngay không hỏi gì rồi thêm từng ngày vào
+  lịch. Hai nút tên gần giống nhau ở hai trang khiến người dùng bấm nhầm và tưởng tính năng mới bị
+  hỏng — **đừng dựng lại lối vào thứ hai.** Endpoint đó cùng `AiSuggestionService.planWeek` và hai
+  DTO của nó **đã xóa 30/07/2026**: một endpoint gọi Gemini tốn tiền, không client nào gọi và không
+  test nào phủ thì để lại chỉ là bề mặt tấn công cộng thêm gánh nặng bảo trì.
 - **Bước lưu là một endpoint bình thường, không phải phần đuôi của bước sinh.** Client gửi lại đầy
   đủ từng ngày kèm `outfitId` tự chọn, nên `WearPlanService.save` phải tự kiểm tra mọi luật mà
   `OutfitPlanService.createPlan` kiểm tra — đừng cho rằng dữ liệu tới từ bản xem trước server vừa
@@ -478,7 +486,6 @@ gọi `fetch` trực tiếp ở component.
 
 | Việc | Vì sao đáng làm |
 |---|---|
-| CI (GitHub Actions chạy `mvnw test` + `npm run build`) | Có 306 test mà không ai chạy tự động thì phí |
 | Actuator + health check + Micrometer | Chưa có cách nào biết hệ thống đang sống hay đang chết; cũng là nền để đếm lượt gọi Gemini (hiện `AdminOverviewResponse` cố tình bỏ trống con số này thay vì bịa) |
 | Request-id trong log (MDC) | User báo lỗi thì hiện không tra ngược được request nào |
 | Index composite `(owner_id, archived_at, wear_count)` | Mọi truy vấn đều lọc theo bộ này |
@@ -499,8 +506,10 @@ gọi `fetch` trực tiếp ở component.
 - **Class có hai constructor thì Spring không biết chọn cái nào** — phải đánh dấu `@Autowired`
   (xem `AuthTokenService`).
 - **Tự gọi phương thức `@Transactional` trong cùng class thì annotation vô tác dụng** (mục 4.7).
-- **Migration chỉ được kiểm chứng thủ công.** Test chạy H2 nên không đụng tới file `.sql`. Sau khi
-  viết migration, hãy chạy thật:
+- **Migration không được test nào phủ.** Test chạy H2 với `spring.flyway.enabled=false` nên không
+  file `.sql` nào được thi hành. Giờ có job `migration` trong CI dựng MySQL 8.4 trống rồi khởi động
+  jar trên đó — khởi động được nghĩa là migration đúng **và** khớp entity (nhờ `ddl-auto=validate`).
+  Vẫn nên chạy tay trước khi push, vì vòng CI mất vài phút:
 
   ```bash
   # DB trống, để migration thực sự thi hành
@@ -527,6 +536,9 @@ gọi `fetch` trực tiếp ở component.
 ---
 
 ## 8. Trước khi báo cáo hoàn thành
+
+Ba job trong `.github/workflows/ci.yml` chạy đúng hai lệnh dưới đây cộng thêm bước kiểm migration.
+CI không cần secret nào (xem đầu file workflow), nên nó cũng xanh trên fork và trong pull request.
 
 1. `./mvnw test` — 306/306 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
 2. `cd frontend && npm run check` — lint + smoke + build, cả ba phải sạch.

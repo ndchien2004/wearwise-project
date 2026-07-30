@@ -1,0 +1,148 @@
+# Kiểm tra tự động cho mọi push và pull request.
+#
+# Không cần cấu hình gì thêm — không secret, không service ngoài — vì:
+#   - `spring.config.import=optional:application-secrets.properties` nên thiếu file khóa thật vẫn
+#     khởi động được;
+#   - `src/test/resources/application.properties` tự đặt token-secret, chạy H2 trong bộ nhớ và tắt
+#     Flyway, nên không cần MySQL cho bước test.
+# Nhờ vậy người fork repo cũng thấy CI xanh mà không phải xin key.
+
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Push liên tiếp vào cùng một nhánh thì chỉ chạy lần mới nhất — lần cũ không còn ai đọc kết quả.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend — 306 test trên H2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Java 17, KHÔNG phải 21. Bản build đặt release 17; chạy CI trên 17 để một API chỉ có từ
+      # Java 21 (Math.clamp, SequencedCollection...) bị chặn ở đây thay vì lọt tới lúc deploy.
+      # Đây đúng là cạm bẫy số 1 ở mục 7 của CLAUDE.md: JDK trên máy lập trình viên là 21.
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - run: ./mvnw --batch-mode --no-transfer-progress test
+
+      # Báo cáo chi tiết của test hỏng: log trên màn hình chỉ có tên test, muốn xem assert nào sai
+      # thì phải có file này.
+      - name: Tải lên báo cáo test khi hỏng
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          retention-days: 7
+
+  frontend:
+    name: Frontend — lint + smoke + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci` chứ không `npm install`: nó cài đúng phiên bản trong lockfile và báo lỗi nếu
+      # lockfile lệch package.json. `npm install` sẽ âm thầm nâng cấp và CI không còn kiểm chứng
+      # đúng cây phụ thuộc mà người ta chạy ở máy.
+      - run: npm ci
+        working-directory: frontend
+
+      # Cả ba bước trong một lệnh, đúng thứ tự ở CLAUDE.md mục 2: lint bắt biến/import sai, smoke
+      # bắt lỗi lúc render, build bắt lỗi cú pháp. Bỏ lint là mở lại đúng lỗi màn hình trắng cũ.
+      - run: npm run check
+        working-directory: frontend
+
+  migration:
+    name: Migration trên MySQL trống
+    runs-on: ubuntu-latest
+
+    # Đây là thứ 306 test KHÔNG kiểm được: test chạy H2 với `spring.flyway.enabled=false` và schema
+    # do Hibernate dựng từ entity, nên không file .sql nào được thi hành. Trước đây việc này chỉ
+    # được kiểm bằng tay theo hướng dẫn ở mục 7 CLAUDE.md — tức là thường không ai kiểm.
+    #
+    # Ứng dụng khởi động được trên database trống nghĩa là: migration chạy đúng, VÀ schema nó tạo ra
+    # khớp với entity (nhờ ddl-auto=validate — lệch một cột là chết lúc khởi động).
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: wearwise_db
+          MYSQL_ROOT_PASSWORD: rootpw
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -prootpw"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - run: ./mvnw --batch-mode --no-transfer-progress -DskipTests package
+
+      - name: Khởi động trên database trống
+        env:
+          # Chỉ hai biến này là bắt buộc — giống đúng lệnh chạy tay ở mục 7 CLAUDE.md. Cloudinary,
+          # Gemini và tryon-api đều có mặc định rỗng kèm isConfigured(), nên thiếu key vẫn boot.
+          WEARWISE_AUTH_TOKEN_SECRET: ci-only-secret-at-least-32-characters
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/wearwise_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: rootpw
+          SERVER_PORT: '8099'
+        run: |
+          java -jar target/wearwise-0.0.1-SNAPSHOT.jar > boot.log 2>&1 &
+          APP_PID=$!
+
+          # Chưa có Actuator (xem mục 6 CLAUDE.md) nên không có /health để hỏi. Chờ đúng dòng log
+          # Spring in ra khi đã lên xong, và bỏ cuộc ngay nếu tiến trình chết giữa đường thay vì
+          # ngồi hết 90 giây.
+          for i in $(seq 1 90); do
+            if grep -q "Started WearwiseApplication" boot.log; then
+              echo "✓ Khởi động được trên database trống — migration đúng và khớp entity."
+              kill $APP_PID
+              exit 0
+            fi
+            if ! kill -0 $APP_PID 2>/dev/null; then
+              echo "✗ Ứng dụng chết khi đang khởi động:"
+              cat boot.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "✗ Quá 90 giây vẫn chưa khởi động xong:"
+          cat boot.log
+          kill $APP_PID 2>/dev/null || true
+          exit 1
+
+      - name: Tải lên log khởi động khi hỏng
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-log
+          path: boot.log
+          retention-days: 7

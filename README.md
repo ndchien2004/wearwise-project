@@ -1,5 +1,7 @@
 # WearWise — Tủ đồ thông minh 👕
 
+[![CI](https://github.com/ndchien2004/wearwise-project/actions/workflows/ci.yml/badge.svg)](https://github.com/ndchien2004/wearwise-project/actions/workflows/ci.yml)
+
 Ứng dụng quản lý tủ đồ cá nhân: quản lý quần áo, phối outfit, lên lịch mặc, gợi ý theo thời tiết và thống kê tần suất sử dụng.
 
 ## Cấu trúc dự án
@@ -306,6 +308,19 @@ cho khỏi đọc nhầm). Người nhận vào trang **Chia sẻ**, nhập mã,
 ./mvnw test        # backend (306 tests)
 cd frontend && npm run check  # frontend: lint + smoke render + build
 ```
+
+### CI
+
+`.github/workflows/ci.yml` chạy mỗi push và pull request, ba job song song:
+
+| Job | Làm gì | Vì sao |
+|---|---|---|
+| `backend` | `./mvnw test` trên **JDK 17** | Không phải 21, để một API chỉ có từ Java 21 bị chặn tại đây thay vì lọt tới lúc deploy |
+| `frontend` | `npm ci` + `npm run check` | `npm ci` theo đúng lockfile; `npm install` sẽ âm thầm nâng cấp và CI không còn kiểm chứng cây phụ thuộc thật |
+| `migration` | Dựng MySQL 8.4 trống, `package` rồi khởi động jar trên đó | Đây là thứ 306 test **không** kiểm được: test chạy H2 với Flyway tắt nên không file `.sql` nào được thi hành. Khởi động được = migration đúng **và** khớp entity (`ddl-auto=validate`) |
+
+Không cần secret nào: `spring.config.import=optional:application-secrets.properties` cho phép thiếu
+file khóa thật, và cấu hình test tự đặt `token-secret`. Nhờ vậy CI cũng xanh trên fork.
 
 ## Deploy
 
