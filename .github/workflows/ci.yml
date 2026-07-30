@@ -24,36 +24,43 @@ jobs:
     name: Backend — 306 test trên H2
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Java 17, KHÔNG phải 21. Bản build đặt release 17; chạy CI trên 17 để một API chỉ có từ
       # Java 21 (Math.clamp, SequencedCollection...) bị chặn ở đây thay vì lọt tới lúc deploy.
       # Đây đúng là cạm bẫy số 1 ở mục 7 của CLAUDE.md: JDK trên máy lập trình viên là 21.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: temurin
           cache: maven
 
+      # Cả nhóm làm việc trên Windows, nơi không có khái niệm bit thực thi — nên `mvnw` rất dễ bị
+      # commit lại ở mode 644 và runner Linux trả exit code 126 (Permission denied). Mode trong git
+      # đã sửa thành 755, dòng này chỉ để lần sau có ai làm hỏng lại thì CI vẫn chạy.
+      - run: chmod +x mvnw
+
       - run: ./mvnw --batch-mode --no-transfer-progress test
 
       # Báo cáo chi tiết của test hỏng: log trên màn hình chỉ có tên test, muốn xem assert nào sai
-      # thì phải có file này.
+      # thì phải có file này. `if-no-files-found: ignore` vì khi build vỡ TRƯỚC lúc chạy test thì
+      # thư mục này không tồn tại, và một cảnh báo "không tìm thấy file" ở đó chỉ gây nhiễu.
       - name: Tải lên báo cáo test khi hỏng
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: surefire-reports
           path: target/surefire-reports/
+          if-no-files-found: ignore
           retention-days: 7
 
   frontend:
     name: Frontend — lint + smoke + build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -94,13 +101,15 @@ jobs:
           --health-retries=10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: temurin
           cache: maven
+
+      - run: chmod +x mvnw
 
       - run: ./mvnw --batch-mode --no-transfer-progress -DskipTests package
 
@@ -141,7 +150,7 @@ jobs:
 
       - name: Tải lên log khởi động khi hỏng
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: boot-log
           path: boot.log
