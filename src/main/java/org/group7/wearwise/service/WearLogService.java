@@ -66,7 +66,7 @@ public class WearLogService {
                 .build());
 
         item.setWearCount(increment(item.getWearCount()));
-        item.setLastWornAt(wornAt);
+        item.setLastWornAt(latest(item.getLastWornAt(), wornAt));
         clothingItemRepository.save(item);
         return true;
     }
@@ -98,7 +98,7 @@ public class WearLogService {
                 .build());
 
         outfit.setWearCount(increment(outfit.getWearCount()));
-        outfit.setLastWornAt(wornAt);
+        outfit.setLastWornAt(latest(outfit.getLastWornAt(), wornAt));
         outfitRepository.save(outfit);
         return true;
     }
@@ -185,6 +185,16 @@ public class WearLogService {
                 .wornAt(lastWornAt)
                 .source(WearSource.LEGACY)
                 .build());
+    }
+
+    /**
+     * {@code lastWornAt} chỉ được tiến, không được lùi. Một lượt mặc ghi bù cho ngày hôm qua vẫn
+     * là lượt mặc thật (phải cộng {@code wearCount}), nhưng nếu nó ghi đè luôn {@code lastWornAt}
+     * thì món vừa mặc hôm nay sẽ hiện là "mặc lần cuối hôm qua" — và tụt xuống mục "lâu chưa đụng
+     * tới". Cùng quy ước với {@code revertPlanWears}: giá trị này luôn là mốc mới nhất trong nhật ký.
+     */
+    private static LocalDateTime latest(LocalDateTime current, LocalDateTime candidate) {
+        return current == null || candidate.isAfter(current) ? candidate : current;
     }
 
     private static int increment(Integer wearCount) {

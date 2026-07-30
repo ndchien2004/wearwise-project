@@ -19,6 +19,10 @@ await build({
   jsx: 'automatic',
   outfile,
   logLevel: 'error',
+  // Render một trang thì kéo theo cả api/client.js, mà file đó đọc `import.meta.env` của Vite —
+  // thứ không tồn tại khi bundle sang CJS cho Node. Không có dòng này, thêm một `check(...)` cho
+  // component nằm trong pages/ là làm cả bước smoke vỡ ngay lúc nạp module, trước khi render.
+  define: { 'import.meta.env': JSON.stringify({}) },
 });
 
 // react-dom/server cảnh báo useLayoutEffect trên mỗi lần render; ở đây là nhiễu thuần túy.

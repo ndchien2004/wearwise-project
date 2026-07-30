@@ -20,6 +20,13 @@ import ItemCard from '../src/components/ItemCard';
 import OutfitCard from '../src/components/OutfitCard';
 import CalendarPlanChip from '../src/components/CalendarPlanChip';
 import OutfitVisual from '../src/components/OutfitVisual';
+import AiPlanModal from '../src/components/AiPlanModal';
+import WardrobeTransferModal from '../src/components/WardrobeTransferModal';
+import DayModal from '../src/components/DayModal';
+import AiPrompt from '../src/components/AiPrompt';
+import ForecastChip from '../src/components/ForecastChip';
+import OutfitActions from '../src/components/OutfitActions';
+
 import { ConfirmProvider } from '../src/context/ConfirmContext';
 
 const failures = [];
@@ -143,6 +150,85 @@ check('OutfitVisual', <OutfitVisual outfit={outfit()} />);
 check(
   'CalendarPlanChip',
   <CalendarPlanChip plan={{ id: 1, date: '2026-08-03', outfit: outfit(), note: 'Ghi chú', completed: false }} />
+);
+
+// --- Lịch: hộp thoại một ngày, gồm nhánh "đã lên lịch nhưng hôm nay chưa mặc được" ---
+const dayPlan = (extra = {}) => ({
+  id: 1,
+  date: '2026-08-03',
+  outfit: outfit(),
+  note: 'Họp với khách',
+  completed: false,
+  ...extra,
+});
+
+const dayModalProps = { iso: '2026-08-03', onChanged: noop, onClose: noop };
+
+check('DayModal / ngày trống', <DayModal {...dayModalProps} plans={[]} outfits={[outfit()]} />);
+check(
+  'DayModal / có kế hoạch',
+  <DayModal {...dayModalProps} plans={[dayPlan()]} outfits={[outfit()]} />
+);
+check(
+  'DayModal / bộ vướng đồ giặt',
+  <DayModal
+    {...dayModalProps}
+    plans={[
+      dayPlan({
+        outfit: outfit({ wearableNow: false, blockingItems: [{ itemName: 'Áo sơ mi trắng', reason: 'LAUNDRY' }] }),
+      }),
+    ]}
+    outfits={[outfit()]}
+  />
+);
+check(
+  'DayModal / đã đánh dấu mặc',
+  <DayModal {...dayModalProps} plans={[dayPlan({ completed: true })]} outfits={[outfit()]} />
+);
+// Server cũ chưa trả wearableNow: nút không được vô cớ khóa lại.
+check(
+  'DayModal / thiếu trường mới',
+  <DayModal
+    {...dayModalProps}
+    plans={[{ id: 9, date: '2026-08-03', outfit: { id: 9, name: 'Bộ cũ', clothingItems: [item()] } }]}
+    outfits={[outfit()]}
+  />
+);
+
+check('AiPlanModal / form', <AiPlanModal forecast={[]} tone={null} onSaved={noop} onClose={noop} />);
+
+// --- Nhập/xuất tủ đồ: khối báo cáo chỉ hiện sau khi nhập nên rất dễ vỡ mà không ai thấy ---
+check(
+  'WardrobeTransferModal',
+  <WardrobeTransferModal onImported={noop} onClose={noop} />
+);
+
+// --- Trang Gợi ý: các mảnh của vùng kết quả có tab ---
+check(
+  'ForecastChip',
+  <ForecastChip day={{ date: '2026-08-03', emoji: '⛅', tempMin: 25.4, tempMax: 33.1, rainChance: 20 }} />
+);
+// Server cũ / API thiếu rainChance: dải dự báo không được vỡ vì một ô trống.
+check(
+  'ForecastChip / thiếu rainChance',
+  <ForecastChip day={{ date: '2026-08-03', emoji: '☀️', tempMin: 26, tempMax: 34 }} />
+);
+check('OutfitActions / chưa mặc', <OutfitActions outfit={outfit()} onPlan={noop} onWear={noop} />);
+check(
+  'OutfitActions / đã mặc hôm nay',
+  <OutfitActions outfit={outfit({ lastWornAt: new Date().toISOString() })} onPlan={noop} onWear={noop} />
+);
+check(
+  'AiPrompt',
+  <AiPrompt
+    emoji="🤖"
+    title="Để AI chọn giúp"
+    hint="Mô tả ngắn"
+    actionLabel="Cho AI chọn"
+    loading={false}
+    loadingLabel="Đang chọn..."
+    onRun={noop}
+  />
 );
 
 if (failures.length > 0) {

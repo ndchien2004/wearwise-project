@@ -12,6 +12,8 @@ import org.group7.wearwise.repository.OutfitPlanRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -49,6 +52,9 @@ class OutfitPlanServiceTest {
 
     @InjectMocks
     private OutfitPlanService outfitPlanService;
+
+    @Captor
+    private ArgumentCaptor<LocalDateTime> wornAt;
 
     @BeforeEach
     void setUpOwner() {
@@ -111,21 +117,39 @@ class OutfitPlanServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.PLAN_NOT_DUE);
 
-        verify(outfitService, never()).applyWear(any(), any(), any(), any());
+        verify(outfitService, never()).applyWear(any(), any(), any(), any(), any());
         assertThat(plan.getCompleted()).isFalse();
     }
 
     /** Lượt mặc phải mang theo id kế hoạch, nếu không hoàn tác sẽ không biết gỡ dòng nào. */
     @Test
     void completePlanRecordsTheWearAgainstThePlan() {
-        OutfitPlan plan = plan(3L, LocalDate.now());
+        LocalDate today = LocalDate.now();
+        OutfitPlan plan = plan(3L, today);
         when(outfitPlanRepository.findByIdAndOwner_Username(3L, OWNER)).thenReturn(Optional.of(plan));
 
         OutfitPlan completed = outfitPlanService.completePlan(OWNER, 3L);
 
-        verify(outfitService).applyWear(OWNER, 7L, WearSource.PLAN, 3L);
+        verify(outfitService).applyWear(eq(OWNER), eq(7L), eq(WearSource.PLAN), eq(3L), wornAt.capture());
+        assertThat(wornAt.getValue().toLocalDate()).isEqualTo(today);
         assertThat(completed.getCompleted()).isTrue();
         assertThat(completed.getCompletedAt()).isNotNull();
+    }
+
+    /**
+     * Tick bù cho một ngày đã qua phải ghi lượt mặc vào <b>ngày đó</b>. Ghi vào hôm nay thì "Mặc
+     * gần đây" và mọi thống kê theo ngày đều lệch đúng khoảng thời gian người dùng quên tick.
+     */
+    @Test
+    void completingAPastPlanRecordsTheWearOnThePlanDate() {
+        LocalDate threeDaysAgo = LocalDate.now().minusDays(3);
+        when(outfitPlanRepository.findByIdAndOwner_Username(3L, OWNER))
+                .thenReturn(Optional.of(plan(3L, threeDaysAgo)));
+
+        outfitPlanService.completePlan(OWNER, 3L);
+
+        verify(outfitService).applyWear(eq(OWNER), eq(7L), eq(WearSource.PLAN), eq(3L), wornAt.capture());
+        assertThat(wornAt.getValue().toLocalDate()).isEqualTo(threeDaysAgo);
     }
 
     @Test

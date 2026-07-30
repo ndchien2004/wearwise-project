@@ -17,10 +17,11 @@ lên lịch mặc theo ngày, nhận gợi ý theo thời tiết, thử đồ �
 | Backend | Spring Boot 4.0.6, Java 17 (JDK cài sẵn là 21 — **đừng dùng API Java 21** như `Math.clamp`) |
 | Database | MySQL 8.4 qua Docker; schema quản lý bằng Flyway |
 | Frontend | React 18 + Vite 5, JavaScript thuần (không TypeScript), CSS tự viết theo phong cách neobrutalism |
-| Test | JUnit 5 + Mockito + AssertJ, chạy trên H2. 275 test, tất cả phải xanh |
+| Test | JUnit 5 + Mockito + AssertJ, chạy trên H2. 306 test, tất cả phải xanh |
 | Dịch vụ ngoài | Cloudinary (ảnh), Google Gemini (nhận diện + gợi ý), tryon-api.com (thử đồ ảo), Open-Meteo (thời tiết, không cần key) |
 
-Quy mô: ~148 file Java, ~47 file JS/JSX. Đây là đồ án nhóm nhưng được xây theo chuẩn sản phẩm thật.
+Quy mô: ~170 file Java (+33 file test), ~65 file JS/JSX. Đây là đồ án nhóm nhưng được xây theo chuẩn
+sản phẩm thật.
 
 ---
 
@@ -46,7 +47,7 @@ chứ không phải khóa sai.
 **Kiểm tra trước khi báo xong việc:**
 
 ```bash
-./mvnw test                      # backend — phải 275/275 xanh
+./mvnw test                      # backend — phải 306/306 xanh
 cd frontend && npm run check     # lint + smoke + build, cả ba phải sạch
 ```
 
@@ -74,6 +75,11 @@ hư hỏng, thiếu ảnh, server cũ chưa trả trường mới). Đó là lo�
 biết nhánh nào thực sự chạy. Thêm nhánh giao diện mới thì thêm một `check(...)` vào file đó —
 `useEffect` không chạy khi render phía server nên không cần mock API.
 
+Component gọi API cũng render được nhờ dòng `define: { 'import.meta.env': ... }` trong
+`scripts/smoke.mjs`: chúng kéo theo `api/client.js`, mà file đó đọc `import.meta.env` của Vite — thứ
+không tồn tại khi esbuild bundle sang CJS cho Node. Thiếu dòng đó thì bước smoke vỡ ngay lúc nạp
+module, trước khi render dòng nào.
+
 ---
 
 ## 3. Bản đồ mã nguồn
@@ -94,6 +100,7 @@ src/main/resources/
 ├── application.properties          Cấu hình chung, an toàn để commit
 ├── application-dev.properties       CHỈ dành cho máy lập trình viên
 ├── application-secrets.properties   API key thật — ĐÃ GITIGNORE, không commit
+├── prompts/wear-plan.md             Luật xếp lịch mặc, nạp lúc dựng bean (mục 4.13)
 └── db/migration/                    Flyway: V1__init.sql … V5__wear_plans.sql
 
 frontend/src/
@@ -105,6 +112,10 @@ frontend/src/
 
 Kiến trúc phân tầng thẳng: **controller → service → repository**. Nghiệp vụ nằm ở service; controller
 chỉ nhận request, gọi service, trả DTO. Đừng đưa logic vào controller hay repository.
+
+**File trong `pages/` chỉ chứa đúng một component — component của route đó.** Cần một mảnh dùng lại
+(hoặc chỉ để `npm run smoke` render riêng được) thì đưa sang `components/`, đừng export thêm từ file
+trang: một file trang export ba component là chỗ người sau tìm mãi không ra.
 
 ---
 
@@ -159,7 +170,7 @@ Năm nhóm trong `RateLimitFilter`, xếp theo mức "đắt":
 |---|---|---|
 | `AI` | `/api/ai/**` (Gemini), trừ `/api/ai/status` | 40/giờ |
 | `TRY_ON` | `POST /api/try-on/items/*`, `POST /api/try-on/outfits/*` | 15/giờ |
-| `UPLOAD` | `POST` tới `/api/images/*`, `/api/try-on/body-photo`, `/api/auth/avatar` | 80/giờ |
+| `UPLOAD` | `POST` tới `/api/images/*`, `/api/try-on/body-photo`, `/api/auth/avatar`, `/api/wardrobe/import` | 80/giờ |
 | `AUTH` | `/api/auth/**` trừ `/me`, `/avatar`, `/logout` | 20/phút |
 | `GENERAL` | còn lại | 240/phút |
 
@@ -169,6 +180,9 @@ Năm nhóm trong `RateLimitFilter`, xếp theo mức "đắt":
   áo là hết lượt ghép ảnh một cách vô lý.
 - Thêm endpoint gọi dịch vụ trả tiền thì **phải** xếp nó vào `TRY_ON` hoặc `UPLOAD` trong
   `groupOf()`, nếu không nó rơi vào GENERAL = 240 lượt/phút và đốt sạch quota.
+- `/api/wardrobe/import` nằm trong `UPLOAD` dù **không** gọi dịch vụ nào trả tiền: một lời gọi ghi
+  tới 500 dòng vào database, để nó rơi vào GENERAL là cho phép 120.000 lượt ghi mỗi phút từ một tài
+  khoản. Tiêu chí xếp nhóm là *chi phí mỗi lời gọi*, không riêng gì tiền trả cho bên thứ ba.
 - Quản trị viên đặt được hạn mức riêng cho từng tài khoản; giá trị nằm trong `app_users` và được
   đệm ở `UserRateLimitOverrides` (không truy vấn DB trong filter — filter chạy trên mọi request).
   Núm "dịch vụ ngoài" nới **cả** `TRY_ON` lẫn `UPLOAD` — tách thành hai núm cần thêm cột và một
@@ -270,6 +284,17 @@ hoặc là bấm "Mặc" xong mới nhận thông báo từ chối.
   giao diện xếp bộ vào mục "Chưa mặc được" kèm lý do **trước khi** người dùng bấm. Frontend rẽ
   nhánh theo hằng số, lời văn nằm ở `BLOCK_REASON_LABELS` trong `utils/labels.js`.
 - Gợi ý thời tiết, xếp hạng AI và `planWeek` đều lọc theo `isWearableNow`.
+- Nút "✅ Đã mặc" trong `DayModal` cũng khóa theo `wearableNow` (nhãn đổi thành "⚠️ Chưa mặc được"
+  kèm câu lý do từ `describeBlockers`). Ngày mai bộ đó giặt xong là bấm được lại — vì vậy kế hoạch
+  **không** bị xóa, chỉ nút bị khóa.
+- **`OutfitService.assertPlannable` là luật "lên lịch được không" dùng chung.** Có **hai** đường ghi
+  vào `outfit_plans` — một ngày lẻ ở trang Lịch, và cả đợt qua `WearPlanService` — nên luật phải nằm
+  ở một chỗ. Đường AI từng nhận `outfitId` bất kỳ từ client và ghi được cả bộ đang thiếu món vào lịch.
+- **Đánh dấu "đã mặc" muộn ghi lượt mặc vào đúng ngày của kế hoạch**, không phải hôm nay
+  (`applyWear(..., wornAt)`). Người dùng thường quên tick rồi vài hôm sau mới vào lịch tick bù; ghi
+  vào hôm nay thì "Mặc gần đây" và mọi thống kê theo ngày lệch đúng khoảng thời gian họ quên. Đi kèm
+  điều đó, `WearLogService` chỉ cho `lastWornAt` **tiến, không lùi** — một lượt ghi bù cho hôm qua
+  vẫn cộng `wearCount` nhưng không được đẩy món vừa mặc hôm nay xuống mục "lâu chưa đụng tới".
 
 ### 4.13 Kế hoạch mặc do AI sinh
 
@@ -291,6 +316,10 @@ Người dùng gõ một câu ("7 ngày đi làm, thứ Sáu gặp khách"), AI 
   classpath (không phải `docs/`) để bản `java -jar` đọc được; phần trước dấu `---` là ghi chú cho
   lập trình viên và bị cắt bỏ trước khi gửi cho model. Nạp **một lần lúc dựng bean**: file hỏng thì
   hỏng ngay lúc khởi động, rõ hơn nhiều so với lỗi chỉ hiện khi có người bấm nút.
+- **Dự báo xin đủ 14 ngày** (`FORECAST_DAYS` trong `api/weather.js`), bằng đúng trần một đợt kế
+  hoạch — không phải 5 ngày như dải dự báo hiển thị trên trang Gợi ý (`FORECAST_STRIP_DAYS`). Hai số
+  này từng là một, nên kế hoạch 7–14 ngày có gần nửa số ngày được xếp trong tình trạng mù thời tiết.
+  Open-Meteo miễn phí tới 16 ngày nên không tốn thêm gì.
 - Số ngày do **JSON schema** ép (`minItems`/`maxItems`), không phải dặn bằng lời — một câu "hãy trả
   đủ 7 ngày" thì model bỏ qua lúc nào không hay. Trần `WearPlan.MAX_DAYS` = 14.
 - Model trả về id bịa hoặc ngày ngoài khoảng thì **bỏ dòng đó**, không ném lỗi cả lượt: mất một
@@ -301,6 +330,64 @@ Người dùng gõ một câu ("7 ngày đi làm, thứ Sáu gặp khách"), AI 
   Hai nút tên gần giống nhau ở hai trang khiến người dùng bấm nhầm và tưởng tính năng mới bị hỏng —
   đừng dựng lại lối vào thứ hai. **`/api/ai/weekly-plan` và `AiSuggestionService.planWeek` hiện
   không còn client nào gọi**, giữ lại chỉ vì chưa ai quyết định xóa.
+- **Bước lưu là một endpoint bình thường, không phải phần đuôi của bước sinh.** Client gửi lại đầy
+  đủ từng ngày kèm `outfitId` tự chọn, nên `WearPlanService.save` phải tự kiểm tra mọi luật mà
+  `OutfitPlanService.createPlan` kiểm tra — đừng cho rằng dữ liệu tới từ bản xem trước server vừa
+  sinh. Cụ thể: `OutfitService.assertPlannable` cho từng ngày, chặn hai dòng cùng một ngày, và ép
+  cả đợt nằm trong `MAX_DAYS` ngày liền nhau (đủ 14 dòng nhưng rải ra hai năm thì thẻ "đợt đang
+  chạy" ở trang chủ hiện suốt hai năm).
+- **Ghi đè một ngày là thay cả ngày.** Trang Lịch cho thêm nhiều bộ vào cùng một ngày, nên "kế
+  hoạch của ngày X" là một **danh sách**. Tra bằng `Map<LocalDate, OutfitPlan>` thì bản đồ chỉ giữ
+  bản cuối: bản xem trước kể tên thiếu, và ghi đè xóa đúng một bộ rồi để bộ còn lại nằm cạnh bộ AI
+  vừa thêm. Đó là lý do có `groupByDate()`.
+
+### 4.14 Bố cục trang Gợi ý theo thời tiết
+
+Nguyên tắc: **mọi thứ "đầu vào" nằm gọn trong màn hình đầu tiên**, để danh sách outfit — thứ người
+dùng vào trang để xem — bắt đầu ngay dưới nếp gấp.
+
+- Thời tiết và bảng điều khiển AI xếp **hai cột** (`.suggest-cockpit`), không phải hai thẻ chiếm trọn
+  chiều ngang. Một thẻ kéo hết bề ngang chỉ để hiện một con số nhiệt độ là đẩy mọi thứ khác xuống
+  dưới màn hình.
+- Ba loại gợi ý dùng **một vùng kết quả có tab** (`score` / `ranked` / `composed`), không xếp dọc
+  thành ba mục có tiêu đề riêng. Hai tab đầu hiển thị cùng một loại card (outfit đã có trong tủ) nên
+  xếp dọc là in gần như cùng một danh sách hai lần; trước đây phải cuộn qua hai màn hình mới thấy
+  card đầu tiên.
+- Tab AI chưa chạy thì hiện `AiPrompt` **trong** vùng kết quả — nói rõ nó sẽ làm gì rồi mới mời bấm.
+  Không đặt nút gọi AI ở đầu trang kèm một thẻ rỗng chờ sẵn: thẻ rỗng vẫn chiếm chỗ.
+- `wearNow` phải cập nhật **cả** `suggestions` lẫn `aiRanking`. Hai tab hiển thị cùng những bộ đó,
+  nên chỉ sửa một danh sách là cùng một bộ hiện "Đã mặc" ở tab này và "Mặc luôn" ở tab kia.
+- Mọi lần đọc `sessionStorage` phải bọc `try/catch` (`ssGet` / `ssSet` / `ssRaw`). Ở Safari chế độ
+  riêng tư, chỉ *truy cập* biến đó đã ném `SecurityError` — và vì lời gọi nằm trong bộ khởi tạo
+  `useState`, một lỗi ở đây làm trắng cả trang chứ không chỉ mất giá trị đã lưu.
+
+### 4.15 Nhập / xuất tủ đồ bằng CSV
+
+`GET /api/wardrobe/export` · `GET /api/wardrobe/template` · `POST /api/wardrobe/import`
+
+- **CSV chứ không phải JSON**, vì đây là định dạng người dùng *sửa được*: mở Excel, dán 200 dòng từ
+  file kiểm kê cũ, nộp lên. File xuất ra đúng định dạng file mẫu nên nhập lại được — đó là điều kiện
+  để dùng nó làm bản sao lưu.
+- **Nhập theo từng dòng, không phải cả lô.** Khác `ClothingItemService.createItems` (quét ảnh, tối đa
+  12 món, một món sai là hủy cả lô): file 300 dòng mà hủy hết vì dòng 217 gõ sai tên mùa là bắt người
+  dùng dò lại từ đầu. Vì vậy `WardrobeCsvService` **không** mang `@Transactional` — mỗi dòng là một
+  giao dịch riêng do `createItem` mở. Bọc cả vòng lặp trong một giao dịch thì một dòng sai đánh dấu
+  giao dịch rollback-only và mọi dòng hợp lệ trước đó lặng lẽ mất lúc commit (cùng cái bẫy proxy ở
+  mục 4.7).
+- **Trùng tên thì bỏ qua** (mặc định, có ô tick để tắt) — nếu không, nộp lại file đã sửa sẽ nhân đôi
+  tủ đồ. Tên vừa thêm trong chính lượt nhập cũng được tính, để hai dòng cùng tên trong một file
+  không tạo ra hai món.
+- Cột được so khớp **theo tên trong dòng tiêu đề**, không theo vị trí: người dùng kéo cột trong Excel
+  là chuyện bình thường.
+- Ba cái bẫy Excel đã xử lý trong `CsvCodec`, đừng viết lại bằng `split(",")`: **BOM** ở đầu file
+  (không cắt thì tên cột đầu không khớp), **xuống dòng trong ô** đã bọc ngoặc kép, và **CRLF** (giữ
+  lại `\r` thì mọi giá trị ở cột cuối mang một ký tự vô hình và so khớp enum thất bại).
+- Phản hồi chỉ trả **những dòng có vấn đề** kèm số dòng thật trong file, không trả danh sách dòng đã
+  thêm: bảng 500 dòng "đã thêm" thì không ai đọc, còn ba dòng sai thì phải thấy ngay để mở Excel sửa.
+- Controller trả `byte[]` đã mã hóa UTF-8, **không** trả `String`: Spring áp charset ISO-8859-1 cho
+  `text/csv` theo mặc định và tên món tiếng Việt sẽ thành dấu hỏi. Có integration test giữ chỗ này.
+- Ảnh **không** đi qua CSV. Ảnh nằm trên Cloudinary và tải lên ở trang Tủ đồ; cột `imageUrl` chỉ để
+  bản xuất ra không mất dữ liệu.
 
 ### 4.11 Phân trang
 
@@ -391,7 +478,7 @@ gọi `fetch` trực tiếp ở component.
 
 | Việc | Vì sao đáng làm |
 |---|---|
-| CI (GitHub Actions chạy `mvnw test` + `npm run build`) | Có 275 test mà không ai chạy tự động thì phí |
+| CI (GitHub Actions chạy `mvnw test` + `npm run build`) | Có 306 test mà không ai chạy tự động thì phí |
 | Actuator + health check + Micrometer | Chưa có cách nào biết hệ thống đang sống hay đang chết; cũng là nền để đếm lượt gọi Gemini (hiện `AdminOverviewResponse` cố tình bỏ trống con số này thay vì bịa) |
 | Request-id trong log (MDC) | User báo lỗi thì hiện không tra ngược được request nào |
 | Index composite `(owner_id, archived_at, wear_count)` | Mọi truy vấn đều lọc theo bộ này |
@@ -441,7 +528,7 @@ gọi `fetch` trực tiếp ở component.
 
 ## 8. Trước khi báo cáo hoàn thành
 
-1. `./mvnw test` — 275/275 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
+1. `./mvnw test` — 306/306 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
 2. `cd frontend && npm run check` — lint + smoke + build, cả ba phải sạch.
 3. Sửa entity → đã có migration tương ứng chưa? Đã chạy thử trên DB trống chưa?
 4. Thêm endpoint gọi dịch vụ trả tiền → đã xếp vào `TRY_ON`/`UPLOAD` trong `groupOf()` chưa?

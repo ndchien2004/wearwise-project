@@ -3,12 +3,16 @@ import { Link } from 'react-router-dom';
 import * as aiApi from '../api/ai';
 import * as outfitsApi from '../api/outfits';
 import * as plansApi from '../api/plans';
-import { DEFAULT_CITY, getWeather, searchCity } from '../api/weather';
+import { DEFAULT_CITY, FORECAST_STRIP_DAYS, getWeather, searchCity } from '../api/weather';
 import AiPlanModal from '../components/AiPlanModal';
+import AiPrompt from '../components/AiPrompt';
+import ForecastChip from '../components/ForecastChip';
+import OutfitActions from '../components/OutfitActions';
 import OutfitVisual from '../components/OutfitVisual';
 import { Badge, Button, EmptyState, ErrorBanner, Loading, Toast } from '../components/ui';
 import {
   CATEGORY_EMOJIS,
+  NEGATIVE_SUGGESTION_REASONS,
   SEASON_EMOJIS,
   SEASON_LABELS,
   STYLE_LABELS,
@@ -16,9 +20,23 @@ import {
   TONE_LABELS,
   label,
 } from '../utils/labels';
-import { isWornToday, todayIso } from '../utils/date';
+import { todayIso } from '../utils/date';
 
 const CITY_KEY = 'wearwise_city';
+
+/**
+ * Ba cách trả lời cùng một câu hỏi "hôm nay mặc gì", nằm trong **một** vùng kết quả có tab.
+ *
+ * <p>Trước đây ba thứ này là ba mục xếp dọc, mỗi mục một tiêu đề và một thẻ chiếm trọn chiều ngang,
+ * nên phải cuộn qua hai màn hình mới thấy danh sách outfit — thứ người dùng vào trang để xem. Hai
+ * tab đầu còn hiển thị cùng một loại card (outfit đã có trong tủ) nên xếp dọc là in hai lần gần
+ * như cùng một danh sách.</p>
+ */
+const TABS = [
+  { key: 'score', emoji: '✨', label: 'Bộ phù hợp' },
+  { key: 'ranked', emoji: '🤖', label: 'AI chọn giúp' },
+  { key: 'composed', emoji: '🧩', label: 'AI phối bộ mới' },
+];
 
 function loadSavedCity() {
   try {
@@ -46,6 +64,19 @@ const ssSet = (key, value) => {
   }
 };
 
+/**
+ * Đọc chuỗi thô. Phải bọc try/catch như hai hàm trên: ở Safari chế độ riêng tư và khi người dùng
+ * chặn lưu trữ, chỉ *truy cập* `sessionStorage` đã ném SecurityError — và vì lời gọi này nằm trong
+ * bộ khởi tạo `useState`, một lỗi ở đây làm trắng cả trang chứ không chỉ mất giá trị đã lưu.
+ */
+const ssRaw = (key) => {
+  try {
+    return sessionStorage.getItem(key) || '';
+  } catch {
+    return '';
+  }
+};
+
 export default function SuggestionsPage() {
   const [city, setCity] = useState(loadSavedCity);
   const [cityQuery, setCityQuery] = useState('');
@@ -55,7 +86,9 @@ export default function SuggestionsPage() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
 
-  const [aiTone, setAiTone] = useState(() => sessionStorage.getItem('ww_ai_tone') || '');
+  const [tab, setTab] = useState('score');
+
+  const [aiTone, setAiTone] = useState(() => ssRaw('ww_ai_tone'));
   const [aiSuggestions, setAiSuggestions] = useState(() => ssGet('ww_ai_compose'));
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
@@ -67,7 +100,7 @@ export default function SuggestionsPage() {
 
   const [aiPlanning, setAiPlanning] = useState(false);
 
-  // Lưu kết quả AI để chuyển tab rồi quay lại vẫn còn. Kế hoạch nhiều ngày không cần lưu như vậy:
+  // Lưu kết quả AI để chuyển trang rồi quay lại vẫn còn. Kế hoạch nhiều ngày không cần lưu như vậy:
   // nó được lưu thẳng vào lịch, xem lại ở trang Lịch hoặc thẻ kế hoạch ở Trang chủ.
   useEffect(() => ssSet('ww_ai_ranking', aiRanking), [aiRanking]);
   useEffect(() => ssSet('ww_ai_compose', aiSuggestions), [aiSuggestions]);
@@ -140,6 +173,24 @@ export default function SuggestionsPage() {
     }
   };
 
+  const wearNow = async (outfit) => {
+    setError(null);
+    try {
+      const updated = await outfitsApi.markOutfitWorn(outfit.id);
+      setSuggestions((list) =>
+        list.map((s) => (s.outfit.id === updated.id ? { ...s, outfit: updated } : s))
+      );
+      // Tab "AI chọn giúp" hiển thị chính những bộ này, nên phải cập nhật cùng lúc — nếu không, cùng
+      // một bộ sẽ hiện "đã mặc" ở tab này và "Mặc luôn" ở tab kia.
+      setAiRanking((list) =>
+        list == null ? list : list.map((r) => (r.outfit.id === updated.id ? { ...r, outfit: updated } : r))
+      );
+      toastOk(`Đã ghi nhận bạn mặc "${outfit.name}" hôm nay! 👣`);
+    } catch (err) {
+      toastErr(err.message);
+    }
+  };
+
   const askAi = async () => {
     setAiError(null);
     setAiSuggestions(null);
@@ -178,15 +229,6 @@ export default function SuggestionsPage() {
     }
   };
 
-  // Dự báo theo đúng dạng AiPlanModal cần, để nó không phải biết cấu trúc của API thời tiết.
-  const forecastForPlan = (weather?.daily ?? []).map((d) => ({
-    date: d.date,
-    tempMin: d.tempMin,
-    tempMax: d.tempMax,
-    rainChance: d.rainChance,
-    description: d.desc,
-  }));
-
   // Biến một gợi ý AI thành outfit thật trong tủ.
   const createOutfitFromAi = async (suggestion) => {
     setAiError(null);
@@ -208,17 +250,186 @@ export default function SuggestionsPage() {
     }
   };
 
-  const wearNow = async (outfit) => {
-    setError(null);
-    try {
-      const updated = await outfitsApi.markOutfitWorn(outfit.id);
-      setSuggestions((list) =>
-        list.map((s) => (s.outfit.id === updated.id ? { ...s, outfit: updated } : s))
+  // Dự báo theo đúng dạng AiPlanModal cần, để nó không phải biết cấu trúc của API thời tiết.
+  const forecastForPlan = (weather?.daily ?? []).map((d) => ({
+    date: d.date,
+    tempMin: d.tempMin,
+    tempMax: d.tempMax,
+    rainChance: d.rainChance,
+    description: d.desc,
+  }));
+
+  const counts = {
+    score: suggestions?.length ?? null,
+    ranked: aiRanking?.length ?? null,
+    composed: aiSuggestions?.length ?? null,
+  };
+
+  /** Nút hành động ở góc phải thanh tab — mỗi tab một việc, nên chỉ hiện đúng việc của tab đang mở. */
+  const renderTabAction = () => {
+    if (tab === 'ranked' && aiRanking) {
+      return (
+        <Button size="sm" onClick={rankWithAi} disabled={rankingLoading}>
+          {rankingLoading ? 'AI đang chọn...' : '🔄 Cho AI chọn lại'}
+        </Button>
       );
-      toastOk(`Đã ghi nhận bạn mặc "${outfit.name}" hôm nay! 👣`);
-    } catch (err) {
-      toastErr(err.message);
     }
+    if (tab === 'composed' && aiSuggestions) {
+      return (
+        <Button size="sm" onClick={askAi} disabled={aiLoading}>
+          {aiLoading ? 'AI đang phối...' : '🔄 Phối bộ khác'}
+        </Button>
+      );
+    }
+    if (tab === 'score' && suggestions?.length > 0) {
+      return <span className="results-note">Xếp theo điểm phù hợp với thời tiết hiện tại</span>;
+    }
+    return null;
+  };
+
+  const renderScoreTab = () => {
+    if (suggestions === null) return <Loading>Đang chấm điểm outfit...</Loading>;
+
+    if (suggestions.length === 0) {
+      return (
+        <EmptyState emoji="🤷">
+          Chưa có bộ nào mặc được hôm nay. Hãy tạo vài outfit trong mục "Outfit", hoặc kiểm tra xem
+          đồ có đang giặt hết không nhé!
+        </EmptyState>
+      );
+    }
+
+    return (
+      <div className="card-grid card-grid--dense">
+        {suggestions.map(({ outfit, score, reasons }, index) => (
+          <div key={outfit.id} className="nb-card nb-card--hover item-card suggest-card">
+            <OutfitVisual outfit={outfit} />
+
+            <div className="suggest-card-head">
+              <div style={{ minWidth: 0 }}>
+                <div className="item-name" title={outfit.name}>
+                  {index === 0 ? '🏆 ' : ''}
+                  {outfit.name}
+                </div>
+                <div className="item-meta">
+                  {SEASON_EMOJIS[outfit.season]} {label(SEASON_LABELS, outfit.season)} ·{' '}
+                  {label(STYLE_LABELS, outfit.style)}
+                </div>
+              </div>
+              <span className="suggestion-score" title="Điểm phù hợp">
+                {score}
+              </span>
+            </div>
+
+            <div className="badge-row badge-row--tight">
+              {reasons.map((reason) => (
+                <Badge key={reason} color={NEGATIVE_SUGGESTION_REASONS.has(reason) ? 'red' : 'green'}>
+                  {label(SUGGESTION_REASON_LABELS, reason)}
+                </Badge>
+              ))}
+            </div>
+
+            <OutfitActions outfit={outfit} onPlan={planToday} onWear={wearNow} />
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderRankedTab = () => {
+    if (!aiRanking) {
+      return (
+        <AiPrompt
+          emoji="🤖"
+          title="Để AI chọn giúp hôm nay"
+          hint={`AI đọc thời tiết ${Math.round(weather.current.temperature)}°C${
+            weather.current.raining ? ' (đang mưa)' : ''
+          } cùng màu sắc, phong cách của các bộ đã có rồi xếp thứ tự kèm lý do cho từng bộ.`}
+          actionLabel="🤖 Cho AI chọn"
+          loading={rankingLoading}
+          loadingLabel="AI đang chọn..."
+          onRun={rankWithAi}
+        />
+      );
+    }
+
+    return (
+      <div className="card-grid card-grid--dense">
+        {aiRanking.map(({ outfit, reason }, index) => (
+          <div key={outfit.id} className="nb-card nb-card--hover item-card suggest-card">
+            <OutfitVisual outfit={outfit} />
+            <div className="item-name" title={outfit.name}>
+              {index === 0 ? '🥇 ' : ''}
+              {outfit.name}
+            </div>
+            <div className="item-meta">
+              {SEASON_EMOJIS[outfit.season]} {label(SEASON_LABELS, outfit.season)} ·{' '}
+              {label(STYLE_LABELS, outfit.style)}
+            </div>
+            <p className="suggest-card-reason">💡 {reason}</p>
+            <OutfitActions outfit={outfit} onPlan={planToday} onWear={wearNow} />
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderComposedTab = () => {
+    if (!aiSuggestions) {
+      return (
+        <AiPrompt
+          emoji="🧩"
+          title="Nhờ AI phối bộ mới từ tủ của bạn"
+          hint="AI ghép các món lẻ đang có thành bộ chưa từng lưu. Thấy bộ nào hợp thì lưu thành outfit thật bằng một nút."
+          actionLabel="🧩 Nhờ AI phối đồ"
+          loading={aiLoading}
+          loadingLabel="AI đang phối đồ..."
+          onRun={askAi}
+        />
+      );
+    }
+
+    return (
+      <div className="card-grid card-grid--dense">
+        {aiSuggestions.map((suggestion) => (
+          <div key={suggestion.name} className="nb-card item-card suggest-card">
+            {suggestion.items.some((item) => item.imageUrl) && (
+              <div className="outfit-collage">
+                {suggestion.items
+                  .filter((item) => item.imageUrl)
+                  .slice(0, 4)
+                  .map((item) => (
+                    <div key={item.id} className="collage-cell" title={item.name}>
+                      <img src={item.imageUrl} alt={item.name} />
+                    </div>
+                  ))}
+              </div>
+            )}
+            <div className="item-name" title={suggestion.name}>
+              🤖 {suggestion.name}
+            </div>
+            <div className="badge-row badge-row--tight">
+              {suggestion.items.map((item) => (
+                <Badge key={item.id}>
+                  {CATEGORY_EMOJIS[item.category]} {item.name}
+                </Badge>
+              ))}
+            </div>
+            <p className="suggest-card-reason">💡 {suggestion.reason}</p>
+            <div className="card-actions">
+              <Button
+                size="sm"
+                variant="pink"
+                onClick={() => createOutfitFromAi(suggestion)}
+                disabled={creatingName !== null}
+              >
+                {creatingName === suggestion.name ? 'Đang tạo...' : '🧢 Lưu thành outfit'}
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -266,53 +477,39 @@ export default function SuggestionsPage() {
         <Loading>Đang xem trời hôm nay...</Loading>
       ) : (
         <>
-          <div className="nb-card weather-hero" style={{ marginBottom: 24, background: 'var(--cyan)' }}>
-            <span className="weather-emoji">{weather.current.emoji}</span>
-            <div>
-              <div className="weather-temp">{Math.round(weather.current.temperature)}°C</div>
-              <div className="weather-desc">
-                {weather.current.desc} · {city.name}
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <Badge>🌡️ Cảm giác như {Math.round(weather.current.feelsLike)}°C</Badge>
-              <Badge>💧 Độ ẩm {weather.current.humidity}%</Badge>
-              <Badge color={weather.current.raining ? 'blue' : 'green'}>
-                {weather.current.raining ? '☔ Đang mưa — nhớ mang áo khoác/ô!' : '🌂 Không mưa'}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="stat-row">
-            {weather.daily.map((day) => (
-              <div key={day.date} className="stat-tile" style={{ background: 'var(--paper)' }}>
-                <div style={{ fontWeight: 700, fontSize: 13 }}>
-                  {new Date(`${day.date}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+          {/* Thời tiết và bảng điều khiển AI đứng cạnh nhau: cả hai đều là "thông tin đầu vào",
+              và xếp dọc thì riêng chúng đã chiếm hết màn hình đầu tiên. */}
+          <div className="suggest-cockpit">
+            <section className="nb-card weather-panel">
+              <div className="weather-panel-now">
+                <span className="weather-panel-emoji">{weather.current.emoji}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div className="weather-panel-temp">{Math.round(weather.current.temperature)}°C</div>
+                  <div className="weather-panel-place">
+                    {weather.current.desc} · {city.name}
+                  </div>
                 </div>
-                <div style={{ fontSize: 30 }}>{day.emoji}</div>
-                <div className="stat-label">
-                  {Math.round(day.tempMin)}° – {Math.round(day.tempMax)}° · ☔ {day.rainChance ?? 0}%
+                <div className="weather-facts">
+                  <span className="weather-fact">🌡️ Như {Math.round(weather.current.feelsLike)}°</span>
+                  <span className="weather-fact">💧 {weather.current.humidity}%</span>
+                  <span className={`weather-fact ${weather.current.raining ? 'is-rain' : ''}`}>
+                    {weather.current.raining ? '☔ Đang mưa' : '🌂 Không mưa'}
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
 
-          <div className="section-heading-row">
-            <h2 className="section-heading" style={{ margin: 0 }}>🗓️ Kế hoạch mặc nhiều ngày</h2>
-            <Button variant="primary" onClick={() => setAiPlanning(true)}>
-              ✨ AI lên kế hoạch
-            </Button>
-          </div>
+              {/* Dải này chỉ vẽ vài ngày đầu; cả 14 ngày dự báo vẫn được gửi cho AI lên kế hoạch. */}
+              <div className="forecast-strip">
+                {weather.daily.slice(0, FORECAST_STRIP_DAYS).map((day) => (
+                  <ForecastChip key={day.date} day={day} />
+                ))}
+              </div>
+            </section>
 
-          <p style={{ fontWeight: 600, color: 'var(--muted)', fontSize: 13.5, marginTop: 0, marginBottom: 22 }}>
-            Nói cho AI biết bạn cần lịch cho dịp gì và bao nhiêu ngày — dự báo ở trên được dùng luôn.
-            Xem trước rồi lưu cả đợt vào lịch trong một lần.
-          </p>
+            <section className="nb-card ai-console">
+              <h2 className="ai-console-title">🤖 Trợ lý AI</h2>
 
-          <h2 className="section-heading">🤖 Nhờ AI phối đồ từ tủ của bạn</h2>
-          <div className="nb-card" style={{ marginBottom: 20 }}>
-            <div className="ai-control-row">
-              <div className="nb-field" style={{ margin: 0, flex: '1 1 240px' }}>
+              <div className="nb-field" style={{ margin: 0 }}>
                 <label className="nb-label">Tone màu muốn mặc</label>
                 <select className="nb-select" value={aiTone} onChange={(e) => setAiTone(e.target.value)}>
                   <option value="">Tùy AI chọn</option>
@@ -323,170 +520,55 @@ export default function SuggestionsPage() {
                   ))}
                 </select>
               </div>
-              <Button variant="primary" className="ai-ask-btn" onClick={askAi} disabled={aiLoading}>
-                {aiLoading ? '🤖 AI đang phối đồ...' : '✨ Nhờ AI phối đồ'}
+
+              <p className="ai-console-hint">
+                Tone này áp dụng cho cả hai tab AI bên dưới và cho kế hoạch nhiều ngày.
+              </p>
+
+              <Button variant="primary" onClick={() => setAiPlanning(true)}>
+                🗓️ AI lên kế hoạch nhiều ngày
               </Button>
-            </div>
-            <p style={{ fontWeight: 600, color: 'var(--muted)', fontSize: 13.5, marginTop: 10, marginBottom: 0 }}>
-              AI sẽ dựa vào thời tiết {Math.round(weather.current.temperature)}°C
-              {weather.current.raining ? ' (đang mưa)' : ''} + thuộc tính và màu sắc đồ trong tủ để phối bộ phù hợp nhất.
-            </p>
-
-            {aiError && (
-              <div style={{ marginTop: 12 }}>
-                <ErrorBanner error={aiError} onDismiss={() => setAiError(null)} />
-              </div>
-            )}
-
-            {aiSuggestions && (
-              <div className="card-grid" style={{ marginTop: 16 }}>
-                {aiSuggestions.map((suggestion) => (
-                  <div key={suggestion.name} className="nb-card item-card">
-                    <div className="item-name" title={suggestion.name}>🤖 {suggestion.name}</div>
-                    <div className="badge-row">
-                      {suggestion.items.map((item) => (
-                        <Badge key={item.id}>
-                          {CATEGORY_EMOJIS[item.category]} {item.name}
-                        </Badge>
-                      ))}
-                    </div>
-                    {suggestion.items.some((item) => item.imageUrl) && (
-                      <div className="outfit-collage">
-                        {suggestion.items.filter((item) => item.imageUrl).slice(0, 4).map((item) => (
-                          <div key={item.id} className="collage-cell" title={item.name}>
-                            <img src={item.imageUrl} alt={item.name} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <p style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--muted)', margin: 0 }}>
-                      💡 {suggestion.reason}
-                    </p>
-                    <div className="card-actions">
-                      <Button
-                        size="sm"
-                        variant="pink"
-                        onClick={() => createOutfitFromAi(suggestion)}
-                        disabled={creatingName !== null}
-                      >
-                        {creatingName === suggestion.name ? '⏳ Đang tạo...' : '🧢 Tạo outfit từ gợi ý'}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+              <p className="ai-console-hint">
+                Nói bạn cần lịch cho dịp gì và bao nhiêu ngày — dự báo ở bên cạnh được dùng luôn. Xem
+                trước rồi lưu cả đợt vào lịch trong một lần.
+              </p>
+            </section>
           </div>
 
-          <div className="section-heading-row">
-            <h2 className="section-heading" style={{ margin: 0 }}>✨ Outfit phù hợp hôm nay</h2>
-            {suggestions && suggestions.length > 0 && (
-              <Button variant="primary" onClick={rankWithAi} disabled={rankingLoading}>
-                {rankingLoading ? '🤖 AI đang chọn...' : '🤖 Để AI chọn giúp'}
-              </Button>
-            )}
-          </div>
-
-          {rankingError && (
-            <div style={{ marginBottom: 14 }}>
-              <ErrorBanner error={rankingError} onDismiss={() => setRankingError(null)} />
-            </div>
+          {(rankingError || aiError) && (
+            <ErrorBanner
+              error={rankingError || aiError}
+              onDismiss={() => {
+                setRankingError(null);
+                setAiError(null);
+              }}
+            />
           )}
 
-          {aiRanking && (
-            <div className="nb-card" style={{ background: 'var(--yellow)', marginBottom: 22 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-                <h3 className="chart-title" style={{ margin: 0 }}>🤖 AI đề xuất cho hôm nay</h3>
-                <button type="button" onClick={() => setAiRanking(null)} className="nb-btn nb-btn--sm">
-                  ✕ Ẩn
+          <div className="results-bar">
+            <div className="page-switch page-switch--sm" role="tablist" aria-label="Kiểu gợi ý">
+              {TABS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === item.key}
+                  className={`page-switch-btn ${tab === item.key ? 'is-active' : ''}`}
+                  onClick={() => setTab(item.key)}
+                >
+                  <span className="page-switch-emoji">{item.emoji}</span>
+                  {item.label}
+                  {counts[item.key] != null && <span className="tab-count">{counts[item.key]}</span>}
                 </button>
-              </div>
-              <div className="card-grid" style={{ marginTop: 8 }}>
-                {aiRanking.map(({ outfit, reason }, index) => (
-                  <div key={outfit.id} className="nb-card item-card">
-                    <OutfitVisual outfit={outfit} />
-                    <div className="item-name" title={outfit.name}>
-                      {index === 0 ? '🥇 ' : ''}🧢 {outfit.name}
-                    </div>
-                    <div className="item-meta">
-                      {SEASON_EMOJIS[outfit.season]} {label(SEASON_LABELS, outfit.season)} ·{' '}
-                      {label(STYLE_LABELS, outfit.style)}
-                    </div>
-                    <p style={{ fontWeight: 600, fontSize: 13.5, margin: 0 }}>💡 {reason}</p>
-                    <div className="card-actions">
-                      <Button size="sm" variant="primary" onClick={() => planToday(outfit)}>
-                        📅 Lên lịch
-                      </Button>
-                      {isWornToday(outfit.lastWornAt) ? (
-                        <Button size="sm" disabled>
-                          ✅ Đã mặc
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="green" onClick={() => wearNow(outfit)}>
-                          👣 Mặc luôn
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {suggestions === null ? (
-            <Loading>Đang chấm điểm outfit...</Loading>
-          ) : suggestions.length === 0 ? (
-            <EmptyState emoji="🤷">
-              Chưa có outfit nào để gợi ý. Hãy tạo vài outfit trong mục "Outfit" trước nhé!
-            </EmptyState>
-          ) : (
-            <div className="card-grid">
-              {suggestions.map(({ outfit, score, reasons }, index) => (
-                <div key={outfit.id} className="nb-card nb-card--hover item-card">
-                  <OutfitVisual outfit={outfit} />
-
-                  <div className="item-card-top">
-                    <div style={{ minWidth: 0 }}>
-                      <div className="item-name" title={outfit.name}>
-                        {index === 0 ? '🏆 ' : ''}
-                        {outfit.name}
-                      </div>
-                      <div className="item-meta">
-                        {SEASON_EMOJIS[outfit.season]} {label(SEASON_LABELS, outfit.season)} ·{' '}
-                        {label(STYLE_LABELS, outfit.style)}
-                      </div>
-                    </div>
-                    <span className="suggestion-score" title="Điểm phù hợp">
-                      {score}
-                    </span>
-                  </div>
-
-                  <div className="badge-row">
-                    {reasons.map((reason) => (
-                      <Badge key={reason} color={reason.includes('MISMATCH') || reason.includes('UNAVAILABLE') || reason.includes('NO_JACKET') ? 'red' : 'green'}>
-                        {label(SUGGESTION_REASON_LABELS, reason)}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  <div className="card-actions">
-                    <Button size="sm" variant="primary" onClick={() => planToday(outfit)}>
-                      📅 Lên lịch
-                    </Button>
-                    {isWornToday(outfit.lastWornAt) ? (
-                      <Button size="sm" disabled>
-                        ✅ Đã mặc
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="green" onClick={() => wearNow(outfit)}>
-                        👣 Mặc luôn
-                      </Button>
-                    )}
-                  </div>
-                </div>
               ))}
             </div>
-          )}
+
+            {renderTabAction()}
+          </div>
+
+          {tab === 'score' && renderScoreTab()}
+          {tab === 'ranked' && renderRankedTab()}
+          {tab === 'composed' && renderComposedTab()}
         </>
       )}
 

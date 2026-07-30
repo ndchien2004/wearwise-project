@@ -12,10 +12,6 @@ export function createPlan(payload) {
   return apiFetch('/api/outfit-plans', { method: 'POST', body: payload });
 }
 
-export function updatePlan(id, payload) {
-  return apiFetch(`/api/outfit-plans/${id}`, { method: 'PUT', body: payload });
-}
-
 export function completePlan(id) {
   return apiFetch(`/api/outfit-plans/${id}/complete`, { method: 'PATCH' });
 }

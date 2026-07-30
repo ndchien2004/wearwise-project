@@ -4,7 +4,6 @@ import org.group7.wearwise.entity.AppUser;
 import org.group7.wearwise.entity.ClothingItem;
 import org.group7.wearwise.entity.Outfit;
 import org.group7.wearwise.enums.ClothingCategory;
-import org.group7.wearwise.enums.ClothingStatus;
 import org.group7.wearwise.enums.ItemBlockReason;
 import org.group7.wearwise.enums.Season;
 import org.group7.wearwise.enums.Style;
@@ -152,8 +151,18 @@ public class OutfitService {
      */
     @Transactional
     public Outfit applyWear(String ownerUsername, Long id, WearSource source, Long outfitPlanId) {
+        return applyWear(ownerUsername, id, source, outfitPlanId, LocalDateTime.now());
+    }
+
+    /**
+     * @param wornAt thời điểm ghi vào nhật ký. Người dùng thường quên tick "Đã mặc" đúng ngày rồi
+     *               vài hôm sau mới vào lịch tick lại — khi đó phải ghi đúng ngày của kế hoạch,
+     *               không phải hôm nay, nếu không "Mặc gần đây" và mọi thống kê theo ngày đều lệch
+     *               đúng khoảng thời gian người dùng quên.
+     */
+    @Transactional
+    public Outfit applyWear(String ownerUsername, Long id, WearSource source, Long outfitPlanId, LocalDateTime wornAt) {
         Outfit outfit = getOutfitById(ownerUsername, id);
-        LocalDateTime wornAt = LocalDateTime.now();
 
         // Bộ thiếu món (do món bị ẩn) thì chặn sớm bằng thông báo nói rõ phải thay món nào,
         // thay vì để assertWearable báo lỗi về một món lẻ.
@@ -288,17 +297,11 @@ public class OutfitService {
             reasons.add("NOT_RECENTLY_WORN");
         }
 
-        boolean allItemsAvailable = outfit.getClothingItems()
-                .stream()
-                .allMatch(item -> item.getStatus() == ClothingStatus.AVAILABLE);
-
-        if (allItemsAvailable) {
-            score += 1;
-            reasons.add("ALL_ITEMS_AVAILABLE");
-        } else {
-            score -= 2;
-            reasons.add("ITEMS_UNAVAILABLE");
-        }
+        // Không còn nhánh trừ điểm cho "có món chưa sẵn sàng": suggestOutfits đã lọc isWearableNow
+        // từ trước khi chấm điểm, nên mọi bộ tới được đây đều sẵn sàng. Nhánh đó từng tồn tại và
+        // trở thành mã chết, kéo theo một nhãn đỏ ở frontend không bao giờ hiện ra.
+        score += 1;
+        reasons.add("ALL_ITEMS_AVAILABLE");
 
         return new OutfitSuggestion(outfit, score, List.copyOf(reasons));
     }
@@ -323,6 +326,24 @@ public class OutfitService {
      */
     public static boolean isAvailable(Outfit outfit) {
         return outfit.getClothingItems().stream().noneMatch(item -> item.getArchivedAt() != null);
+    }
+
+    /**
+     * Luật "bộ này lên lịch được không", dùng chung cho lịch tự đặt tay và cho kế hoạch AI.
+     *
+     * <p>Nằm ở đây chứ không nằm riêng trong {@code OutfitPlanService} vì có <b>hai</b> đường ghi
+     * vào {@code outfit_plans}: một ngày lẻ ở trang Lịch, và cả đợt qua {@code WearPlanService}.
+     * Mỗi đường tự kiểm tra một kiểu thì sớm muộn cũng lệch — đường AI từng nhận id bộ bất kỳ từ
+     * client và ghi được cả bộ đang thiếu món vào lịch.</p>
+     */
+    public static void assertPlannable(Outfit outfit) {
+        if (!isAvailable(outfit)) {
+            throw new BusinessRuleException(
+                    ErrorCode.OUTFIT_INCOMPLETE,
+                    "Outfit \"" + outfit.getName() + "\" đang thiếu món do có món đã bị ẩn, "
+                            + "chưa lên lịch được. Hãy sửa outfit và thay bằng món khác."
+            );
+        }
     }
 
     /**

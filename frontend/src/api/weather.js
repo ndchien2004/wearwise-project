@@ -46,13 +46,24 @@ export async function searchCity(name) {
   }));
 }
 
+/**
+ * Số ngày dự báo xin từ Open-Meteo. Bằng đúng trần của một đợt kế hoạch mặc
+ * (`WearPlan.MAX_DAYS` = 14) chứ không phải số ô dự báo hiển thị trên trang: kế hoạch 14 ngày mà
+ * chỉ có 5 ngày dự báo thì AI xếp 9 ngày cuối trong tình trạng mù thời tiết. Gói miễn phí cho tới
+ * 16 ngày nên không tốn thêm gì; dải hiển thị tự cắt bớt bằng `FORECAST_STRIP_DAYS`.
+ */
+const FORECAST_DAYS = 14;
+
+/** Số ô dự báo vẽ trên trang Gợi ý — 14 ô thì tràn hàng và không ai đọc tới ngày thứ mười. */
+export const FORECAST_STRIP_DAYS = 5;
+
 export async function getWeather(latitude, longitude) {
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
     current: 'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code',
     daily: 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code',
-    forecast_days: '5',
+    forecast_days: String(FORECAST_DAYS),
     timezone: 'auto',
   });
 

@@ -185,6 +185,67 @@ export async function apiFetch(path, { method = 'GET', body, auth = true } = {})
   return sendWithRetry(send, auth);
 }
 
+/**
+ * Tải một file do server sinh ra (CSV xuất tủ đồ, file mẫu) rồi lưu xuống máy.
+ *
+ * <p>Không dùng được `apiFetch`: nó parse mọi phản hồi thành JSON. Cũng không dùng được thẻ
+ * `<a download>` trỏ thẳng tới endpoint, vì access token nằm trong bộ nhớ chứ không phải cookie —
+ * trình duyệt sẽ gửi một request không có header Authorization và nhận 401. Vì vậy phải fetch kèm
+ * token rồi tự tạo blob URL.</p>
+ */
+export async function apiDownload(path, fallbackFilename) {
+  const send = (token) => {
+    const headers = { [CLIENT_HEADER]: 'web' };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    return fetch(apiUrl(path), { headers, credentials: 'include' });
+  };
+
+  let response = await send(getToken());
+  if (response.status === 401 && hasSessionHint()) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      response = await send(refreshed.accessToken);
+    }
+  }
+
+  if (!response.ok) {
+    // Lỗi thì server trả JSON như mọi endpoint khác, không phải file.
+    const text = await response.text();
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    throw new ApiError(
+      response.status,
+      data?.message || `Không tải được file (HTTP ${response.status}).`,
+      data?.errors || {},
+      data?.code || null
+    );
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+  const filename = match ? decodeURIComponent(match[1]) : fallbackFilename;
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Thu hồi ngay là Firefox huỷ luôn lần tải chưa kịp bắt đầu; hoãn một nhịp cho chắc.
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+  return filename;
+}
+
 // Tải file (multipart) — trình duyệt tự đặt Content-Type kèm boundary, không set thủ công.
 export async function apiUpload(path, formData, { method = 'POST' } = {}) {
   const send = (token) => {

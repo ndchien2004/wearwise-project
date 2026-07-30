@@ -52,6 +52,10 @@ export default function AiPlanModal({ forecast, tone, onSaved, onClose }) {
       setError('Hãy mô tả bạn muốn lên kế hoạch cho dịp gì.');
       return;
     }
+    if (startDate < todayIso()) {
+      setError('Chọn ngày bắt đầu từ hôm nay trở đi — kế hoạch cho ngày đã qua thì không đánh dấu được nữa.');
+      return;
+    }
 
     setBusy(true);
     setError(null);
@@ -149,10 +153,13 @@ export default function AiPlanModal({ forecast, tone, onSaved, onClose }) {
               </select>
             </Field>
             <Field label="Bắt đầu từ" className="filter-cell">
+              {/* Không cho lùi về quá khứ: ngày đã qua thì không đánh dấu "đã mặc" được nữa, nên cả
+                  đợt chỉ để nhìn — mà vẫn tốn một lượt gọi Gemini trong hạn mức 40 lượt/giờ. */}
               <input
                 type="date"
                 className="nb-input"
                 value={startDate}
+                min={todayIso()}
                 onChange={(e) => setStartDate(e.target.value)}
               />
             </Field>

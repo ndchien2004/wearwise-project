@@ -560,14 +560,14 @@ function ItemPicker({ itemsPage, page, onPageChange, busy, generatingId, activeI
               <div className="tryon-item-photo">
                 <img src={item.imageUrl} alt={item.name} />
                 {/* Nhãn nổi trên ảnh: nhìn một cái là biết món nào đang trên người */}
-                {generating && <span className="tryon-item-flag">⏳ Đang ghép</span>}
-                {!generating && active && <span className="tryon-item-flag is-wearing">✓ Đang mặc</span>}
+                {generating && <span className="tryon-item-flag">Đang ghép</span>}
+                {!generating && active && <span className="tryon-item-flag is-wearing">Đang mặc</span>}
               </div>
               <div className="tryon-item-name" title={item.name}>
                 {CATEGORY_EMOJIS[item.category]} {item.name}
               </div>
               <Button size="sm" variant={active ? 'dark' : 'green'} onClick={() => onPick(item)} disabled={busy}>
-                {generating ? '⏳ Đang ghép...' : active ? '↻ Ghép lại' : '✨ Thử'}
+                {generating ? 'Đang ghép...' : active ? 'Ghép lại' : 'Thử'}
               </Button>
             </div>
           );
@@ -622,14 +622,14 @@ function OutfitPicker({ outfits, keyword, busy, generatingId, activeOutfitId, on
               {/* Đúng tấm ảnh sẽ được gửi đi ghép — xem trước thấy gì thì thử ra thứ đó */}
               <div className="tryon-item-photo">
                 <img src={outfit.imageUrl} alt={outfit.name} />
-                {generating && <span className="tryon-item-flag">⏳ Đang ghép</span>}
-                {!generating && active && <span className="tryon-item-flag is-wearing">✓ Đang mặc</span>}
+                {generating && <span className="tryon-item-flag">Đang ghép</span>}
+                {!generating && active && <span className="tryon-item-flag is-wearing">Đang mặc</span>}
               </div>
               <div className="tryon-item-name" title={outfit.name}>
                 🧢 {outfit.name} · {itemCount} món
               </div>
               <Button size="sm" variant={active ? 'dark' : 'green'} onClick={() => onPick(outfit)} disabled={busy}>
-                {generating ? '⏳ Đang ghép...' : active ? '↻ Ghép lại' : '✨ Thử cả bộ'}
+                {generating ? 'Đang ghép...' : active ? 'Ghép lại' : 'Thử cả bộ'}
               </Button>
             </div>
           );

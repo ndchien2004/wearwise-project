@@ -20,19 +20,8 @@ export function saveWearPlan(payload) {
   return apiFetch('/api/wear-plans', { method: 'POST', body: payload });
 }
 
-export function findWearPlans() {
-  return apiFetch('/api/wear-plans');
-}
-
 /** Các đợt đang phủ ngày hôm nay — thẻ kế hoạch ở trang chủ. */
 export function findActiveWearPlans() {
   return apiFetch('/api/wear-plans?activeOnly=true');
 }
 
-export function getWearPlan(id) {
-  return apiFetch(`/api/wear-plans/${id}`);
-}
-
-export function deleteWearPlan(id) {
-  return apiFetch(`/api/wear-plans/${id}`, { method: 'DELETE' });
-}

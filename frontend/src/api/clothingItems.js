@@ -61,10 +61,6 @@ export function getArchivedItems() {
   return apiFetch('/api/clothing-items/archived');
 }
 
-export function getOutfitsUsingItem(id) {
-  return apiFetch(`/api/clothing-items/${id}/outfits`);
-}
-
 export function setItemFavorite(id, favorite) {
   return apiFetch(`/api/clothing-items/${id}/favorite`, { method: 'PATCH', body: { favorite } });
 }
@@ -75,10 +71,6 @@ export function markItemWorn(id) {
 
 export function getLeastWornItems(limit = 5) {
   return apiFetch(`/api/clothing-items/least-worn?limit=${limit}`);
-}
-
-export function getMostWornItems(limit = 5) {
-  return apiFetch(`/api/clothing-items/most-worn?limit=${limit}`);
 }
 
 export function getRecentlyWornItems(limit = 5) {

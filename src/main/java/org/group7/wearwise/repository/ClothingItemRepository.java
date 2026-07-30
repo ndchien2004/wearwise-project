@@ -64,8 +64,6 @@ public interface ClothingItemRepository extends JpaRepository<ClothingItem, Long
 
     long countByOwner_UsernameAndArchivedAtIsNullAndFavoriteTrue(String username);
 
-    long countByOwner_UsernameAndArchivedAtIsNotNull(String username);
-
     List<ClothingItem> findTop5ByOwner_UsernameAndArchivedAtIsNullAndWearCountGreaterThanOrderByWearCountDescIdAsc(
             String username,
             Integer minimumWearCount

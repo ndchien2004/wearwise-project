@@ -59,7 +59,6 @@ h1, h2, h3, h4,
 .calendar-dow,
 .stat-tile .stat-value,
 .bar-value,
-.weather-temp,
 .suggestion-score,
 .auth-logo,
 .loading-box,
@@ -177,23 +176,6 @@ a {
 
 .hud-logo span {
   color: #e8590c;
-}
-
-/* Nhãn trang đang mở — thay cho việc nhìn mục nào đang sáng ở thanh bên cũ */
-.hud-crumb {
-  font-family: var(--font-display);
-  font-size: 12.5px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 5px 12px;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
-  background: var(--bg);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
 }
 
 .hud-user {
@@ -492,24 +474,6 @@ a {
   }
 }
 
-.account-facts {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px 14px;
-  margin-bottom: 18px;
-  font-size: 14px;
-}
-
-.account-facts dt {
-  font-weight: 800;
-  color: var(--muted);
-}
-
-.account-facts dd {
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-
 /* ---------- Trang tài khoản ---------- */
 
 .profile-hero {
@@ -610,35 +574,6 @@ a {
 .profile-hero-name {
   font-size: 26px;
   overflow-wrap: anywhere;
-}
-
-/* Ô chỉ đọc cho dữ liệu không đổi được (email) */
-.profile-locked-field {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  border: var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  padding: 10px 14px;
-}
-
-.profile-locked-value {
-  font-weight: 700;
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
-
-.profile-locked-badge {
-  margin-left: auto;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
-  background: var(--yellow);
-  padding: 2px 10px;
 }
 
 /* ---------- Chia sẻ trang phục ---------- */
@@ -1175,6 +1110,12 @@ a {
   /* min() giữ cho card không rộng hơn màn hình khi khung nhỏ hơn 250px */
   grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr));
   gap: 20px;
+}
+
+/* Dày hơn: dùng ở trang Gợi ý, nơi cần cả 6 gợi ý nằm trong một màn hình */
+.card-grid--dense {
+  grid-template-columns: repeat(auto-fill, minmax(min(196px, 100%), 1fr));
+  gap: 14px;
 }
 
 /* Phân trang */
@@ -1961,21 +1902,6 @@ a {
 
 /* ---------- Virtual try-on ---------- */
 
-.tryon-photo {
-  border: var(--border);
-  border-radius: var(--radius-sm);
-  background: #fff;
-  overflow: hidden;
-  height: 320px;
-}
-
-.tryon-photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
 .tryon-dropzone {
   width: 100%;
   display: flex;
@@ -2159,19 +2085,6 @@ a {
   flex-shrink: 0;
 }
 
-/* Hàng điều khiển "Nhờ AI phối đồ": select + nút cùng đáy, cùng cao */
-.ai-control-row {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
-
-.ai-control-row .ai-ask-btn {
-  flex: 0 0 auto;
-  height: 47px;
-}
-
 /* Hàng gọn (danh sách ở Dashboard): tên cắt gọn, giá trị/badge phải cố định */
 .mini-row {
   display: flex;
@@ -2288,6 +2201,19 @@ a {
 .calendar-plan-chip.is-previewing {
   background: var(--yellow);
   outline: none;
+}
+
+/* Lý do một bộ đã lên lịch nhưng hôm nay chưa mặc được, trong hộp thoại chi tiết ngày. */
+.day-plan-blocker {
+  margin-top: 4px;
+  background: var(--orange);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.45;
+  display: inline-block;
 }
 
 /* ---------- Thẻ xem nhanh outfit khi hover chip trong lịch ---------- */
@@ -2573,40 +2499,265 @@ a {
   font-size: 16px;
 }
 
-/* ---------- Weather ---------- */
+/* ============================================================
+   Trang Gợi ý theo thời tiết
+   ------------------------------------------------------------
+   Nguyên tắc của trang này: **mọi thứ "đầu vào" phải nằm gọn trong màn hình đầu tiên**, để danh
+   sách outfit — thứ người dùng vào trang để xem — bắt đầu ngay dưới nếp gấp.
 
-.weather-hero {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 24px;
-  padding: 24px;
+   Vì vậy thời tiết và bảng điều khiển AI xếp thành hai cột thay vì hai thẻ chiếm trọn chiều ngang,
+   và ba loại gợi ý dùng chung một vùng kết quả có tab thay vì ba mục xếp dọc. Trước đây phải cuộn
+   qua hai màn hình mới thấy card outfit đầu tiên.
+   ============================================================ */
+
+.suggest-cockpit {
+  display: grid;
+  /* Cột thời tiết rộng hơn vì nó chứa cả dải dự báo 5 ngày */
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 18px;
 }
 
-.weather-temp {
-  font-family: var(--font-display);
-  font-size: 58px;
+@media (max-width: 900px) {
+  .suggest-cockpit { grid-template-columns: 1fr; }
+}
+
+.weather-panel {
+  background: var(--cyan);
+  padding: 15px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.weather-panel-now {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.weather-panel-emoji {
+  font-size: 46px;
   line-height: 1;
 }
 
-.weather-emoji {
-  font-size: 64px;
+.weather-panel-temp {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 38px;
+  line-height: 1;
 }
 
-.weather-desc {
+.weather-panel-place {
   font-weight: 700;
-  font-size: 17px;
+  font-size: 13.5px;
+  margin-top: 3px;
+}
+
+/* Ba con số phụ: gộp thành chip nhỏ xếp ngang, không phải ba badge xếp dọc như trước */
+.weather-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.weather-fact {
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.weather-fact.is-rain {
+  background: var(--blue);
+}
+
+/* Dải dự báo cuộn ngang khi hẹp, thay vì xuống dòng và đội chiều cao của cả khung lên */
+.forecast-strip {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.forecast-chip {
+  flex: 1 0 auto;
+  min-width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 6px 7px;
+  text-align: center;
+}
+
+.forecast-chip-dow {
+  font-weight: 800;
+  font-size: 11.5px;
+  text-transform: capitalize;
+}
+
+.forecast-chip-emoji { font-size: 19px; line-height: 1.1; }
+.forecast-chip-temp { font-weight: 800; font-size: 12.5px; }
+.forecast-chip-rain { font-weight: 600; font-size: 10.5px; color: var(--muted); }
+
+.ai-console {
+  padding: 15px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  align-items: flex-start;
+}
+
+.ai-console-title {
+  font-size: 16px;
+  margin: 0;
+}
+
+.ai-console .nb-field,
+.ai-console .nb-select {
+  width: 100%;
+}
+
+.ai-console-hint {
+  font-size: 12.3px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Thanh tab kết quả + nút hành động của tab đang mở */
+.results-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.results-note {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Biến thể nhỏ của .page-switch: ba tab với cỡ chữ 23px thì tràn dòng trên laptop */
+.page-switch--sm {
+  transform: none;
+  box-shadow: var(--shadow);
+}
+
+.page-switch--sm .page-switch-btn {
+  font-size: 15px;
+  padding: 8px 14px;
+  gap: 6px;
+}
+
+.tab-count {
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 800;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  padding: 0 6px;
+  line-height: 1.5;
+}
+
+/* Card gợi ý gọn hơn card ở Tủ đồ: một trang phải chứa được cả 6 gợi ý */
+.suggest-card {
+  gap: 8px;
+}
+
+.suggest-card .item-photo {
+  height: 118px;
+}
+
+/* Khối ảnh của card phải cao đúng bằng nhau dù là một ảnh bộ hay collage các món: ô collage giữ
+   aspect-ratio 1 thì trong lưới dày, 2 hàng ô vuông cao gấp đôi một tấm ảnh, và card có collage
+   thành cao hơn hẳn card bên cạnh. Cố định chiều cao rồi chia đều cho số hàng thực tế — 1 món thì
+   một hàng cao trọn 118px, 3–4 món thì hai hàng 56px. */
+.suggest-card .outfit-collage {
+  height: 118px;
+  grid-auto-rows: 1fr;
+}
+
+.suggest-card .outfit-collage .collage-cell {
+  aspect-ratio: auto;
+  height: auto;
+}
+
+.suggest-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.suggest-card-reason {
+  font-weight: 600;
+  font-size: 12.8px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin: 0;
+}
+
+.badge-row--tight {
+  gap: 4px;
+}
+
+.badge-row--tight .nb-badge {
+  font-size: 11px;
+  padding: 1px 8px;
 }
 
 .suggestion-score {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 21px;
   border: var(--border);
   border-radius: var(--radius-sm);
   background: var(--yellow);
   box-shadow: var(--shadow);
-  padding: 4px 12px;
+  padding: 2px 10px;
   flex-shrink: 0;
+}
+
+/* Chỗ đứng của một tab AI chưa chạy: gọn, nằm trong vùng kết quả, không đẩy gì xuống dưới */
+.ai-prompt {
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: var(--yellow);
+  padding: 26px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  text-align: center;
+}
+
+.ai-prompt-emoji { font-size: 38px; line-height: 1; }
+
+.ai-prompt-title {
+  font-size: 17px;
+  margin: 0;
+}
+
+.ai-prompt-hint {
+  font-weight: 600;
+  font-size: 13.2px;
+  line-height: 1.5;
+  max-width: 52ch;
+  margin: 0;
 }
 
 /* ---------- Auth page ---------- */
@@ -2805,11 +2956,6 @@ a {
   font-weight: 600;
   color: var(--muted);
   margin-bottom: 14px;
-}
-
-.auth-links {
-  margin-top: 16px;
-  text-align: center;
 }
 
 .auth-link {
@@ -3190,16 +3336,6 @@ a {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-/* Hàng tiêu đề mục có kèm nút hành động (vd "Để AI chọn giúp") */
-.section-heading-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
 }
 
 .two-col {
@@ -3899,7 +4035,6 @@ button.tryon-result-photo {
 
 /* Tablet dọc trở xuống */
 @media (max-width: 860px) {
-  .hud-crumb { display: none; }
   .hud-user { max-width: 46vw; }
   .main-content { padding: 20px 16px 48px; }
   .bar-row { grid-template-columns: 90px 1fr 40px; }
@@ -3917,8 +4052,8 @@ button.tryon-result-photo {
   .nb-card { padding: 16px; }
   .card-grid { gap: 14px; }
   .stat-row { gap: 12px; }
-  .weather-temp { font-size: 44px; }
-  .weather-emoji { font-size: 48px; }
+  .weather-panel-temp { font-size: 32px; }
+  .weather-panel-emoji { font-size: 38px; }
   .profile-hero { gap: 14px; }
   .profile-avatar-wrap { width: 60px; height: 60px; }
   .profile-avatar { font-size: 30px; }
@@ -4237,3 +4372,145 @@ button.tryon-result-photo {
   font-weight: 600;
   line-height: 1.5;
 }
+
+/* ============================================================
+   Nhập / xuất tủ đồ bằng CSV
+   ------------------------------------------------------------
+   Hai việc "lấy file" xếp cạnh nhau thành hai cột vì chúng ngang hàng và đều chỉ có một nút;
+   việc nhập được một khối riêng chiếm trọn dòng vì nó có ô chọn file, tùy chọn và báo cáo.
+   ============================================================ */
+
+.transfer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 620px) {
+  .transfer-grid { grid-template-columns: 1fr; }
+}
+
+.transfer-block {
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.transfer-block--import {
+  background: var(--cyan);
+}
+
+.transfer-title {
+  font-size: 14px;
+  margin: 0;
+}
+
+.transfer-hint {
+  font-size: 12.8px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Ô chọn file cao hơn input thường vì trình duyệt nhồi cả một cái nút vào trong nó */
+.transfer-file {
+  width: 100%;
+  padding: 9px 11px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.transfer-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 12.8px;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.transfer-check input {
+  margin-top: 2px;
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+}
+
+.transfer-result {
+  border-top: 2px dashed var(--ink);
+  margin-top: 16px;
+  padding-top: 14px;
+}
+
+.transfer-tally {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 11px;
+}
+
+.transfer-pill {
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 12.5px;
+  font-weight: 800;
+  background: var(--paper);
+  white-space: nowrap;
+}
+
+.transfer-pill--ok { background: var(--green); }
+.transfer-pill--bad { background: var(--orange); }
+
+/* Danh sách dòng có vấn đề: cuộn trong khung thay vì kéo dài modal ra vô tận */
+.transfer-problems {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.transfer-problem {
+  display: grid;
+  grid-template-columns: 82px minmax(90px, 1fr) 2fr;
+  gap: 10px;
+  align-items: baseline;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.transfer-problem.is-bad {
+  background: var(--orange);
+}
+
+@media (max-width: 560px) {
+  .transfer-problem { grid-template-columns: 1fr; gap: 2px; }
+}
+
+.transfer-problem-line {
+  font-family: var(--font-display);
+  font-weight: 900;
+}
+
+.transfer-problem-name,
+.transfer-problem-msg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transfer-problem-name { font-weight: 800; }

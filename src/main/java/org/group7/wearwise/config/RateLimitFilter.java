@@ -140,11 +140,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
     /**
      * Mọi đường dẫn nhận ảnh từ người dùng đều đẩy lên Cloudinary, bất kể ảnh đó rồi sẽ thành
      * món quần áo, ảnh cơ thể hay ảnh đại diện — nên chúng dùng chung một túi hạn mức.
+     *
+     * <p>Nhập CSV tủ đồ cũng nằm ở đây dù không gọi dịch vụ nào trả tiền: một lời gọi ghi tới 500
+     * dòng vào database, để nó rơi vào GENERAL là cho phép 240 lượt/phút từ một tài khoản.</p>
      */
     private static boolean isUpload(String path) {
         return path.startsWith("/api/images/")
                 || path.startsWith("/api/try-on/body-photo")
-                || path.startsWith("/api/auth/avatar");
+                || path.startsWith("/api/auth/avatar")
+                || path.startsWith("/api/wardrobe/import");
     }
 
     /** Ưu tiên tính theo tài khoản; chưa đăng nhập thì theo IP (xem {@link ClientIpResolver}). */

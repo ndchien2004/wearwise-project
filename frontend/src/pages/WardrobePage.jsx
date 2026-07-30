@@ -7,6 +7,7 @@ import ItemCard from '../components/ItemCard';
 import BulkScanModal from '../components/BulkScanModal';
 import ClosetSwitch from '../components/ClosetSwitch';
 import ItemFormModal from '../components/ItemFormModal';
+import WardrobeTransferModal from '../components/WardrobeTransferModal';
 import { Button, EmptyState, ErrorBanner, Field, Loading, Pagination, Toast } from '../components/ui';
 import { useConfirm } from '../context/ConfirmContext';
 import {
@@ -53,6 +54,7 @@ export default function WardrobePage() {
   const [archived, setArchived] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
   const [bulkScan, setBulkScan] = useState(false);
+  const [transfer, setTransfer] = useState(false);
   const [aiReady, setAiReady] = useState(false);
 
   // Các món đã từng thử đồ (để hiện badge "🪞 Đã thử" trên card).
@@ -254,6 +256,9 @@ export default function WardrobePage() {
       <div className="page-header">
         <ClosetSwitch />
         <div className="header-tools">
+          <Button onClick={() => setTransfer(true)} title="Nhập hoặc xuất tủ đồ bằng file CSV">
+            📁 Nhập / xuất
+          </Button>
           {aiReady && (
             <Button variant="purple" onClick={() => setBulkScan(true)}>
               📸 Quét nhiều món
@@ -403,6 +408,16 @@ export default function WardrobePage() {
             setBulkScan(false);
             await load();
             toastOk(`Đã thêm ${count} món vào tủ đồ! 🎉`);
+          }}
+        />
+      )}
+      {transfer && (
+        <WardrobeTransferModal
+          onClose={() => setTransfer(false)}
+          onImported={async (result) => {
+            // Modal vẫn mở để người dùng đọc báo cáo từng dòng; chỉ làm mới danh sách phía sau.
+            await load();
+            toastOk(`Đã nhập ${result.created} món vào tủ đồ! 🎉`);
           }}
         />
       )}

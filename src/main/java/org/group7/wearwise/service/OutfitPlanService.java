@@ -68,7 +68,7 @@ public class OutfitPlanService {
         String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
         AppUser owner = getOwner(normalizedOwnerUsername);
         Outfit outfit = outfitService.getOutfitById(normalizedOwnerUsername, outfitId);
-        assertOutfitUsable(outfit);
+        OutfitService.assertPlannable(outfit);
 
         LocalDate normalizedPlanDate = requirePlanDate(planDate);
         if (outfitPlanRepository.existsByOwner_UsernameAndPlanDateAndOutfit_Id(
@@ -91,7 +91,7 @@ public class OutfitPlanService {
         String normalizedOwnerUsername = normalizeOwnerUsername(ownerUsername);
         OutfitPlan plan = getPlanById(normalizedOwnerUsername, id);
         Outfit outfit = outfitService.getOutfitById(normalizedOwnerUsername, outfitId);
-        assertOutfitUsable(outfit);
+        OutfitService.assertPlannable(outfit);
 
         LocalDate normalizedPlanDate = requirePlanDate(planDate);
         if (outfitPlanRepository.existsByOwner_UsernameAndPlanDateAndOutfit_IdAndIdNot(
@@ -113,16 +113,6 @@ public class OutfitPlanService {
         );
     }
 
-    /** Không cho lên lịch một bộ đang thiếu món — tới ngày đó cũng không mặc được. */
-    private void assertOutfitUsable(Outfit outfit) {
-        if (!OutfitService.isAvailable(outfit)) {
-            throw new BusinessRuleException(
-                    ErrorCode.OUTFIT_INCOMPLETE,
-                    "Outfit \"" + outfit.getName() + "\" đang thiếu món do có món đã bị ẩn, "
-                            + "chưa lên lịch được. Hãy sửa outfit và thay bằng món khác."
-            );
-        }
-    }
 
     @Transactional
     public OutfitPlan completePlan(String ownerUsername, Long id) {
@@ -133,15 +123,23 @@ public class OutfitPlanService {
             return plan;
         }
 
+        LocalDateTime now = LocalDateTime.now();
+
         // Completing a future plan would stamp today onto lastWornAt and skew every wear statistic.
-        if (plan.getPlanDate().isAfter(LocalDate.now())) {
+        if (plan.getPlanDate().isAfter(now.toLocalDate())) {
             throw new BusinessRuleException(
                     ErrorCode.PLAN_NOT_DUE,
                     "Kế hoạch ngày " + plan.getPlanDate() + " chưa tới nên chưa đánh dấu đã mặc được."
             );
         }
 
-        outfitService.applyWear(normalizedOwnerUsername, plan.getOutfit().getId(), WearSource.PLAN, plan.getId());
+        // Ghi lượt mặc vào đúng NGÀY CỦA KẾ HOẠCH, không phải hôm nay: người dùng thường quên tick
+        // rồi vài hôm sau mới vào lịch tick bù, và khi đó nhật ký lẫn "Mặc gần đây" sẽ nói họ mặc
+        // bộ đó hôm nay. Giữ giờ hiện tại để thứ tự trong cùng một ngày vẫn hợp lý.
+        LocalDateTime wornAt = plan.getPlanDate().atTime(now.toLocalTime());
+
+        outfitService.applyWear(
+                normalizedOwnerUsername, plan.getOutfit().getId(), WearSource.PLAN, plan.getId(), wornAt);
 
         plan.setCompleted(true);
         plan.setCompletedAt(LocalDateTime.now());

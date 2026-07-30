@@ -33,6 +33,4 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, Long> {
     @Query("select event.action, count(event) from AuditEvent event "
             + "where event.occurredAt >= :since group by event.action")
     List<Object[]> countByActionSince(LocalDateTime since);
-
-    long countByActionAndOccurredAtAfter(AuditAction action, LocalDateTime after);
 }

@@ -22,8 +22,6 @@ public interface OutfitRepository extends JpaRepository<Outfit, Long>, JpaSpecif
     @EntityGraph(attributePaths = "clothingItems")
     List<Outfit> findAll(Specification<Outfit> specification);
 
-    boolean existsByOwner_UsernameAndClothingItems_Id(String username, Long clothingItemId);
-
     /** Các outfit đang chứa một món đồ — dùng khi cân nhắc xóa/ẩn món đó. */
     @EntityGraph(attributePaths = "clothingItems")
     List<Outfit> findByOwner_UsernameAndClothingItems_Id(String username, Long clothingItemId);

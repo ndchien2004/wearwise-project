@@ -64,6 +64,7 @@ Mở http://localhost:5173 — dev server proxy sẵn `/api` sang backend nên k
 | Gợi ý outfit theo thời tiết (Open-Meteo, không cần API key) | `/api/outfits/suggestions` | Gợi ý thời tiết |
 | Thống kê tủ đồ (phân bố, mặc nhiều nhất, lâu chưa mặc) | `/api/statistics` | Thống kê |
 | Lịch sử mặc theo ngày (mặc gì nhiều nhất trong tháng, số ngày có mặc) | `/api/statistics/history` | Trang chủ |
+| Nhập / xuất toàn bộ tủ đồ bằng CSV, có file mẫu | `/api/wardrobe/{export,template,import}` | Tủ đồ |
 | Chia sẻ outfit/món đồ sang tài khoản khác bằng mã 8 ký tự | `/api/shares` | Chia sẻ |
 | Vận hành: tài khoản, hạn mức, nhật ký kiểm toán (chỉ `ROLE_ADMIN`) | `/api/admin/*` | Quản trị |
 
@@ -250,6 +251,21 @@ chỉ là bản tóm tắt được cập nhật kèm theo.
 - Tài khoản có sẵn dữ liệu từ trước được dựng lại một dòng `LEGACY` tại `lastWornAt` ngay lần khởi
   động đầu tiên, nên hoàn tác và màn hình lịch sử vẫn có dữ liệu để đọc.
 
+### Nhập / xuất tủ đồ bằng CSV
+
+Trang **Tủ đồ** → **📁 Nhập / xuất**. Ba việc trong một hộp thoại: tải file mẫu, xuất tủ đồ hiện có,
+nhập từ file CSV.
+
+- File mẫu có dòng tiêu đề, hai dòng ví dụ và ghi chú giá trị hợp lệ của từng cột ngay trong file —
+  người dùng sửa file bằng Excel chứ không mở tài liệu.
+- Bản **xuất ra đúng định dạng file mẫu**, nên nhập lại được. Đó là điều kiện để dùng nó làm bản sao
+  lưu hoặc để sửa hàng loạt rồi nhập lại.
+- Bắt buộc bốn cột `name`, `category`, `season`, `style`; các cột còn lại để trống là dùng mặc định.
+  Cột được so khớp **theo tên tiêu đề**, không theo vị trí.
+- **Dòng sai không làm đổ cả file**: dòng hợp lệ vào tủ, dòng sai được báo kèm số dòng để mở Excel
+  sửa. Nộp lại file đã sửa thì phần đã vào được bỏ qua nhờ luật trùng tên (có ô tick để tắt).
+- Tối đa 500 dòng mỗi lần, file tối đa 1MB. Ảnh không nhập bằng file này — ảnh tải lên ở trang Tủ đồ.
+
 ### Logic gợi ý theo thời tiết
 
 Frontend lấy thời tiết hiện tại từ Open-Meteo (theo thành phố người dùng chọn), rồi gọi
@@ -258,6 +274,20 @@ Frontend lấy thời tiết hiện tại từ Open-Meteo (theo thành phố ng�
 - Nhiệt độ < 20°C → ưu tiên outfit mùa đông; ≥ 26°C → mùa hè; outfit quanh năm luôn được cộng nhẹ
 - Trời lạnh/mưa → cộng điểm outfit có áo khoác; trời mưa mà thiếu áo khoác → trừ điểm
 - Cộng điểm outfit yêu thích, outfit lâu chưa mặc, outfit có đủ đồ ở trạng thái sẵn sàng
+
+Chỉ những bộ **mặc được ngay hôm nay** được chấm điểm (xem *Bộ đồ "chưa mặc được"* ở trên), nên mọi
+bộ trong danh sách đều đã sẵn sàng.
+
+Trang hiển thị ba loại gợi ý trong **một vùng kết quả có tab**, không xếp dọc thành ba mục:
+
+| Tab | Trả lời | Tốn lượt AI? |
+|---|---|:---:|
+| ✨ Bộ phù hợp | Chấm điểm theo luật ở trên, có sẵn khi mở trang | không |
+| 🤖 AI chọn giúp | Gemini xếp thứ tự các bộ **đã có** kèm lý do từng bộ | có |
+| 🧩 AI phối bộ mới | Gemini ghép các món lẻ thành bộ chưa từng lưu | có |
+
+Hai tab AI chỉ chạy khi bấm nút, và kết quả được giữ trong `sessionStorage` để đi sang trang khác
+rồi quay lại không mất — mỗi lần chạy là một lượt gọi trả tiền trong hạn mức 40 lượt/giờ.
 
 ### Chia sẻ trang phục
 
@@ -273,7 +303,7 @@ cho khỏi đọc nhầm). Người nhận vào trang **Chia sẻ**, nhập mã,
 ## Test
 
 ```bash
-./mvnw test        # backend (275 tests)
+./mvnw test        # backend (306 tests)
 cd frontend && npm run check  # frontend: lint + smoke render + build
 ```
 

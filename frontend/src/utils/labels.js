@@ -97,8 +97,18 @@ export const SUGGESTION_REASON_LABELS = {
   FAVORITE: '⭐ Bộ yêu thích',
   NOT_RECENTLY_WORN: '🕐 Lâu rồi chưa mặc',
   ALL_ITEMS_AVAILABLE: '👍 Tất cả món đồ sẵn sàng',
-  ITEMS_UNAVAILABLE: '🚫 Có món đồ chưa sẵn sàng',
 };
+
+/**
+ * Những lý do là điểm trừ, tô đỏ trên thẻ gợi ý. Liệt kê thẳng tên hằng số thay vì đoán theo chuỗi
+ * con: cách cũ dò `includes('UNAVAILABLE')` nên "🥵 Áo khoác hơi nóng" — một điểm trừ thật — lại
+ * được tô xanh, còn nhánh `UNAVAILABLE` thì không bao giờ tới vì gợi ý đã lọc bộ mặc được.
+ */
+export const NEGATIVE_SUGGESTION_REASONS = new Set([
+  'SEASON_MISMATCH',
+  'NO_JACKET_IN_RAIN',
+  'JACKET_TOO_WARM',
+]);
 
 /**
  * Loại sự kiện trong nhật ký kiểm toán. Thứ tự khai báo cũng là thứ tự hiển thị trong dropdown

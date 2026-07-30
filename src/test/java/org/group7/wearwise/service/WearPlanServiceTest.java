@@ -156,6 +156,91 @@ class WearPlanServiceTest {
                 .hasMessageContaining("không có gì để lưu");
     }
 
+    /**
+     * Một ngày có thể có nhiều kế hoạch — trang Lịch cho thêm bao nhiêu bộ cũng được. Tick ghi đè
+     * là thay <b>cả ngày</b>; xóa đúng một bản thì ngày đó còn lại bộ cũ nằm cạnh bộ AI vừa thêm.
+     */
+    @Test
+    void replacingADayRemovesEveryPlanThatDayAlreadyHad() {
+        givenUser();
+        givenOutfit(1L, "Bộ công sở");
+        givenPlanSaved();
+        givenDaysSavedAsGiven();
+
+        OutfitPlan first = existingPlanOn(MONDAY);
+        OutfitPlan second = existingPlanOn(MONDAY);
+        second.setId(501L);
+        when(outfitPlanRepository.findAllByOwner_UsernameAndPlanDateBetween(eq(USERNAME), any(), any()))
+                .thenReturn(List.of(first, second));
+
+        wearPlanService.save(USERNAME, new SaveWearPlanRequest(
+                "Tuần công sở", "1 ngày", null, List.of(day(MONDAY, 1L, "AI đề xuất", true))));
+
+        verify(outfitPlanRepository).delete(first);
+        verify(outfitPlanRepository).delete(second);
+    }
+
+    /**
+     * Client gửi lại nguyên danh sách ngày nên nó là đầu vào không tin được. Hai dòng cùng ngày thì
+     * dòng sau tra vào bản đồ "ngày đã có gì" đã cũ, và ngày đó lặng lẽ nhận hai kế hoạch.
+     */
+    @Test
+    void twoEntriesForTheSameDayAreRejected() {
+        givenUser();
+
+        assertThatThrownBy(() -> wearPlanService.save(USERNAME, new SaveWearPlanRequest(
+                "Trùng ngày",
+                "2 dòng cùng ngày",
+                null,
+                List.of(
+                        day(MONDAY, 1L, "bộ A", false),
+                        day(MONDAY, 2L, "bộ B", false)
+                ))))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("nhiều lần");
+
+        verify(wearPlanRepository, never()).save(any());
+    }
+
+    /** Đủ số dòng nhưng rải ra hai năm thì thẻ "đợt đang chạy" ở trang chủ hiện suốt hai năm đó. */
+    @Test
+    void aBatchSpreadOverMoreThanTheCapIsRejected() {
+        givenUser();
+
+        assertThatThrownBy(() -> wearPlanService.save(USERNAME, new SaveWearPlanRequest(
+                "Rải rác",
+                "2 ngày cách nhau một năm",
+                null,
+                List.of(
+                        day(MONDAY, 1L, "hôm nay", false),
+                        day(MONDAY.plusYears(1), 2L, "sang năm", false)
+                ))))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("liền nhau");
+
+        verify(wearPlanRepository, never()).save(any());
+    }
+
+    /**
+     * {@code outfitId} đến thẳng từ client, không phải từ bản xem trước server đã lọc — nên đường
+     * lưu kế hoạch phải tự kiểm tra cùng luật với lịch tự đặt tay, nếu không bộ thiếu món vẫn vào
+     * được lịch và người dùng chỉ biết khi bấm "Đã mặc".
+     */
+    @Test
+    void anOutfitMissingAnArchivedItemCannotBeSavedIntoTheCalendar() {
+        givenUser();
+        givenPlanSaved();
+        givenNoExistingPlans();
+        givenOutfitWithArchivedItem(3L, "Bộ thiếu món");
+
+        assertThatThrownBy(() -> wearPlanService.save(USERNAME, new SaveWearPlanRequest(
+                "Bộ hỏng", "1 ngày", null, List.of(day(MONDAY, 3L, "AI đề xuất", false)))))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("thiếu món");
+
+        verify(outfitPlanRepository, never()).save(any());
+    }
+
     @Test
     void plansLongerThanTheCapAreRejected() {
         givenUser();
@@ -193,6 +278,22 @@ class WearPlanServiceTest {
         item.setStatus(ClothingStatus.AVAILABLE);
         item.setCondition(ClothingCondition.GOOD);
         outfit.setClothingItems(new LinkedHashSet<>(List.of(item)));
+
+        when(outfitService.getOutfitById(anyString(), eq(id))).thenReturn(outfit);
+    }
+
+    /** Bộ có một món đã bị ẩn — {@code isAvailable} false, không lên lịch được. */
+    private void givenOutfitWithArchivedItem(Long id, String name) {
+        Outfit outfit = new Outfit();
+        outfit.setId(id);
+        outfit.setName(name);
+
+        ClothingItem archived = new ClothingItem();
+        archived.setName("Áo đã ẩn");
+        archived.setStatus(ClothingStatus.AVAILABLE);
+        archived.setCondition(ClothingCondition.GOOD);
+        archived.setArchivedAt(java.time.LocalDateTime.now());
+        outfit.setClothingItems(new LinkedHashSet<>(List.of(archived)));
 
         when(outfitService.getOutfitById(anyString(), eq(id))).thenReturn(outfit);
     }

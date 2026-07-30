@@ -240,9 +240,8 @@ public class WearPlanService {
             throw new AiUnavailableException("AI trả về dữ liệu không đọc được. Vui lòng thử lại.");
         }
 
-        Map<LocalDate, OutfitPlan> existingByDate = new HashMap<>();
-        outfitPlanRepository.findAllByOwner_UsernameAndPlanDateBetween(username, startDate, endDate)
-                .forEach(plan -> existingByDate.put(plan.getPlanDate(), plan));
+        Map<LocalDate, List<OutfitPlan>> existingByDate =
+                groupByDate(outfitPlanRepository.findAllByOwner_UsernameAndPlanDateBetween(username, startDate, endDate));
 
         List<WearPlanPreviewResponse.Day> parsed = new ArrayList<>();
 
@@ -260,13 +259,18 @@ public class WearPlanService {
                 continue;
             }
 
-            OutfitPlan existing = existingByDate.get(date);
+            // Một ngày có thể có nhiều kế hoạch (trang Lịch cho thêm bao nhiêu bộ cũng được), nên
+            // phải kể tên hết: nói "ngày này đã có Bộ A" rồi xóa cả Bộ B khi người dùng tick ghi
+            // đè là xóa thứ họ không được cảnh báo.
+            List<OutfitPlan> existing = existingByDate.getOrDefault(date, List.of());
             parsed.add(new WearPlanPreviewResponse.Day(
                     date,
                     OutfitResponse.from(outfit),
                     node.path("reason").asText(""),
-                    existing == null ? null : existing.getId(),
-                    existing == null ? null : existing.getOutfit().getName()
+                    existing.isEmpty() ? null : existing.get(0).getId(),
+                    existing.isEmpty() ? null : existing.stream()
+                            .map(plan -> plan.getOutfit().getName())
+                            .collect(java.util.stream.Collectors.joining(", "))
             ));
         }
 
@@ -311,12 +315,38 @@ public class WearPlanService {
                     ErrorCode.INVALID_REQUEST, "Mỗi đợt kế hoạch tối đa " + WearPlan.MAX_DAYS + " ngày.");
         }
 
+        // Client gửi lại nguyên danh sách ngày nên đây là đầu vào không tin được, khác với bản xem
+        // trước do server tự sinh (bản đó đã lọc trùng ngày). Hai dòng cùng ngày thì dòng sau tra
+        // vào bản đồ "ngày đã có gì" đã cũ, và ngày đó lặng lẽ nhận hai kế hoạch.
+        List<LocalDate> duplicateDates = days.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        SaveWearPlanRequest.Day::date, java.util.stream.Collectors.counting()))
+                .entrySet().stream()
+                .filter(entry -> entry.getValue() > 1)
+                .map(Map.Entry::getKey)
+                .sorted()
+                .toList();
+
+        if (!duplicateDates.isEmpty()) {
+            throw new BusinessRuleException(
+                    ErrorCode.INVALID_REQUEST,
+                    "Mỗi ngày chỉ được một bộ trong cùng một đợt, nhưng ngày " + duplicateDates.get(0)
+                            + " xuất hiện nhiều lần.");
+        }
+
         LocalDate start = days.get(0).date();
         LocalDate end = days.get(days.size() - 1).date();
 
-        Map<LocalDate, OutfitPlan> existingByDate = new HashMap<>();
-        outfitPlanRepository.findAllByOwner_UsernameAndPlanDateBetween(username, start, end)
-                .forEach(plan -> existingByDate.put(plan.getPlanDate(), plan));
+        // Số ngày đúng hạn mức nhưng rải ra hai năm thì thẻ "đợt đang chạy" ở trang chủ hiện suốt
+        // hai năm đó — khoảng ngày mới là thứ quyết định đợt nào còn hiệu lực, không phải số dòng.
+        if (start.plusDays(WearPlan.MAX_DAYS - 1L).isBefore(end)) {
+            throw new BusinessRuleException(
+                    ErrorCode.INVALID_REQUEST,
+                    "Một đợt kế hoạch phải nằm trong " + WearPlan.MAX_DAYS + " ngày liền nhau.");
+        }
+
+        Map<LocalDate, List<OutfitPlan>> existingByDate =
+                groupByDate(outfitPlanRepository.findAllByOwner_UsernameAndPlanDateBetween(username, start, end));
 
         WearPlan plan = wearPlanRepository.save(WearPlan.builder()
                 .owner(owner)
@@ -330,18 +360,23 @@ public class WearPlanService {
         List<OutfitPlan> saved = new ArrayList<>();
 
         for (SaveWearPlanRequest.Day day : days) {
-            OutfitPlan existing = existingByDate.get(day.date());
+            List<OutfitPlan> existing = existingByDate.getOrDefault(day.date(), List.of());
 
             // Không tick ghi đè mà ngày đó đã có kế hoạch thì bỏ qua — kế hoạch người dùng tự đặt
             // không bao giờ bị xóa mà không có lệnh rõ ràng.
-            if (existing != null && !day.replaceExisting()) {
+            if (!existing.isEmpty() && !day.replaceExisting()) {
                 continue;
             }
-            if (existing != null) {
-                outfitPlanRepository.delete(existing);
-            }
+            // Ghi đè là thay cả ngày: xóa mọi kế hoạch của ngày đó, không chỉ một. Xóa đúng một
+            // bản thì ngày đó còn lại bộ cũ nằm cạnh bộ AI vừa thêm, trong khi người dùng tick
+            // "thay" với ý là ngày này chỉ còn bộ mới.
+            existing.forEach(outfitPlanRepository::delete);
 
             Outfit outfit = outfitService.getOutfitById(username, day.outfitId());
+            // Cùng luật với lịch tự đặt tay: bộ thiếu món thì không vào lịch được. outfitId đến
+            // thẳng từ client nên không thể tin là nó nằm trong danh sách bản xem trước đã lọc.
+            OutfitService.assertPlannable(outfit);
+
             saved.add(outfitPlanRepository.save(OutfitPlan.builder()
                     .owner(owner)
                     .outfit(outfit)
@@ -397,6 +432,17 @@ public class WearPlanService {
         WearPlan plan = findOwned(username, id);
         outfitPlanRepository.deleteAll(outfitPlanRepository.findAllByWearPlan_IdOrderByPlanDateAsc(plan.getId()));
         wearPlanRepository.delete(plan);
+    }
+
+    /**
+     * Kế hoạch của một khoảng ngày, nhóm theo ngày. Trả về <b>danh sách</b> chứ không phải một bản
+     * duy nhất cho mỗi ngày: trang Lịch cho phép thêm nhiều bộ vào cùng một ngày, và một bản đồ
+     * một-một sẽ âm thầm giữ lại đúng bản cuối cùng rồi bỏ quên phần còn lại.
+     */
+    private static Map<LocalDate, List<OutfitPlan>> groupByDate(List<OutfitPlan> plans) {
+        Map<LocalDate, List<OutfitPlan>> byDate = new HashMap<>();
+        plans.forEach(plan -> byDate.computeIfAbsent(plan.getPlanDate(), date -> new ArrayList<>()).add(plan));
+        return byDate;
     }
 
     private WearPlan findOwned(String username, Long id) {
