@@ -214,7 +214,20 @@ phát hành được token cho mọi tài khoản.
 openssl rand -base64 48        # sinh khóa, đặt vào WEARWISE_AUTH_TOKEN_SECRET
 ```
 
-Chỉ profile `dev`/`test`/`local` mới được dùng khóa dùng chung trong `application-dev.properties`.
+```powershell
+# Windows PowerShell
+$b = New-Object byte[] 48
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+[Convert]::ToBase64String($b)
+```
+
+Chỉ profile `dev`/`test`/`local` mới được dùng khóa dùng chung trong `application-dev.properties`;
+`AuthTokenService` từ chối khởi động nếu thấy đúng khóa đó ngoài ba profile này. Chốt đó so sánh
+**theo chuỗi**, nên khóa trong file dev phải trùng khít hằng số `AuthTokenService.DEV_ONLY_SECRET` —
+có test canh việc này, đừng đổi một chỗ rồi bỏ chỗ kia.
+
+Lưu ý giới hạn: chốt trên **không** chặn được việc deploy production mà bật `spring.profiles.active=dev`.
+Bản `java -jar` không tự bật profile nào, nên đừng thêm nó vào lệnh khởi chạy ở môi trường thật.
 
 > Gặp lỗi *"Chưa cấu hình wearwise.auth.token-secret"* khi chạy cục bộ? Gần như chắc chắn là
 > profile `dev` chưa bật — xem [phần chạy backend](#2-backend-cổng-8080). Khóa nằm trong
@@ -305,7 +318,7 @@ cho khỏi đọc nhầm). Người nhận vào trang **Chia sẻ**, nhập mã,
 ## Test
 
 ```bash
-./mvnw test        # backend (306 tests)
+./mvnw test        # backend (307 tests)
 cd frontend && npm run check  # frontend: lint + smoke render + build
 ```
 
@@ -317,7 +330,7 @@ cd frontend && npm run check  # frontend: lint + smoke render + build
 |---|---|---|
 | `backend` | `./mvnw test` trên **JDK 17** | Không phải 21, để một API chỉ có từ Java 21 bị chặn tại đây thay vì lọt tới lúc deploy |
 | `frontend` | `npm ci` + `npm run check` | `npm ci` theo đúng lockfile; `npm install` sẽ âm thầm nâng cấp và CI không còn kiểm chứng cây phụ thuộc thật |
-| `migration` | Dựng MySQL 8.4 trống, `package` rồi khởi động jar trên đó | Đây là thứ 306 test **không** kiểm được: test chạy H2 với Flyway tắt nên không file `.sql` nào được thi hành. Khởi động được = migration đúng **và** khớp entity (`ddl-auto=validate`) |
+| `migration` | Dựng MySQL 8.4 trống, `package` rồi khởi động jar trên đó | Đây là thứ 307 test **không** kiểm được: test chạy H2 với Flyway tắt nên không file `.sql` nào được thi hành. Khởi động được = migration đúng **và** khớp entity (`ddl-auto=validate`) |
 
 Không cần secret nào: `spring.config.import=optional:application-secrets.properties` cho phép thiếu
 file khóa thật, và cấu hình test tự đặt `token-secret`. Nhờ vậy CI cũng xanh trên fork.

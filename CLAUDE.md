@@ -17,7 +17,7 @@ lên lịch mặc theo ngày, nhận gợi ý theo thời tiết, thử đồ �
 | Backend | Spring Boot 4.0.6, Java 17 (JDK cài sẵn là 21 — **đừng dùng API Java 21** như `Math.clamp`) |
 | Database | MySQL 8.4 qua Docker; schema quản lý bằng Flyway |
 | Frontend | React 18 + Vite 5, JavaScript thuần (không TypeScript), CSS tự viết theo phong cách neobrutalism |
-| Test | JUnit 5 + Mockito + AssertJ, chạy trên H2. 306 test, tất cả phải xanh |
+| Test | JUnit 5 + Mockito + AssertJ, chạy trên H2. 307 test, tất cả phải xanh |
 | Dịch vụ ngoài | Cloudinary (ảnh), Google Gemini (nhận diện + gợi ý), tryon-api.com (thử đồ ảo), Open-Meteo (thời tiết, không cần key) |
 
 Quy mô: ~170 file Java (+33 file test), ~65 file JS/JSX. Đây là đồ án nhóm nhưng được xây theo chuẩn
@@ -47,7 +47,7 @@ chứ không phải khóa sai.
 **Kiểm tra trước khi báo xong việc:**
 
 ```bash
-./mvnw test                      # backend — phải 306/306 xanh
+./mvnw test                      # backend — phải 307/307 xanh
 cd frontend && npm run check     # lint + smoke + build, cả ba phải sạch
 ```
 
@@ -157,10 +157,33 @@ trang: một file trang export ba component là chỗ người sau tìm mãi kh�
 
 ### 4.3 Khóa ký JWT
 
-Không có giá trị mặc định trong `application.properties`. `AuthTokenService` từ chối khởi động khi:
-thiếu khóa, khóa ngắn hơn 32 ký tự, hoặc dùng khóa dev (`DEV_ONLY_SECRET`) ngoài profile
-`dev`/`test`/`local`. Hỏng lúc khởi động rõ ràng hơn nhiều so với một hệ thống chạy êm mà không có
-xác thực thật.
+Không có giá trị mặc định trong `application.properties` — đặt mặc định ở đó nghĩa là mọi bản deploy
+quên đổi khóa đều ký token bằng một chuỗi công khai trên GitHub, mà vẫn chạy êm nên không ai phát
+hiện. `AuthTokenService` từ chối khởi động khi: thiếu khóa, khóa ngắn hơn 32 ký tự, hoặc dùng khóa
+dev (`DEV_ONLY_SECRET`) ngoài profile `dev`/`test`/`local`. Hỏng lúc khởi động rõ ràng hơn nhiều so
+với một hệ thống chạy êm mà không có xác thực thật.
+
+**Chốt thứ ba so sánh theo chuỗi, nên nó chỉ có tác dụng khi khóa trong
+`application-dev.properties` trùng khít hằng số `DEV_ONLY_SECRET`.** Hai bên từng lệch nhau — hằng
+số là `wearwise-local-development-secret-...` còn file dev chứa một chuỗi base64 khác — nên chốt
+**không bao giờ kích hoạt cho khóa dự án thật sự dùng**. Hai unit test của chốt vẫn xanh suốt vì
+chúng tự truyền hằng số vào, tức xanh mà chẳng bảo vệ gì. Đã sửa cho khớp và thêm
+`AuthTokenServiceTest.theDevKeyOnDiskMustMatchTheGuardedConstant()` đọc thẳng file trên classpath để
+canh: **đổi một bên mà quên bên kia là test đỏ ngay.** Đừng gỡ test đó, và đừng đổi khóa dev ở một
+chỗ duy nhất.
+
+**Cái chốt này KHÔNG chặn được** trường hợp deploy production mà bật `--spring.profiles.active=dev`:
+khi đó profile dev đang bật nên điều kiện không thỏa, và ứng dụng chạy bằng khóa công khai. Hiện chỉ
+có quy ước (`java -jar` không tự bật profile nào) và ghi chú trong `application-dev.properties` giữ
+việc này. Muốn chặn bằng code thì cần thêm một cờ riêng kiểu `wearwise.allow-dev-profile`.
+
+Sinh khóa cho môi trường thật: `openssl rand -base64 48`, hoặc trên PowerShell:
+
+```powershell
+$b = New-Object byte[] 48
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+[Convert]::ToBase64String($b)
+```
 
 ### 4.4 Giới hạn tần suất
 
@@ -540,7 +563,7 @@ gọi `fetch` trực tiếp ở component.
 Ba job trong `.github/workflows/ci.yml` chạy đúng hai lệnh dưới đây cộng thêm bước kiểm migration.
 CI không cần secret nào (xem đầu file workflow), nên nó cũng xanh trên fork và trong pull request.
 
-1. `./mvnw test` — 306/306 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
+1. `./mvnw test` — 307/307 xanh (con số này tăng khi thêm test; cập nhật lại README và file này).
 2. `cd frontend && npm run check` — lint + smoke + build, cả ba phải sạch.
 3. Sửa entity → đã có migration tương ứng chưa? Đã chạy thử trên DB trống chưa?
 4. Thêm endpoint gọi dịch vụ trả tiền → đã xếp vào `TRY_ON`/`UPLOAD` trong `groupOf()` chưa?

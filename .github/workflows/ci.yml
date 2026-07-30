@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend — 306 test trên H2
+    name: Backend — 307 test trên H2
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -81,7 +81,7 @@ jobs:
     name: Migration trên MySQL trống
     runs-on: ubuntu-latest
 
-    # Đây là thứ 306 test KHÔNG kiểm được: test chạy H2 với `spring.flyway.enabled=false` và schema
+    # Đây là thứ 307 test KHÔNG kiểm được: test chạy H2 với `spring.flyway.enabled=false` và schema
     # do Hibernate dựng từ entity, nên không file .sql nào được thi hành. Trước đây việc này chỉ
     # được kiểm bằng tay theo hướng dẫn ở mục 7 CLAUDE.md — tức là thường không ai kiểm.
     #
